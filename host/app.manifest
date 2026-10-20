@@ -13,7 +13,7 @@
     </security>
   </trustInfo>
 
-  <!-- 声明受支持的 Windows 版本：系统不再按「兼容模式」加载本程序。 -->
+ <!-- Declaring supported Windows versions: The system no longer loads this program in 'compatibility mode'. -->
   <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
     <application>
       <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
