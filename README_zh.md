@@ -4,7 +4,7 @@
 
 Windows 桌面端五子棋 / 连珠助手。它会**直接读你正在对弈的那盘棋**——任何第三方客户端、网页棋盘或模拟器都行——把局面同步到内部小棋盘，交给随包的 Rapfi 引擎思考，必要时替你落子。本仓库是**连线（识图）版**：屏幕取像 + 置顶小窗 + 模拟点击，不接触对方程序的任何内部接口。
 
-![主界面](docs/images/main.png)
+![主界面](docs/images_zh/main.png)
 
 > 📄 **可打印的双语说明（PDF，48 页）：** [docs/Meter-Gomoku-Manual.pdf](docs/Meter-Gomoku-Manual.pdf)
 
@@ -37,7 +37,7 @@ Windows 桌面端五子棋 / 连珠助手。它会**直接读你正在对弈的�
 
 ## 三、主界面
 
-![主界面](docs/images/main.png)
+![主界面](docs/images_zh/main.png)
 
 | 区域 | 内容 |
 |---|---|
@@ -49,7 +49,7 @@ Windows 桌面端五子棋 / 连珠助手。它会**直接读你正在对弈的�
 
 ### 对局设置
 
-![对局设置卡](docs/images/setup.png)
+![对局设置卡](docs/images_zh/setup.png)
 
 * **模式** —— 对弈 / 摆盘 / 残局。
 * **AI 执子** —— 黑 / 白；两个都不开就是你自己下两边。
@@ -61,7 +61,7 @@ Windows 桌面端五子棋 / 连珠助手。它会**直接读你正在对弈的�
 
 ### 计算评估
 
-![计算评估卡](docs/images/analysis.png)
+![计算评估卡](docs/images_zh/analysis.png)
 
 | 功能 | 作用 |
 |---|---|
@@ -77,7 +77,7 @@ Windows 桌面端五子棋 / 连珠助手。它会**直接读你正在对弈的�
 
 ### 引擎仪表盘
 
-![引擎仪表盘](docs/images/engine.png)
+![引擎仪表盘](docs/images_zh/engine.png)
 
 `深度` · `速度`（节点/秒） · `节点` · `用时`（分析计算模式下跨轮累加） · `评估`（正数对行棋方有利） · `最佳`。任何计算期间这些数值都会边算边跳，是判断「引擎有没有在干活」最快的地方。
 
@@ -85,7 +85,7 @@ Windows 桌面端五子棋 / 连珠助手。它会**直接读你正在对弈的�
 
 ## 四、识图
 
-![识图窗](docs/images/vision.png)
+![识图窗](docs/images_zh/vision.png)
 
 顶栏点 **识图** 打开。它把一张截图变成局面代码。
 
@@ -115,7 +115,7 @@ Windows 桌面端五子棋 / 连珠助手。它会**直接读你正在对弈的�
 
 ## 五、连线模式
 
-![连线窗](docs/images/link.png)
+![连线窗](docs/images_zh/link.png)
 
 连线窗是独立的顶层窗口，304×712，永远置顶。识别与 AI 的全部工作都在这里；主窗只做同步显示。
 
@@ -163,7 +163,7 @@ Windows 桌面端五子棋 / 连珠助手。它会**直接读你正在对弈的�
 
 ## 六、连线窗里的识别参数
 
-![识别参数](docs/images/link-params.png)
+![识别参数](docs/images_zh/link-params.png)
 
 点一下就把按键区换成 6 项阈值，统计行腾空，下方文本框改成逐条参数说明。
 

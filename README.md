@@ -1,6 +1,6 @@
 # Meter Gomoku — Line Version
 
-**English** | [中文](README_zh.md)
+**English** | [Chinese](README_zh.md)
 
 A Windows desktop assistant for Gomoku / Renju. It **reads the board you are already playing on** — any third-party client, web board or emulator — keeps a mirror of the position, asks the bundled Rapfi engine for the best move, and can play it for you. This repository is the **Line (screen-recognition) version**: screen capture + always-on-top overlay + simulated clicks. It is not a stand-alone trainer.
 
@@ -27,11 +27,11 @@ A Windows desktop assistant for Gomoku / Renju. It **reads the board you are alr
 
 1. Run `Release/Meter Gomoku_Setup4.42.exe` and finish the installer.
 2. Start the app, then open your Gomoku client (or a web board) and get to the game screen.
-3. In the main window click **连线 / Link** in the top bar — a small window appears.
-4. Click **框选棋盘 / Frame Board** and drag a rectangle around the board *including its outer border*.
-5. Choose **AI 执黑 / AI 执白** (the side the engine plays), the rule and the thinking time, then switch on **自动落子 / Auto Drop**.
+3. In the main window click **Link** in the top bar — a small window appears.
+4. Click **Frame Board** and drag a rectangle around the board *including its outer border*.
+5. Choose **AI Black / AI White** (the side the engine plays), the rule and the thinking time, then switch on **Auto Drop**.
 
-The mirror board in the link window starts following the game immediately. If your client ignores simulated clicks, turn on **真实点击 / Real Click** (it borrows the physical cursor — see §5).
+The mirror board in the link window starts following the game immediately. If your client ignores simulated clicks, turn on **Real Click** (it borrows the physical cursor — see §5).
 
 ---
 
@@ -41,20 +41,20 @@ The mirror board in the link window starts following the game immediately. If yo
 
 | Area | What is there |
 |---|---|
-| **Top bar** | 连线 (open the link window) · 识图 (screen recognition) · 复盘 (review) · 历史 (history) · 关于 (about) · EN/中 (language) · 颜色 (palette) |
+| **Top bar** | Link (opens the link window) · Recognition (screen recognition) · Review · History · About · Language (toggles the UI between English and Chinese) · Palette |
 | **Left dock** | Engine dashboard (depth / speed / nodes / time / eval / best move) and the evaluation curve (black and white series, vertical axis auto-scales to about ±1200) |
 | **Board** | 15×15 board with coordinates on all four sides and a continue/pause key in the middle. Analysis marks are drawn straight on it |
-| **Right dock** | Cards: 对局设置 (game setup), 计算评估 (calculation & evaluation), 引擎仪表盘 (engine dashboard). Drag by the title bar to reorder, fold with the small dash, close with ✕. The layout is remembered |
-| **Bottom bar** | 分析计算 (live analysis) · ◀ ▶ (step through moves) · 重新开始 · 保存局面 · undo / redo / swap colours · AI 执子 (AI-side popover) · 设置 (add a card) |
+| **Right dock** | Cards: Game setup, Calculation & evaluation, Engine dashboard. Drag by the title bar to reorder, fold with the small dash, close with ✕. The layout is remembered |
+| **Bottom bar** | Live analysis · ◀ ▶ (step through moves) · Restart · Save position · undo / redo / swap colours · AI side (popover) · Settings (add a card) |
 
 ### Game setup
 
 ![Game setup card](docs/images/setup.png)
 
-* **Mode** — 对弈 (play) · 摆盘 (place stones) · 残局 (endgame problem).
-* **AI side** — 黑 / 白; both switches off means you play both sides.
+* **Mode** — Play · Place stones · Endgame problem.
+* **AI side** — Black / White; both switches off means you play both sides.
 * **Think time** — 0.2 s to 300 s. The same value is used by the link window; the two are always in step.
-* **Rule** — 无禁手 (freestyle) · 无禁手 · 长连不赢 (overline does not win) · 连珠 (Renju, forbidden moves).
+* **Rule** — Freestyle · Overline (a six-in-a-row does not win) · Renju (forbidden moves).
 * **Engine** — thread count and hash size. The maximum thread count is chosen from the real topology (physical cores minus two, so recognition and the system keep breathing room); hash is memory-adaptive. Both are persisted, so the next launch starts where you left off.
 * **Board display** — move numbers on stones, hover preview box.
 * **Position code** — copy / paste / load the whole position as one string.
@@ -65,15 +65,15 @@ The mirror board in the link window starts following the game immediately. If yo
 
 | Function | What it does |
 |---|---|
-| **计算 / Calc** | One deep search of the current position; the best point is marked on the board. The key toggles to 停止计算 |
-| **多点分析 / Multi-point** | Returns *N* candidates (2–8, default 4); each ring carries its rank and score |
-| **平衡点 / Balance** | Runs the engine's native **paired** balance search and returns points where neither side has a clear edge, together with the balance engine's own score. `\|eval\| ≤ 50` is what counts as balanced (ScalingFactor = 200, so win rate = sigmoid(eval/200)) |
-| **点数 / Points** | How many balance points to return (1–6). An empty board is fixed at 3 — Black 1 at the centre, White 2 and Black 3 given jointly by one paired search |
-| **扫描防守 / Defend scan** | Scores every empty point in a 9×9 neighbourhood: **W = moves to win, L = moves to lose**, badge colour runs from teal (safe) to red (dangerous). Re-scans automatically after each move |
-| **前瞻 / Lookahead, VCF, VCT** | Forced-line tools. Lookahead plays the position forward until five in a row actually appears; VCF only uses consecutive fours; VCT adds live threes |
-| **教练 / Coach** | Four-colour square hints while it is your turn (best / good / fair / poor); they vanish when you move |
-| **分析计算 / Live analysis** | Keeps deepening in the background and lays out the engine's current list; your move or undo restarts the session |
-| **清除标记 / Clear marks** | Erases every mark this card leaves on the board, without touching the position |
+| **Calc** | One deep search of the current position; the best point is marked on the board. The key toggles to Stop |
+| **Multi-point** | Returns *N* candidates (2–8, default 4); each ring carries its rank and score |
+| **Balance** | Runs the engine's native **paired** balance search and returns points where neither side has a clear edge, together with the balance engine's own score. `\|eval\| ≤ 50` is what counts as balanced (ScalingFactor = 200, so win rate = sigmoid(eval/200)) |
+| **Points** | How many balance points to return (1–6). An empty board is fixed at 3 — Black 1 at the centre, White 2 and Black 3 given jointly by one paired search |
+| **Defend scan** | Scores every empty point in a 9×9 neighbourhood: **W = moves to win, L = moves to lose**, badge colour runs from teal (safe) to red (dangerous). Re-scans automatically after each move |
+| **Lookahead, VCF, VCT** | Forced-line tools. Lookahead plays the position forward until five in a row actually appears; VCF only uses consecutive fours; VCT adds live threes |
+| **Coach** | Four-colour square hints while it is your turn (best / good / fair / poor); they vanish when you move |
+| **Live analysis** | Keeps deepening in the background and lays out the engine's current list; your move or undo restarts the session |
+| **Clear marks** | Erases every mark this card leaves on the board, without touching the position |
 
 ### Engine dashboard
 
@@ -83,19 +83,19 @@ The mirror board in the link window starts following the game immediately. If yo
 
 ---
 
-## 4. Screen recognition (识图)
+## 4. Screen recognition
 
 ![Recognition window](docs/images/vision.png)
 
-Open it from **识图** in the top bar. It turns a screenshot into a position code.
+Open it from **Recognition** in the top bar. It turns a screenshot into a position code.
 
-1. **上传图片 / Upload** (multi-select, up to 150) or **屏幕截图 / Screenshot** to capture a region.
-2. **裁剪 / Crop** — the crop box snaps to the board and leaves about 1/30 of the board as margin, so the outermost stone stays complete.
-3. **识别 / Recognize** — the result becomes a position code that can be copied, or loaded straight into practice.
-4. **修改 / Edit** — swap Black and White (click one of each), delete stones, add Black or White stones; `Ctrl+Z` undoes.
-5. **VC 模式 / VC mode** — for mate problems: Black and White counts may differ, adding stones is unlimited, and loading it switches to Endgame mode with the attacking side preset.
+1. **Upload** (multi-select, up to 150) or **Screenshot** to capture a region.
+2. **Crop** — the crop box snaps to the board and leaves about 1/30 of the board as margin, so the outermost stone stays complete.
+3. **Recognize** — the result becomes a position code that can be copied, or loaded straight into practice.
+4. **Edit** — swap Black and White (click one of each), delete stones, add Black or White stones; `Ctrl+Z` undoes.
+5. **VC mode** — for mate problems: Black and White counts may differ, adding stones is unlimited, and loading it switches to Endgame mode with the attacking side preset.
 
-**识别参数 / Recog Params** lays six thresholds directly on the panel and applies them while you drag:
+**Recog Params** lays six thresholds directly on the panel and applies them while you drag:
 
 | Parameter | Meaning |
 |---|---|
@@ -121,17 +121,17 @@ The link window is a separate top-level window, 304×712, always on top. It does
 
 | Control | What it does |
 |---|---|
-| **规则三键** | Freestyle / Overline / Renju — switches the endgame and forbidden-move rules used by the link window |
-| **框选棋盘 / Frame Board** | Drag a rectangle over the board on screen; recognition starts once the frame is set |
-| **识别参数 / Recog Params** | Swaps the button area for the six thresholds, applied live (see §6) |
-| **真实点击 / Real Click** | Uses the physical mouse cursor. **Off by default** — only needed for clients that accept nothing but real mouse input. While on it takes over your cursor |
-| **自动落子 / Auto Drop** | Thinks as soon as the opponent's move is seen and plays for you |
+| **Rule buttons** | Freestyle / Overline / Renju — switches the endgame and forbidden-move rules used by the link window |
+| **Frame Board** | Drag a rectangle over the board on screen; recognition starts once the frame is set |
+| **Recog Params** | Swaps the button area for the six thresholds, applied live (see §6) |
+| **Real Click** | Uses the physical mouse cursor. **Off by default** — only needed for clients that accept nothing but real mouse input. While on it takes over your cursor |
+| **Auto Drop** | Thinks as soon as the opponent's move is seen and plays for you |
 | **×1 / ×2 / ×3** | Clicks per move |
-| **AI 执黑 / AI 执白** | Mutually exclusive; the choice is mirrored into the main window immediately |
-| **思考时间 / Think time** | 0.2–300 s, one shared value |
-| **交换平衡点 / Swap Balance** | Opening balance points (see below) |
-| **交换评估 / Swap Eval** | Independent of the above: scores the current swap position with the *playing* engine, to help you decide whether swapping is worth it |
-| **取消 / Cancel** | Stops an in-flight balance / evaluation and clears the marks already drawn |
+| **AI Black / AI White** | Mutually exclusive; the choice is mirrored into the main window immediately |
+| **Think time** | 0.2–300 s, one shared value |
+| **Swap Balance** | Opening balance points (see below) |
+| **Swap Eval** | Independent of the above: scores the current swap position with the *playing* engine, to help you decide whether swapping is worth it |
+| **Cancel** | Stops an in-flight balance / evaluation and clears the marks already drawn |
 
 ### Status area
 
@@ -157,7 +157,7 @@ On an **empty board** the app uses the official opening book: the engine returns
 | 3 stones (5 moves) | 2 | 1 Black, 1 White | One **paired** balance search returns both points together |
 | More than 5 stones | — | — | Past the swap window; the app says so |
 
-Marks live inside the recognition frame: blue/purple rings with a number for the order of play, and they disappear once you have played those stones. Pressing **交换平衡点** cancels any selected AI side (they would interfere); if Auto Drop is on, the points are played in order automatically.
+Marks live inside the recognition frame: blue/purple rings with a number for the order of play, and they disappear once you have played those stones. Pressing **Swap Balance** cancels any selected AI side (they would interfere); if Auto Drop is on, the points are played in order automatically.
 
 ---
 
@@ -168,9 +168,9 @@ Marks live inside the recognition frame: blue/purple rings with a number for the
 One click replaces the button area with the six thresholds; the statistics row folds away and the text box below explains each parameter.
 
 * Dragging or typing applies the value **immediately** and also saves it, so the next launch remembers it.
-* **通用 / General** loads the defaults (200 / 50 / 96 / 33 / 96 / 33) — good for most boards.
-* **存档 / Save** and **读档 / Load** store the six values under a name (up to 50 presets, drawer with Load / All / Delete / Undo).
-* **应用 / Apply** saves and folds the panel; **取消 / Cancel** restores the values that were last applied, in the page *and* in the host.
+* **General** loads the defaults (200 / 50 / 96 / 33 / 96 / 33) — good for most boards.
+* **Save** and **Load** store the six values under a name (up to 50 presets, drawer with Load / All / Delete / Undo).
+* **Apply** saves and folds the panel; **Cancel** restores the values that were last applied, in the page *and* in the host.
 
 ---
 
@@ -178,9 +178,9 @@ One click replaces the button area with the six thresholds; the statistics row f
 
 | Rule | Five in a row | Forbidden |
 |---|---|---|
-| 无禁手 Freestyle | Wins, overline included | none |
-| 无禁手 · 长连不赢 Overline | Wins; **six or more in a row does not win** | none |
-| 连珠 Renju | Wins | overline, double-four, double-three (four-three is legal) |
+| Freestyle | Wins, overline included | none |
+| Overline | Wins; **six or more in a row does not win** | none |
+| Renju | Wins | overline, double-four, double-three (four-three is legal) |
 
 ---
 
@@ -198,11 +198,11 @@ One click replaces the button area with the six thresholds; the statistics row f
 | Symptom | Cause | Fix |
 |---|---|---|
 | The board is found but no stones appear | Frame is too tight, or the stones have very low contrast | Frame the board **with its border**, then try lower black/white offsets |
-| Too many or too few stones of one colour | Thresholds not tuned for this theme | Use 识别参数: black/white offset for the grey threshold, percent for the in-cell coverage |
-| Automatic dropping does nothing | The client only accepts real mouse input | Turn on **真实点击**; keep the window position fixed (the frame is geometry-locked) |
+| Too many or too few stones of one colour | Thresholds not tuned for this theme | Use Recog Params: set the black/white offset for the grey threshold, percent for the in-cell coverage |
+| Automatic dropping does nothing | The client only accepts real mouse input | Turn on **Real Click**; keep the window position fixed (the frame is geometry-locked) |
 | The window is blank on start | Security software quarantined the UI package | Whitelist the install folder and reinstall |
 | 360 / antivirus flags the installer | Unsigned executable that captures the screen | Allow it, or sign the build |
-| Board mirror stops following | The board moved, or the window was resized | Click **框选棋盘** again |
+| Board mirror stops following | The board moved, or the window was resized | Click **Frame Board** again |
 
 ---
 
