@@ -1,0 +1,34 @@
+
+
+#include <winver.h>
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION    4,42,0,0
+ PRODUCTVERSION 4,42,0,0
+ FILEFLAGSMASK  0x3fL
+ FILEFLAGS      0x0L
+ FILEOS         0x40004L
+ FILETYPE       0x1L
+ FILESUBTYPE    0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName",      "Meter"
+            VALUE "FileDescription",  "GomokuVision board recognition service"
+            VALUE "FileVersion",      "4.42.0.0"
+            VALUE "InternalName",     "GomokuVision"
+            VALUE "LegalCopyright",   "Meter"
+            VALUE "LegalTrademarks",  "Meter GomokuVision"
+            VALUE "OriginalFilename", "GomokuVision.exe"
+            VALUE "ProductName",      "Meter GomokuVision"
+            VALUE "ProductVersion",   "4.42.0.0"
+            VALUE "Comments",         "Meter GomokuVision 4.42 - local board scan / recognition service (named pipe + shared memory)"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

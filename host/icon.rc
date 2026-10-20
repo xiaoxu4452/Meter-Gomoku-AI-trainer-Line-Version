@@ -1,0 +1,7 @@
+1 ICON "Calculator.ico"
+
+
+1 24 "app.manifest"
+
+
+#include "appver.rc"

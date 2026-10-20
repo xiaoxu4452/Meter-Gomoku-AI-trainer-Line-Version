@@ -1,0 +1,651 @@
+﻿
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Meter Gomoku</title>
+<!-- ★ 2026-10-16：页面级错误上报。背景 —— 曾经出现「页面沉默」：宿主 serve 了 calc.html/css/js，
+     但渲染进程此后一个请求都没有、也收不到 {type:'ready'}，日志只剩
+     `main page still silent ... re-navigating`，**完全看不出为什么**。
+     有了这段，任何未捕获异常 / Promise 拒绝都会以 {type:'status', text:'JSERR …'} 发给宿主，
+     宿主日志里就能直接看到 `[msg] {"type":"status","text":"JSERR …"}`。
+     必须放在最前面（早于 calc.js），否则它自己抛出前注册不上。
+     实测：健康路径下宿主日志不会多出任何 JSERR 行。 -->
+<script>
+(function () {
+  window.__gbErrs = [];
+  function report(kind, detail) {
+    try { window.__gbErrs.push(kind + ' ' + detail); } catch (e) {}
+    try {
+      if (window.chrome && window.chrome.webview)
+        window.chrome.webview.postMessage({ type: 'status', text: kind + ' ' + detail });
+    } catch (e2) {}
+  }
+  window.onerror = function (m, s, l, c, e) {
+    report('JSERR', m + ' @' + (s || '') + ':' + l + ':' + c +
+      (e && e.stack ? ' | ' + String(e.stack).split('\n').slice(0, 3).join(' <- ') : ''));
+    return false;
+  };
+  window.addEventListener('unhandledrejection', function (ev) {
+    var r = ev && ev.reason;
+    report('JSREJ', String((r && r.message) || r) + (r && r.stack ? ' | ' + String(r.stack).split('\n')[0] : ''));
+  });
+})();
+</script>
+
+<link rel="stylesheet" href="calc.css">
+</head>
+<body data-theme="light">
+
+<script>
+(function () {
+  var th = 'light', lg = 'zh', st = null;
+  try {
+    st = JSON.parse(localStorage.getItem('gbcalc.settings.v1') || '{}') || {};
+    if (st.theme === 'dark') th = 'dark';
+    if (st.lang === 'en') lg = 'en';
+  } catch (e) {}
+  document.body.setAttribute('data-theme', th);
+  document.documentElement.lang = lg;
+  if (st && st.cssVars) {
+    try { for (var k in st.cssVars) document.body.style.setProperty(k, st.cssVars[k]); } catch (e2) {}
+  }
+  window.__bootInfo = { theme: th, lang: lg };
+  window.__isRv = /(?:\?|&)rv=1/.test(location.search);
+  window.__isVis = /(?:\?|&)vis=1/.test(location.search);
+})();
+</script>
+
+<div id="boot" class="boot"><span class="brand"><i>Meter</i> Gomoku</span></div>
+<script>
+(function () {
+  if (window.__isRv) {
+    var b = document.querySelector('#boot .brand');
+    if (b) b.textContent = 'Gomoku Review';
+    document.title = '复盘 · Gomoku Review';
+  }
+  if (window.__isVis) {
+    var v = document.querySelector('#boot .brand');
+    if (v) v.textContent = 'Gomoku Vision';
+    document.title = '识图 · Gomoku Vision';
+  }
+})();
+</script>
+
+<header id="hdr">
+  <div class="brand">
+    <span id="t_title">Meter Gomoku</span><span class="ver" id="t_ver"></span>
+  </div>
+  <div class="hdr-actions">
+    
+    <button id="btn_link" class="btn">连线</button>
+    
+    <button id="btn_vis" class="btn">识图</button>
+    <button id="btn_review" class="btn">复盘</button>
+    
+    <button id="btn_history" class="btn">历史</button>
+    
+    <button id="btn_about" class="btn" data-tip="aboutTip">关于</button>
+    <button id="btn_lang" class="btn ghost">EN</button>
+    
+    <button id="btn_color" class="btn ghost">颜色</button>
+  </div>
+</header>
+
+<main id="stage">
+
+  <div id="dockL" class="dock" data-dock="L"></div>
+
+  <aside id="visPane" hidden>
+    <div class="vis-view" id="visView">
+      <div class="vis-imgbar">
+        <button id="btn_vis_upload" class="btn">上传图片</button>
+        <button id="btn_vis_shot" class="btn">屏幕截图</button>
+        
+        <button id="btn_vis_crop" class="btn">裁剪</button>
+        
+        <button id="btn_vis_prev" class="btn sq">&lt;</button>
+        
+        <button id="visPos" class="pill vis-pill">0 / 0</button>
+        <button id="btn_vis_next" class="btn sq">&gt;</button>
+      </div>
+      
+      <div class="vis-box" id="visBox">
+        <img id="visImg" alt="" hidden>
+        
+        <textarea id="visInput" spellcheck="false" wrap="soft"></textarea>
+        <button id="btn_vis_del" class="btn sq vis-del" title="移除当前张" hidden>✕</button>
+      </div>
+      <div class="vis-acts">
+        <button id="btn_vis_rec" class="btn accent">识别</button>
+        <button id="btn_vis_rc" class="btn" title="识别参数：调整识别的 5 项阈值（拖动即时生效、自动保存）；再次点击关闭">识别参数</button>
+        <button id="btn_vis_load" class="btn">加载到练习</button>
+        
+        <button id="btn_vis_vc" class="btn" title="算杀题模式：黑白子数不统一也可保存/加载，加载后自动 VCF/VCT 模拟">VC 模式</button>
+        
+        <button id="btn_vis_edit" class="btn">修改</button>
+      </div>
+      
+      <div class="vis-rcbox" id="visRcBox" hidden></div>
+      
+      <div class="vis-codebar" id="visCodeBar" hidden>
+        <span class="hint vcl" id="t_visCode">棋盘代码</span>
+        <textarea id="visCode" spellcheck="false" wrap="soft" readonly></textarea>
+        <button id="btn_vis_codecopy" class="btn vd-mini">复制</button>
+      </div>
+      <div class="vis-msg hint" id="visMsg"></div>
+    </div>
+
+    <div id="visCrop" class="crop-mask" hidden>
+      <div class="crop-panel" id="cropPanel">
+        <div class="crop-head">
+          <span class="ttl" id="t_visCropTitle">裁剪图片</span>
+          <span class="hint" id="t_visCropHint">拖动鼠标框选要保留的区域</span>
+          <span class="grow"></span>
+          <span class="hint" id="t_visCropSize"></span>
+        </div>
+        <div class="crop-stage" id="cropStage">
+          <canvas id="cropCanvas"></canvas>
+        </div>
+        <div class="crop-acts">
+          <button id="btn_crop_reset" class="btn">重置</button>
+          <span class="grow"></span>
+          <button id="btn_crop_cancel" class="btn">取消</button>
+          <button id="btn_crop_ok" class="btn accent">确定</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <aside id="visDrawer" hidden>
+    <div class="vd-head">
+      <span class="ttl" id="t_visDrawer">图片</span>
+      <span class="hint" id="vdCount">0</span>
+      <span class="grow"></span>
+      
+      <button id="btn_vd_sel" class="btn vd-mini">选择</button>
+      <button id="btn_vd_all" class="btn vd-mini">全选</button>
+      <button id="btn_vd_del" class="btn vd-mini danger">删除</button>
+      <button id="btn_vd_close" class="btn sq" data-tip="visDrawerClose">✕</button>
+    </div>
+    <div id="vdList" class="vd-list"></div>
+    <div class="vd-tip hint" id="t_vdTip">点缩略图选中 · ✕ 移除 · 点空白上传</div>
+  </aside>
+
+  <section id="boardCol">
+    <div id="boardWrap"><canvas id="board"></canvas></div>
+
+    <div id="visEditBar" hidden>
+      
+      <div class="ve-row">
+        <button id="btn_ve_swap" class="btn">交换黑白子</button>
+        <button id="btn_ve_del" class="btn">删除棋子</button>
+        <button id="btn_ve_fillb" class="btn">补充黑子</button>
+        <button id="btn_ve_fillw" class="btn">补充白子</button>
+        <button id="btn_ve_add" class="btn">添加黑白子</button>
+        <span id="veAddKeys" class="ve-pop" hidden>
+          <button id="btn_ve_addb" class="btn">黑子开始</button>
+          <button id="btn_ve_addw" class="btn">白子开始</button>
+        </span>
+        <button id="btn_ve_undo" class="btn">撤销</button>
+      </div>
+    </div>
+
+    <div id="boardFoot">
+      <div class="bf-side bf-l">
+        
+        <button id="btn_live" class="btn bfkey">分析计算</button>
+      </div>
+      <div id="boardBtns">
+        
+        <span class="bgroup nav-group">
+          <button id="btn_prev" class="btn ico" title="上一步">←</button>
+          <button id="btn_next" class="btn ico" title="下一步">→</button>
+        </span>
+        <button id="btn_reset" class="btn">重新开始</button>
+        <button id="btn_pause" class="btn ico" title="点击：AI 辅助落一子 / 暂停 / 自打开关">❚❚</button>
+        <button id="btn_save" class="btn">保存局面</button>
+        <span class="bgroup lay-group">
+          <button id="btn_rot" class="btn ico" title="整体棋子顺时针旋转 90°（坐标轴不动）">↻</button>
+          <button id="btn_mirror" class="btn ico" title="翻转棋子布局">⇄</button>
+          <button id="btn_shift" class="btn ico" title="局面步进（整体平移一格）">✥</button>
+        </span>
+      </div>
+      <div class="bf-side bf-r">
+        
+        <button id="btn_aiside" class="btn bfkey">AI 执子</button>
+        
+        <button id="btn_set" class="btn bfkey">设置</button>
+      </div>
+    </div>
+    
+    <div id="mirrorPop" hidden>
+      <span class="sp-ttl" id="t_mirrorTtl">翻转棋子布局</span>
+      <span class="sp-btns">
+        <button id="btn_mv_fv" class="btn" title="左右翻转">左右</button>
+        <button id="btn_mv_fh" class="btn" title="上下翻转">上下</button>
+        <button id="btn_mv_d1" class="btn" title="对角翻转（左上↔右下）">╲</button>
+        <button id="btn_mv_d2" class="btn" title="对角翻转（右上↔左下）">╱</button>
+        <button id="btn_mv_close" class="btn ico" title="关闭">✕</button>
+      </span>
+    </div>
+    
+    <div id="shiftPop" hidden>
+      <span class="sp-ttl" id="t_shiftTtl">局面平移</span>
+      <span class="sp-btns">
+        <button id="btn_mv_left" class="btn ico" title="整体向左平移一格">←</button>
+        <button id="btn_mv_up" class="btn ico" title="整体向上平移一格">↑</button>
+        <button id="btn_mv_down" class="btn ico" title="整体向下平移一格">↓</button>
+        <button id="btn_mv_right" class="btn ico" title="整体向右平移一格">→</button>
+        <button id="btn_shift_close" class="btn ico" title="关闭">✕</button>
+      </span>
+    </div>
+    
+    <div id="openBar" hidden><span class="hint" id="openHint"></span>
+      <button id="btn_ten" class="btn" hidden>十打（叫 10 个候选点）</button><button id="btn_balcall" class="btn" hidden>平衡打点</button><span id="yamaDecl" hidden></span><span id="taraSwap" hidden><button id="btn_tara_yes" class="btn">换手</button><button id="btn_tara_no" class="btn">继续</button></span></div>
+
+    <div id="egBar" hidden>
+      
+      <button id="btn_eg_ok" class="btn">确定</button>
+      <button id="btn_eg_seq" class="btn">顺序摆盘</button>
+      <button id="btn_eg_free" class="btn">任意摆盘</button>
+      <span id="egKeys" hidden>
+        <button id="btn_eg_b" class="btn">黑子</button>
+        <button id="btn_eg_w" class="btn">白子</button>
+      </span>
+    </div>
+
+    <div id="swapPop" class="swappop" hidden>
+      <span class="sp-ttl" id="t_swapTtl">交换完成 · 请选择你的先后手</span>
+      <span class="sp-btns">
+        <button id="btn_swap_first" class="btn">先手 · 执黑</button>
+        <button id="btn_swap_second" class="btn">后手 · 执白</button>
+      </span>
+    </div>
+
+    <div id="aiSidePop" hidden>
+      <span class="ai-grp">
+        
+        <button id="ai_side_b" data-ai="b" class="tglbtn"><span class="tgl"><i></i></span><span class="tgl-txt">AI 执黑</span></button>
+        <button id="ai_side_w" data-ai="w" class="tglbtn"><span class="tgl"><i></i></span><span class="tgl-txt">AI 执白</span></button>
+      </span>
+      <span class="ai-grp">
+        <span class="ai-turn" id="t_aiTurn">思考时间</span>
+        <span class="numbox ainum">
+          <input id="num_turn2" type="number" min="0.2" max="300" step="0.1" value="2">
+          <span class="unit">s</span>
+        </span>
+      </span>
+      <button id="btn_ai_close" class="btn ico" title="关闭">✕</button>
+    </div>
+
+    <div id="setPop" hidden>
+      <button data-card="engine" class="btn">引擎仪表盘</button>
+      <button data-card="setup" class="btn">对局设置</button>
+      <button data-card="analysis" class="btn">计算评估</button>
+    </div>
+
+    <div id="rvBar" hidden>
+      <span id="rvGroup" hidden>
+        <button id="btn_recite" class="btn">背诵复盘</button>
+        <button id="btn_replay" class="btn">回顾复盘</button>
+        <span id="rvMiss" class="missbox">背错 0</span>
+        <button id="btn_rv_prev" class="btn sq" data-tip="prev" hidden>◀</button>
+        <span class="pill" id="rvPos" hidden>0 / 0</span>
+        <button id="btn_rv_next" class="btn sq" data-tip="next" hidden>▶</button>
+        
+        <button id="btn_rv_play" class="btn sq" hidden>播放</button>
+        <select id="rvSpeed" hidden data-tip="rvSpeedTtl" title="单步间隔 0.5~5 秒">
+          <option value="0.5">0.5s</option>
+          <option value="1">1s</option>
+          <option value="1.5">1.5s</option>
+          <option value="2">2s</option>
+          <option value="3">3s</option>
+          <option value="4">4s</option>
+          <option value="5">5s</option>
+        </select>
+        <button id="btn_rv_exit" class="btn" hidden>退出</button>
+      </span>
+      
+      <button id="btn_rv_num" class="btn">序号</button>
+      <button id="btn_redo_rv" class="btn">重来</button>
+      <button id="btn_save_rv" class="btn">保存局面</button>
+      <button id="btn_rv_hist" class="btn">历史</button>
+      
+    </div>
+  </section>
+
+  <div id="dockR" class="dock" data-dock="R">
+
+    <section class="card" data-id="setup">
+      <div class="card-h">
+        <span class="ttl" id="t_setup">对局设置</span>
+        <span class="grow"></span>
+        
+        <span class="dash" data-tip="dragCard" title="点击折叠 / 展开；按住标题栏拖动换位"></span>
+        <button class="pinkey" data-tip="closeCard" data-pin="setup" title="关闭卡片">✕</button>
+      </div>
+      <div class="card-b">
+        
+        <div class="sec" data-sec="game">
+          <div class="sec-h"><span class="sec-t" id="t_secGame">对局</span></div>
+          <div class="sec-b">
+        
+        <div class="grp" id="modeGrp">
+          <div class="row head"><label id="t_mode">模式</label>
+            
+            <div class="seg s3" id="seg_mode">
+              <button data-mode="pve" class="on">对弈</button>
+              
+              <span class="subseg">
+                <button data-mode="place">摆盘</button>
+                <button data-mode="endgame">残局</button>
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="grp" id="sideGrp">
+          <div class="row head"><label id="t_side">AI 执子</label>
+            
+            <div class="seg s2" id="seg_side">
+              <button data-ai="b" class="tglbtn"><span class="tgl"><i></i></span><span class="tgl-txt">AI 执黑</span></button>
+              <button data-ai="w" class="tglbtn"><span class="tgl"><i></i></span><span class="tgl-txt">AI 执白</span></button>
+            </div>
+          </div>
+          <div class="row"><span class="hint" id="sideHint"></span></div>
+        </div>
+        
+        <div class="row" id="turnRow"><label id="t_turn">思考时间</label>
+          <span class="field">
+            <span class="numbox">
+              <input id="num_turn" type="number" min="0.2" max="300" step="0.1" value="2">
+              <span class="unit">s</span>
+            </span>
+          </span>
+        </div>
+        <div class="row"><label id="t_rule">规则</label>
+          <select id="sel_rule">
+            <option value="0">无禁手</option>
+            <option value="1">无禁手 · 长连不赢</option>
+            <option value="2">连珠（有禁手）</option>
+          </select>
+        </div>
+        <div class="row"><span class="hint" id="ruleHint"></span></div>
+          </div>
+        </div>
+        
+        <div class="sec" data-sec="engine">
+          <div class="sec-h"><span class="sec-t" id="t_secEngine">引擎</span></div>
+          <div class="sec-b">
+        
+        <div class="row"><span class="hint" id="sysInfo"></span></div>
+        <div class="row"><label id="t_cores">线程数</label>
+          <select id="sel_cores"></select>
+          
+          <span class="hint" id="coresHint"></span>
+        </div>
+        <div class="row"><label id="t_hash">哈希表</label>
+          <select id="sel_hash"></select>
+        </div>
+        
+        <div class="row"><span class="hint" id="hashInfo"></span></div>
+          </div>
+        </div>
+        
+        <div class="sec" data-sec="view">
+          <div class="sec-h"><span class="sec-t" id="t_secView">棋盘显示</span></div>
+          <div class="sec-b">
+        <div class="row"><label id="t_showNum">显示序号</label>
+          <input id="chk_num" class="chk-dot" type="checkbox">
+          <span class="hint" id="t_showNumHint">棋子上标出第几手</span>
+        </div>
+        
+        <div class="row"><label id="t_preview">预览框</label>
+          <input id="chk_preview" class="chk-dot" type="checkbox">
+          <span class="hint" id="t_previewHint">鼠标悬停时显示的圆角方框</span>
+        </div>
+          </div>
+        </div>
+        
+        <div class="sec" data-sec="code">
+          <div class="sec-h"><span class="sec-t" id="t_secCode">局面</span></div>
+          <div class="sec-b">
+        <div class="row col" id="codeRow">
+          <div class="codeHead">
+            <label id="t_code">局面代码</label>
+            <span class="grow"></span>
+            <button id="btn_copy" class="btn sq2">复制</button>
+            <button id="btn_paste" class="btn sq2">粘贴</button>
+            <button id="btn_load" class="btn sq2 accent">载入</button>
+          </div>
+          <textarea id="inp_code" rows="5" spellcheck="false" placeholder="h8h9g7…" data-tip="codeTip" title="局面代码：小写列字母 + 行号，逐手拼接（与 gomocalc.com 同格式）"></textarea>
+        </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" data-id="analysis">
+      <div class="card-h">
+        <span class="ttl" id="t_analysis">计算评估</span>
+        <span class="grow"></span>
+        <span class="dash" data-tip="dragCard" title="点击折叠 / 展开；按住标题栏拖动换位"></span>
+        <button class="pinkey" data-tip="closeCard" data-pin="analysis" title="关闭卡片">✕</button>
+      </div>
+      <div class="card-b">
+        
+        <div class="anbtns">
+          
+          <button id="btn_an_nbest" class="btn">多点分析</button>
+          <button id="btn_an_defend" class="btn">扫描防守</button>
+          <span class="dashed-group">
+          <button id="btn_an_bal" class="btn">平衡点</button>
+          <span class="hint" data-i18n="anBalLabel">点数</span>
+          <select id="btn_an_baln" class="sel" title="平衡点数（1~6，空盘固定 3）"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
+          </span>
+          
+          <button id="btn_an_stop" class="btn accent">计算</button>
+          
+          <button id="btn_fwd_clear" class="btn" data-i18n="fwdClear" title="清除计算评估里的所有棋盘标记（含前瞻 / VCF / VCT）">清除标记</button>
+        </div>
+        
+        <div class="fwdbox" id="fwdBox">
+          <div class="fwd-h">
+            <button id="btn_fwd" class="btn fwdkey" data-i18n="fwd">前瞻</button>
+            
+            <button id="btn_fwd_vcf" class="btn fwdkey fwdmini" data-i18n="fwdFindVcf">VCF</button>
+            <button id="btn_fwd_vct" class="btn fwdkey fwdmini" data-i18n="fwdFindVct">VCT</button>
+            <span class="grow"></span>
+            <button id="btn_fwd_prev" class="btn sq2">&lt;</button>
+            <button id="btn_fwd_next" class="btn sq2">&gt;</button>
+          </div>
+          <div class="fwd-h fwd-h2">
+            
+            <span class="fwd-lg" id="fwdLg" title="进攻方指示框（不可点）：紫框 = 黑子，浅蓝框 = 白子；自动 = 轮走方（算杀题面 = 子多一方）">
+              <span class="lgr lgfr-b" id="fwdLgB"><em data-i18n="fwdBlack">黑子</em></span>
+              <span class="lgr lgfr-w" id="fwdLgW"><em data-i18n="fwdWhite">白子</em></span>
+            </span>
+            <span class="grow"></span>
+            <button id="btn_fwd_ok" class="btn fwdok" data-i18n="fwdOk">确定</button>
+          </div>
+          <div class="fwd-body" id="fwdBody"><span class="hint" id="fwdMsg"></span></div>
+          <div class="fwd-seq" id="fwdSeq"></div>
+        </div>
+        
+        <div class="row"><label id="t_nbest">分析点数</label>
+          <input id="num_nbest" type="number" min="2" max="8" step="1" value="4">
+          <span class="hint" id="t_nbestHint">至多 8 点（引擎按局面给点，未必给满）</span>
+        </div>
+        <div class="row col" id="anStatusRow">
+          <span class="hint" id="anStatus"></span>
+          <div id="anList" class="anlist"></div>
+        </div>
+        
+        <div class="heatbox">
+          <div class="row"><label id="t_coach">指导视图</label>
+            <input id="chk_coach" class="chk-dot" type="checkbox">
+            <span class="hint" id="t_coachHint">方形四色热力：AI 帮你算最佳落点，落子即消失</span>
+          </div>
+          
+          <div class="row" id="heatLegend" hidden>
+            <span class="lg"><i style="background:rgba(0,191,165,.75)"></i><span id="t_heatBest">最佳</span></span>
+            <span class="lg"><i style="background:rgba(120,200,80,.75)"></i><span id="t_heatGood">良好</span></span>
+            <span class="lg"><i style="background:rgba(255,179,193,.8)"></i><span id="t_heatFair">一般</span></span>
+            <span class="lg"><i style="background:rgba(255,200,215,.8)"></i><span id="t_heatPoor">劣势</span></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" data-id="engine">
+      <div class="card-h">
+        <span class="ttl" id="t_engine">引擎仪表盘</span>
+        
+        <span class="grow"></span>
+        
+        <span class="dash" data-tip="dragCard" title="点击折叠 / 展开；按住标题栏拖动换位"></span>
+        <button class="pinkey" data-tip="closeCard" data-pin="engine" title="关闭卡片">✕</button>
+      </div>
+      <div class="card-b">
+        <div class="grid2">
+          <div class="stat"><span class="k" id="t_depth">深度</span><span class="v" id="st_depth">-</span></div>
+          <div class="stat"><span class="k" id="t_speed">速度</span><span class="v" id="st_speed">-</span></div>
+          <div class="stat"><span class="k" id="t_nodes">节点</span><span class="v" id="st_nodes">-</span></div>
+          <div class="stat"><span class="k" id="t_time">用时</span><span class="v" id="st_time">-</span></div>
+          <div class="stat"><span class="k" id="t_eval">评估</span><span class="v" id="st_eval">-</span></div>
+          <div class="stat"><span class="k" id="t_best">最佳</span><span class="v" id="st_best">-</span></div>
+        </div>
+        <!-- ★ 消息框（2026-10-16 重新设计，用户要求）：评估曲线**上方**一个固定 3~4 行高的虚线框，
+             专门盛放消息（引擎状态 / 连线提示 / 最佳着法等）。此前这里是「一行随文字伸缩」的
+             行内文字：消息由一行变两行，下面的评估曲线整块被顶下去 = 用户报的「卡片抖动」。
+             现在外框 #engMsg 高度恒定，消息只在其内部滚动；#st_line 仍是消息行的容器
+             （既有 textContent 读法只会拿到多行拼接）。 -->
+        <div class="eng-msg" id="engMsg">
+          <div class="line" id="st_line"></div>
+        </div>
+        
+        <div class="curve-head"><span id="t_curveTtl">评估曲线</span></div>
+        <div id="curveWrap">
+          <canvas id="curveAxis"></canvas>
+          <div id="curveScroll"><canvas id="curve"></canvas></div>
+        </div>
+        <div class="legend">
+          <span><i style="background:#7a5af8"></i><span id="t_blackCurve">黑子</span></span>
+          <span><i style="background:#7fb0ef"></i><span id="t_whiteCurve">白子</span></span>
+        </div>
+        
+        <div id="turnPillRow"><span id="turnPill" class="pill"></span></div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<div id="drawer" hidden>
+  <div class="dr-head">
+    <div class="tabs">
+      <button class="tab on" data-tab="hist" id="t_history">历史</button>
+      <button class="tab" data-tab="saved" id="t_saved">保存历史</button>
+      
+      <button id="dr_all" class="btn dr-allbtn">全部选中</button>
+    </div>
+    <span class="grow"></span>
+    <span class="hint" id="drCount">0</span>
+  </div>
+  
+  <div class="dr-actions">
+    <button id="dr_open" class="btn">打开</button>
+    <button id="dr_save" class="btn accent">保存选中</button>
+    <button id="dr_del" class="btn danger">删除</button>
+    <button id="dr_imp" class="btn">导入</button>
+    <button id="dr_exp" class="btn">导出</button>
+    <button id="dr_close" class="btn">关闭</button>
+  </div>
+  <div class="dr-tip hint" id="t_drTip">勾选若干局，点「保存选中」→ 永久存入「保存历史」</div>
+  <div id="drList" class="dr-list"></div>
+</div>
+
+<div id="about" class="modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <span class="modal-title" id="t_about">关于</span>
+      <span class="grow"></span>
+      <button id="ab_close" class="btn">关闭</button>
+    </div>
+    <div id="ab_body" class="modal-body"></div>
+  </div>
+</div>
+
+<div id="vcxPop" class="modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <span class="modal-title" id="t_vcxPop">算杀结果</span>
+      <span class="grow"></span>
+      <button id="vcxPop_close" class="btn">关闭</button>
+    </div>
+    <div id="vcxPopBody" class="modal-body"></div>
+  </div>
+</div>
+
+<div id="colorPop" class="modal" hidden>
+  <div class="modal-card cp-card">
+    <div class="modal-head">
+      <span class="modal-title" id="t_color">颜色</span>
+      <span class="grow"></span>
+      <button id="cp_close" class="btn">关闭</button>
+    </div>
+    <div class="modal-body cp-body">
+      <div class="cp-row"><label id="t_cpTheme">主题</label>
+        
+        <div class="seg s3" id="cp_theme">
+          <button data-th="light">浅色</button>
+          <button data-th="dark">深色</button>
+          <button data-th="custom">自定义</button>
+        </div>
+      </div>
+      <div class="cp-row"><label id="t_cpTarget">调色对象</label>
+        <div class="seg s2" id="cp_target">
+          <button data-tg="board" class="on">棋盘</button>
+          <button data-tg="page">背景</button>
+        </div>
+      </div>
+      
+      <div class="cp-picker">
+        <canvas id="cp_sv" width="288" height="150"></canvas>
+        <canvas id="cp_hue" width="288" height="16"></canvas>
+      </div>
+      
+      <div class="cp-sliders">
+        <label>R</label><input id="cp_rn" type="number" min="0" max="255" step="1">
+        <label>G</label><input id="cp_gn" type="number" min="0" max="255" step="1">
+        <label>B</label><input id="cp_bn" type="number" min="0" max="255" step="1">
+      </div>
+      <div class="cp-row"><label id="t_cpHex">RGB 代码</label>
+        <input id="cp_hex" spellcheck="false" placeholder="#d9b878">
+      </div>
+      
+      <div class="cp-row" id="cpPresetRow"><label id="t_cpPreset">预制色</label>
+        <div class="cp-presets" id="cp_presets"></div>
+      </div>
+      <div class="cp-foot">
+        <span class="cp-prev" id="cp_prev"></span>
+        <span class="hint" id="cp_hint"></span>
+        <span class="grow"></span>
+        <button id="cp_reset" class="btn">恢复默认</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="ctxMenu" class="ctx" hidden></div>
+
+<input id="file_imp" type="file" accept=".txt,text/plain" hidden>
+
+<input id="file_vis" type="file" accept="image/*" multiple hidden>
+
+<!-- ★ 2026-10-19 回归 4.36：engine-core.js 单源层退役，解析自含于 bridge.js / engine-ai.js -->
+<script src="calc.js"></script>
+</body>
+</html>

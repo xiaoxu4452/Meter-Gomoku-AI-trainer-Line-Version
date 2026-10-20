@@ -1,0 +1,33 @@
+
+#include <winver.h>
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION    4,42,0,0
+ PRODUCTVERSION 4,42,0,0
+ FILEFLAGSMASK  0x3fL
+ FILEFLAGS      0x0L
+ FILEOS         0x40004L
+ FILETYPE       0x1L
+ FILESUBTYPE    0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName",      "Meter"
+            VALUE "FileDescription",  "Desktop Gomoku Trainer"
+            VALUE "FileVersion",      "4.42.0.0"
+            VALUE "InternalName",     "Desktop GomokuTrainer"
+            VALUE "LegalCopyright",   "Meter"
+            VALUE "LegalTrademarks",  "Meter Gomoku Link"
+            VALUE "OriginalFilename", "Desktop GomokuTrainer.exe"
+            VALUE "ProductName",      "Meter Gomoku Trainer"
+            VALUE "ProductVersion",   "4.42.0.0"
+            VALUE "Comments",         "Meter Gomoku Link 4.42 - on-screen board link with built-in Rapfi analysis"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
