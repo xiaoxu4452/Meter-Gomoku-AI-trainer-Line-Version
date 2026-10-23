@@ -1,9 +1,9 @@
-
+/* 自动生成，勿手改 —— 由 tools/gen-appver-rc.js 从 calc.js 的 APP_VERSION 生成。 */
 #include <winver.h>
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION    4,42,0,0
- PRODUCTVERSION 4,42,0,0
+ FILEVERSION    4,43,0,0
+ PRODUCTVERSION 4,43,0,0
  FILEFLAGSMASK  0x3fL
  FILEFLAGS      0x0L
  FILEOS         0x40004L
@@ -16,14 +16,14 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "Meter"
             VALUE "FileDescription",  "Desktop Gomoku Trainer"
-            VALUE "FileVersion",      "4.42.0.0"
+            VALUE "FileVersion",      "4.43.0.0"
             VALUE "InternalName",     "Desktop GomokuTrainer"
             VALUE "LegalCopyright",   "Meter"
             VALUE "LegalTrademarks",  "Meter Gomoku Link"
             VALUE "OriginalFilename", "Desktop GomokuTrainer.exe"
             VALUE "ProductName",      "Meter Gomoku Trainer"
-            VALUE "ProductVersion",   "4.42.0.0"
-            VALUE "Comments",         "Meter Gomoku Link 4.42 - on-screen board link with built-in Rapfi analysis"
+            VALUE "ProductVersion",   "4.43.0.0"
+            VALUE "Comments",         "Meter Gomoku Link 4.43 - on-screen board link with built-in Rapfi analysis"
         END
     END
     BLOCK "VarFileInfo"

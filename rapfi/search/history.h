@@ -1,3 +1,4 @@
+// Bundled RapFi engine (upstream: github.com/dhbloo/rapfi) — Meter Gomoku Link v4.43
 /*
  *  Rapfi, a Gomoku/Renju playing engine supporting piskvork protocol.
  *  Copyright (C) 2022  Rapfi developers
@@ -110,5 +111,18 @@ typedef HistTable<int16_t, 10692, SIDE_NB, FULL_BOARD_CELL_COUNT, MAIN_HIST_TYPE
 /// CounterMoveHistory records a natural response of moves irrespective of the actual position.
 /// It is indexed by color of the previous move, previous move's position and current move's type.
 typedef HistTable<std::pair<Pos, Pattern4>, 0, SIDE_NB, MAX_MOVES> CounterMoveHistory;
+
+/// Optional dynamic move-ordering information supplied by a searcher to the shared MovePicker.
+/// Alpha-beta owns and populates these tables; other searchers leave this view empty.
+struct MoveHistoryScoring
+{
+    static constexpr int WeightScale = 256 * 256;
+
+    const MainHistory        *mainHistory        = nullptr;
+    const CounterMoveHistory *counterMoveHistory = nullptr;
+    int                       attackWeight       = 0;
+    int                       quietWeight        = 0;
+    int                       counterMoveBonus   = 0;
+};
 
 }  // namespace Search

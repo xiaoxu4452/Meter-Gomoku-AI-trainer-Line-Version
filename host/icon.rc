@@ -1,7 +1,10 @@
 1 ICON "Calculator.ico"
 
-
+/* ★ 2026-10-19 防查杀（用户：「为整个软件做一些防查杀设计」）：把应用程序清单编进 exe。
+   RT_MANIFEST = 24，CREATEPROCESS_MANIFEST_RESOURCE_ID = 1。 */
 1 24 "app.manifest"
 
-
+/* ★ 版本资源：由 tools/gen-appver-rc.js 从 calc.js 的 APP_VERSION 生成（勿手改 appver.rc）。
+   编进去之后，右键 exe → 属性 → 详细信息 / PowerShell 的 VersionInfo / 网盘工具都能直接读出版本号，
+   打包脚本 tools/pkg-7z.js 也是读它来给压缩包补后缀（如 Meter GomokuTrainer4.33.7z）。 */
 #include "appver.rc"

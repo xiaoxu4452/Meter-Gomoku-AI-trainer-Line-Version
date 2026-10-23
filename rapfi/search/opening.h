@@ -1,3 +1,4 @@
+// Bundled RapFi engine (upstream: github.com/dhbloo/rapfi) — Meter Gomoku Link v4.43
 /*
  *  Rapfi, a Gomoku/Renju playing engine supporting piskvork protocol.
  *  Copyright (C) 2022  Rapfi developers
@@ -109,6 +110,7 @@ private:
     PRNG             prng;
     std::vector<int> numMoveChoices;
 
+    bool isRuleLegalMove(Pos pos) const;
     void putRandomMoves(int numMoves, CandArea area);
     bool putBalance1Move();
     bool putBalance2Move();

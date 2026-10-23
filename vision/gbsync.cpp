@@ -1,4 +1,14 @@
-
+// Meter Gomoku Link — v4.43
+/* Vision - boardsync.
+ *
+ * 连线识别的「同步算法」实现：照抄
+ *   C:\Users\harve\Desktop\engine\synchronization\lizzieyzy-next-readboard
+ * 的 C# 版口径（Java 版同口径）：
+ *   · 棋子黑白判定 = readboard/LegacyBoardRecognitionService.cs
+ *   · 棋盘定位     = readboard/LegacySelectionCalibrationService.cs
+ *
+ * 只服务连线扫描（请求带 "algo":"sync"）。主窗练习器走 recognize()，不受影响。
+ */
 
 
 #include "gbvision.h"
@@ -14,7 +24,9 @@ namespace {
 
 inline int iRoundD(double v) { return (int)std::nearbyint(v); }
 
+// ---------------------------------------------------------------- 定位用线段
 //
+// C# LegacyVerticalLine / LegacyHorizontalLine：
 //   VerticalLine(pos=x, StartPoint=(x,minY), EndPoint=(x,maxY))
 //   HorizontalLine(pos=y, StartPoint=(minX,y), EndPoint=(maxX,y))
 struct SyncVLine { int pos = 0, lo = 0, hi = 0; bool del = false; bool validate = false; };
@@ -23,9 +35,10 @@ struct SyncHLine { int pos = 0, lo = 0, hi = 0; bool del = false; bool validate 
 struct SyncGapCount { int gap = 0; int loose = 0; int uniq = 0; };
 struct SyncOffset   { int minPos = 0, maxPos = 0, off = 0; };
 
+// ------------------------------------------------------- 线段合并（同 C# 口径）
 void tryMergeV(SyncVLine& a, SyncVLine& b) {
     if (std::abs(a.pos - b.pos) <= 4) {
-        b.pos = (a.pos + b.pos) / 2;
+        b.pos = (a.pos + b.pos) / 2;              // 整型除法：与 C# 一致
         b.lo = std::min(a.lo, b.lo);
         b.hi = std::max(a.hi, b.hi);
         a.del = true;
@@ -73,6 +86,7 @@ void mergeHLines(std::vector<SyncHLine>& v) {
             v.end());
 }
 
+// ------------------------------------------------------ 主导格距（同 C# 口径）
 void addGapCountIfMissing(std::vector<SyncGapCount>& gc, int gap) {
     for (const SyncGapCount& g : gc) if (g.gap == gap) return;
     SyncGapCount n; n.gap = gap; gc.push_back(n);
@@ -89,6 +103,8 @@ std::vector<SyncGapCount> buildGapCounts(const std::vector<int>& gaps) {
     std::vector<SyncGapCount> gc;
     for (int g : gaps) addGapCountIfMissing(gc, g);
     for (int g : gaps) updateGapCounts(gc, g);
+    // 主导度：UniqueCounts 降序；并列时 LooseCounts 升序（C# 比较器同口径，另加 gap 兜底
+    // 保证是严格弱序，避免不稳定比较器带来的未定义行为）。
     std::stable_sort(gc.begin(), gc.end(), [](const SyncGapCount& l, const SyncGapCount& r) {
         if (l.uniq != r.uniq) return l.uniq > r.uniq;
         if (l.loose != r.loose) return l.loose < r.loose;
@@ -119,6 +135,7 @@ bool resolveDominantGap(const std::vector<SyncGapCount>& gc, int& out) {
     return true;
 }
 
+// ---------------------------------------------------------- 校验线、外框偏移
 void markValidatedV(std::vector<SyncVLine>& v, int gap) {
     for (size_t i = 0; i < v.size(); ++i)
         for (size_t j = i + 1; j < v.size(); ++j)
@@ -223,17 +240,33 @@ void trimHOffsets(std::vector<SyncOffset>& o, const std::vector<SyncVLine>& v, i
     }
 }
 
+// ============================================================ 变化识别（照 readboard 口径）
 //
+// 参考项目 C:\Users\harve\Desktop\engine\synchronization\lizzieyzy-next-readboard：
+//   · BoardContentHash.cs   —— FNV-1a 8 字节指纹（offset basis 14695981039346656037,
+//                              prime 1099511628211），对整帧像素逐字节滚动；
+//   · LegacyBoardCaptureService.IsSameAsPreviousContent：
+//        签名相同 && 宽高相同 ⇒ frame.HasSameContentAsPreviousCapture = true
+//   · LegacyBoardRecognitionService.RecognitionCacheEntry.Matches：
+//        帧签名 + 宽/高/stride + 棋盘尺寸 + 源矩形 + **阈值** 全部一致 ⇒ 直接返回上次
+//        Snapshot（usedCachedSnapshot，**一格都不重算**）
+//   · ReuseSnapshotBackingIfUnchanged：状态签名相同 ⇒ 复用上次 payload。
 //
+// 我们把它做得更细一层（原项目只有"整帧没变才跳过"，一变就 225 格全重算）：
+//   **逐格签名**。每格用固定 6×6 网格采样点算一个 32 位指纹，签名没变 + 阈值没变 ⇒
+//   该格直接沿用上次判定；只有签名变了的格子才跑完整的 syncCellInfo（整窗逐像素统计）。
+//   效果：落一子只重算 1~2 格（≈0.1ms），其余 223 格只做 36 个采样点（≈0.02ms/格），
+//   比"每帧 225 × 整窗 3600 像素"快两个数量级；整帧完全没变时连格子都不用碰。
 constexpr uint64_t kFnvBasis = 14695981039346656037ULL;
 constexpr uint64_t kFnvPrime = 1099511628211ULL;
 
 inline uint64_t fnvByte(uint64_t h, uint8_t v) { return (h ^ v) * kFnvPrime; }
 
+// 单格采样签名：6×6 等距采样点的 RGB（步长按窗口尺寸算，至少 1）
 uint32_t cellSignature(const cv::Mat& rgb, int sx, int sy, int w, int h) {
     const int stepX = std::max(1, w / 6);
     const int stepY = std::max(1, h / 6);
-    uint32_t acc = 2166136261u;
+    uint32_t acc = 2166136261u;                    // FNV-1a 32 位
     for (int yy = sy + stepY / 2; yy < sy + h; yy += stepY) {
         const uint8_t* row = rgb.ptr<uint8_t>(yy);
         for (int xx = sx + stepX / 2; xx < sx + w; xx += stepX) {
@@ -249,20 +282,20 @@ uint32_t cellSignature(const cv::Mat& rgb, int sx, int sy, int w, int h) {
 bool sameLines(const std::vector<double>& a, const std::vector<double>& b) {
     if (a.size() != b.size()) return false;
     for (size_t i = 0; i < a.size(); ++i) {
-        if (std::abs(a[i] - b[i]) > 0.05) return false;
+        if (std::abs(a[i] - b[i]) > 0.05) return false;   // 亚像素抖动视为同一几何
     }
     return true;
 }
 
 struct SyncReadCacheState {
     bool   valid = false;
-    bool   boardOk = true;
+    bool   boardOk = true;              // 上次判定的 !IsAllBlack && !IsAllWhite
     int    n = 0, cellW = 0, cellH = 0, cropW = 0, cropH = 0;
     std::vector<double> xl, yl;
     double spacing = 0;
     SyncRecogParams p{};
     std::vector<uint32_t> cellSig;      // n*n
-    std::vector<int8_t>   cellState;
+    std::vector<int8_t>   cellState;    // n*n（EMPTY/BLACK/WHITE，缓存时不含 marker）
 };
 SyncReadCacheState g_syncReadCache;
 
@@ -274,12 +307,14 @@ bool sameParams(const SyncRecogParams& a, const SyncRecogParams& b) {
 
 }  
 
+// --------------------------------------------------------------- 棋子判定（公开）
 
 SyncCell syncCellInfo(const cv::Mat& rgb, int sx, int sy, int w, int h,
                       const SyncRecogParams& p) {
     SyncCell out;
     if (rgb.empty() || rgb.type() != CV_8UC3 || w <= 0 || h <= 0) return out;
 
+    // 越界夹取：同 C# ClampRegionStart（整体平移，不改变采样窗口尺寸）
     if (sx < 0) sx = 0;
     if (sy < 0) sy = 0;
     if (sx + w > rgb.cols) sx = std::max(0, rgb.cols - w);
@@ -316,7 +351,7 @@ SyncCell syncCellInfo(const cv::Mat& rgb, int sx, int sy, int w, int h,
 
     const int total = w * h;
     if (total > 0) {
-        out.blackPercent = 100 * blackCount / total;
+        out.blackPercent = 100 * blackCount / total;          // 整型除法：与 C# 一致
         out.whitePercent = 100 * whiteCount / total;
         out.pureWhitePercent = 100 * pureWhiteCount / total;
         out.almostWhitePercent = 100 * almostWhiteCount / total;
@@ -325,6 +360,7 @@ SyncCell syncCellInfo(const cv::Mat& rgb, int sx, int sy, int w, int h,
     return out;
 }
 
+// ----------------------------------------------------------------- 棋盘定位（公开）
 
 bool locateBoardSync(const cv::Mat& rgb, int size,
                      std::vector<double>& xLines, std::vector<double>& yLines,
@@ -370,6 +406,7 @@ bool locateBoardSync(const cv::Mat& rgb, int size,
         mergeHLines(hlines);
     };
 
+    // 初始 Canny 高低阈值 200/550；线条总数 < 10 时按 0.9 逐次放宽，最多 10 次
     double low = 200.0, high = 550.0;
     collect((int)low, (int)high);
     int attempts = 10;
@@ -379,16 +416,21 @@ bool locateBoardSync(const cv::Mat& rgb, int size,
         attempts--;
         collect((int)low, (int)high);
     }
+    // EnsureDetectedLines：竖/横各至少 2 条，否则判失败（上层回退自适应找盘）
     if ((int)vlines.size() < 2 || (int)hlines.size() < 2) return false;
 
     std::vector<int> gapsV, gapsH;
     for (size_t i = 0; i + 1 < vlines.size(); ++i) gapsV.push_back(vlines[i + 1].pos - vlines[i].pos);
     for (size_t i = 0; i + 1 < hlines.size(); ++i) gapsH.push_back(hlines[i + 1].pos - hlines[i].pos);
 
-    int gapV = 0, gapH = 0;
+    int gapV = 0, gapH = 0;                       // gapV: 竖线间距(x 向)；gapH: 横线间距(y 向)
     if (!resolveDominantGap(buildGapCounts(gapsV), gapV)) return false;
     if (!resolveDominantGap(buildGapCounts(gapsH), gapH)) return false;
 
+    // ★ 2026-10-18 修订（用户：「识别棋盘总是不是方的」）：同一块正放的棋盘，竖/横格距本应
+    //   相等；HoughLinesP 在两轴**独立**求主导格距会带来 ±1~3px 偏差，使
+    //   boardPixelW != boardPixelH，识别出的棋盘外框就不是方的。这里统一取两轴均值
+    //   （四舍五入），使交点线在 x/y 上等步长、外框为正方形。
     {
         int gm = (gapV + gapH + 1) / 2;
         if (gm > 0) { gapV = gm; gapH = gm; }
@@ -407,6 +449,7 @@ bool locateBoardSync(const cv::Mat& rgb, int size,
     trimHOffsets(offH, vlines, gapH);
     if (offV.empty() || offH.empty()) return false;
 
+    // 外框（同 C# BuildAdjustedBounds，本地坐标 ⇒ selectionBounds 取 (0,0,w,h)）
     const int padY = (int)std::ceil((double)gapV / 2.0);
     const int padX = (int)std::ceil((double)gapH / 2.0);
     const int left = offV[0].minPos - padX;
@@ -414,6 +457,7 @@ bool locateBoardSync(const cv::Mat& rgb, int size,
     const int right = offV[0].maxPos + padX;
     const int bottom = offH[0].maxPos + padY;
 
+    // 交点线：把同步算法的「N 等分格中心」等价映射回本项目的格点线
     xLines.resize(size);
     yLines.resize(size);
     for (int i = 0; i < size; ++i) xLines[i] = (double)(offV[0].minPos + i * gapV);
@@ -433,6 +477,7 @@ bool locateBoardSync(const cv::Mat& rgb, int size,
     return true;
 }
 
+// --------------------------------------------------------------- 逐格读子（公开）
 
 void readStonesSync(const cv::Mat& crop, const GeoLike& g, const SyncRecogParams& p,
                     cv::Mat& board, Json& diag, bool allowRelax) {
@@ -442,18 +487,23 @@ void readStonesSync(const cv::Mat& crop, const GeoLike& g, const SyncRecogParams
     const int cellW = std::max(1, iRoundD(g.spacing));
     const int cellH = cellW;
 
+    // ★★ 2026-10-18 修复：Json 默认是 null 类型，set() 写不进 null —— 必须先把 diag
+    //   变成对象。原来这里忘了，导致 sync 读子的所有诊断（sync/suspect/read_ms/cells）
+    //   全部丢失，宿主只能看到 "diag": null ⇒ 误判成自适应算法、suspect 永远 false。
     diag = Json::makeObj();
 
+    // ★ 2026-10-19：松阈值重判要用的逐格统计（只有 allowRelax 时才留，稳态路径零成本）
     std::vector<SyncCell> stats;
     if (allowRelax) stats.assign((size_t)n * n, SyncCell());
 
     const long long t0 = (long long)cv::getTickCount();
 
+    // ---- 缓存键：几何 + 参数 + 位图尺寸 ----
     SyncReadCacheState& C = g_syncReadCache;
     bool geomSame = C.valid && C.n == n && C.cellW == cellW && C.cellH == cellH &&
                     C.cropW == crop.cols && C.cropH == crop.rows &&
                     sameParams(C.p, p) && sameLines(C.xl, g.x_lines) && sameLines(C.yl, g.y_lines);
-    if (!geomSame) {
+    if (!geomSame) {                       // 棋盘挪了/换了阈值 ⇒ 缓存整份作废
         C.valid = false;
         C.n = n; C.cellW = cellW; C.cellH = cellH;
         C.cropW = crop.cols; C.cropH = crop.rows;
@@ -463,6 +513,7 @@ void readStonesSync(const cv::Mat& crop, const GeoLike& g, const SyncRecogParams
         C.cellState.assign((size_t)n * n, (int8_t)EMPTY);
     }
 
+    // 单格采样窗（以交点为中心、边长 = 格距），越界整体平移 —— 同 C# ClampRegionStart
     auto cellRect = [&](int i, int j, int& sx, int& sy) {
         sx = iRoundD(g.x_lines[i] - cellW / 2.0);
         sy = iRoundD(g.y_lines[j] - cellH / 2.0);
@@ -472,6 +523,11 @@ void readStonesSync(const cv::Mat& crop, const GeoLike& g, const SyncRecogParams
         if (sy < 0) sy = 0;
     };
 
+    // ---- ① 变化识别：先只做签名（n*n 格 × 6×6 采样点 ≈ 8K 次取值）----
+    //   注意：**不用整帧 FNV**。整帧要扫 rows*cols*3 ≈ 3MB，实测比 225 格全量读子还贵
+    //   （README 里 readboard 的 ContentSignature 是全帧哈希，那边帧小；我们这里是
+    //     993×992 的锁定区域，代价不可接受）。棋子只可能落在格内 ⇒ 逐格签名聚合
+    //   与整帧指纹等价，但只碰 8K 个采样点，约 0.02ms。
     std::vector<uint32_t> sigs((size_t)n * n, 0u);
     int changed = 0;
     uint64_t frameSig = kFnvBasis;
@@ -486,6 +542,7 @@ void readStonesSync(const cv::Mat& crop, const GeoLike& g, const SyncRecogParams
         }
     }
 
+    // 整盘一格都没变 ⇒ 直接复用上次判定（readboard 的 usedCachedSnapshot 语义）
     if (C.valid && changed == 0) {
         uint64_t stateSig = kFnvBasis;
         for (int j = 0; j < n; ++j)
@@ -515,6 +572,7 @@ void readStonesSync(const cv::Mat& crop, const GeoLike& g, const SyncRecogParams
             int sx, sy; cellRect(i, j, sx, sy);
             const size_t idx = (size_t)j * n + i;
             int8_t v;
+            // ---- ② 逐格读子：只有签名变了的格才跑完整统计 ----
             if (C.valid && sigs[idx] == C.cellSig[idx]) {
                 v = C.cellState[idx];
                 cellsReused++;
@@ -541,6 +599,15 @@ void readStonesSync(const cv::Mat& crop, const GeoLike& g, const SyncRecogParams
 
     C.valid = true;
 
+    // ★★ 2026-10-19（用户：「……导致只识别了棋盘，而常常不会自动识别棋子」）：
+    //   整盘一颗子都没判出来时做一次**松阈值重判**。
+    //   机制：syncCellInfo 的占比 = 棋子像素 / 整格（格距²）。不少棋盘截图里棋子直径只有格距的
+    //   0.3 倍左右 ⇒ π/4·(2r/spacing)² ≈ 28% < 默认 33%，于是 225 格全判 EMPTY：几何靠 Hough
+    //   线照样找到（棋盘识别到了），棋子全丢（没有读出棋子）。
+    //   离线复现：r=0.30·spacing 的合成盘用默认参数 B=0/W=0；把占比降到 18 立刻 B=5/W=5。
+    //   这里只在「整盘读空 + 225 格都是本帧新读」时重判一次：临时阈值 = 本帧峰值×0.6，并要求
+    //   峰值 ≥10% 且明显高于中位数（≥+8%）—— 空盘 / 星位 / 网格线没有这种对比，不会被判成错子。
+    //   连线稳态不走这条路（allowRelax=false），行为与接手前完全一致。
     if (allowRelax && !anyBlack && !anyWhite && cellsRead == n * n && !stats.empty()) {
         auto pickRelax = [&](bool black, int userPct, int& outPct) -> bool {
             std::vector<int> pcts;
@@ -549,10 +616,10 @@ void readStonesSync(const cv::Mat& crop, const GeoLike& g, const SyncRecogParams
             std::sort(pcts.begin(), pcts.end());
             const int mx = pcts.empty() ? 0 : pcts.back();
             const int med = pcts.empty() ? 0 : pcts[pcts.size() / 2];
-            if (mx < 10 || mx < med + 8) return false;
+            if (mx < 10 || mx < med + 8) return false;      // 没有可用的对比 ⇒ 不判
             int r = mx * 6 / 10;
             if (r < 8) r = 8;
-            if (r >= userPct) return false;
+            if (r >= userPct) return false;                 // 不比用户阈值更松 ⇒ 没意义
             outPct = r;
             return true;
         };
@@ -586,11 +653,13 @@ void readStonesSync(const cv::Mat& crop, const GeoLike& g, const SyncRecogParams
         }
     }
 
+    // C# BoardSnapshot.IsValid = !IsAllBlack && !IsAllWhite（全黑/全白都视为不可信）
     const bool allBlack = (!anyWhite && !anyEmpty);
     const bool allWhite = (!anyBlack && !anyEmpty);
     const bool valid = (!allBlack && !allWhite);
     C.boardOk = valid;
 
+    // 状态指纹（C# BoardContentHash.Finish 的角色）：宿主/页面可直接比它判断"这一拍有没有变化"
     uint64_t stateSig = kFnvBasis;
     for (int j = 0; j < n; ++j)
         for (int i = 0; i < n; ++i)
@@ -608,6 +677,7 @@ void readStonesSync(const cv::Mat& crop, const GeoLike& g, const SyncRecogParams
     diag.set("sync_state_sig", Json::makeInt((long long)(stateSig & 0x7FFFFFFFFFFFFFFFULL)));
 }
 
+// ------------------------------------------------------- 局部对比读子（公开）
 
 namespace {
 
@@ -616,6 +686,7 @@ inline int lumOf(const cv::Mat& rgb, int x, int y) {
     return (p[0] * 299 + p[1] * 587 + p[2] * 114) / 1000;
 }
 
+// 采样一个小块（3×3 个点）的亮度
 void samplePatchLum(const cv::Mat& rgb, double cx, double cy, double half,
                     std::vector<int>& out) {
     static const double kOff[3] = { -0.6, 0.0, 0.6 };
@@ -652,6 +723,9 @@ void readStonesLocal(const cv::Mat& crop, const GeoLike& g, cv::Mat& board, Json
         return;
     }
 
+    // 采样几何（相对格距）：
+    //   中心块 —— 落在交点四周的**对角**上（避开 x/y 网格线，否则空格也会被线拉暗）；
+    //   底色块 —— 再往外一圈的对角（格子四角，那里既没有线也没有棋子）。
     const double kCtrOff = 0.155, kCtrHalf = 0.075;
     const double kBgOff  = 0.400, kBgHalf  = 0.055;
 
@@ -677,10 +751,12 @@ void readStonesLocal(const cv::Mat& crop, const GeoLike& g, cv::Mat& board, Json
                 bgS[q] = medianOf(tmp);
             }
             std::vector<int> cv4(ctrS, ctrS + 4), bv4(bgS, bgS + 4);
-            diff[(size_t)j * n + i] = medianOf(bv4) - medianOf(cv4);
+            diff[(size_t)j * n + i] = medianOf(bv4) - medianOf(cv4);   // >0 中心更暗（黑子）
         }
     }
 
+    // 自适应阈值：|差| 的 p60 × 0.45（子多时 p60 本身接近"子"的对比度，仍可用），
+    // 下限 8（木纹/噪声），上限 60。
     std::vector<int> sorted(N, 0);
     for (size_t i = 0; i < N; ++i) sorted[i] = std::abs(diff[i]);
     std::nth_element(sorted.begin(), sorted.begin() + (size_t)(N * 0.60), sorted.end());

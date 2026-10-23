@@ -1,9 +1,30 @@
-
+// Meter Gomoku Link — v4.43
+/*!
+ * engine-core.js —— 引擎调用的**唯一实现**（单源）
+ *
+ * 背景（2026-10-18，用户：「单源化」）：
+ *   引擎调用层原来有两份实现 ——
+ *     A) desktop-<target>/ui/engine-ai.js  （Worker，走 fetch('/engine/…')）
+ *     B) desktop-connect/ui/bridge.js 的 natEng（页面，走 chrome.webview IPC）
+ *   两边各自实现了一套「解析 / 终局判定 / 预算 / STOP 静默 / 候选排序」。
+ *   代价是真实的、已经发生过的：
+ *     · ponder 残留行被当成终局   → 每手只算 0.3 秒（两处各修一遍才干净）
+ *     · MESSAGE [Pondering] 的对手视角 Eval 被记成我方 → 评分正负抖动
+ *       （bridge 修了，worker 没修 ⇒ 主窗一直在抖）
+ *     · 候选首选点一个用 __final 优先、一个用 __best 优先 → 落点口径不一致
+ *   本文件是这些不变量的唯一来源。任何「一手怎么算」的判断都只能写在这里；
+ *   两个消费者只保留**传输**（怎么把命令送出去、怎么把行拿回来）。
+ *
+ * 约束：
+ *   · 纯逻辑，无 IO、无 DOM、无 Worker API —— 同一份代码在 Worker 与页面里都能跑。
+ *   · 不引用外部变量：盘面尺寸一律由调用方以 N 传入。
+ *   · 挂载到全局 GB_Core：Worker 里 importScripts 后是 worker 全局，页面里是 window。
+ */
 (function (root) {
   'use strict';
   var C = {};
 
-  
+  /* ================= 协议解析 ================= */
 
   C.parseK = function (v) {
     v = String(v).trim();
@@ -15,6 +36,7 @@
     return Math.round(n);
   };
 
+  // FORBID 行：`FORBID 77 78` / `FORBID 7,7 8,8` / `FORBID .`（空）
   C.parseForbidLine = function (line) {
     var t = String(line || '');
     var m = t.match(/^\s*FORBID\b(.*)$/i);
@@ -34,7 +56,26 @@
     return out;
   };
 
-  
+  /**
+   * 一行引擎输出 → 累积进 pvs。
+   * pvs 约定：pvs[i] = {depth, seldepth, nodes, eval, winrate, bestline}，
+   *           pvs.__cur / __numpv / __speed / __totalnodes / __best / __final / __forbid。
+   *
+   * ★★ 关键不变量（2026-10-18 重定，勿回退）：**`[Pondering]` 行一律丢弃，一个字段都不收。**
+   *
+   *   官方 Rapfi（search/searchoutput.cpp）在 ponder 状态下给每条 MESSAGE 加
+   *   `[Pondering] ` 前缀，而 ponder 树的**根是对手**。所以这些行的含义是：
+   *     · `Eval`   = 对手视角（符号与我们的相反）
+   *     · `PV[0]`  = 对手要走的那一手（不是我们的候选点）
+   *     · `Depth`  = 另一棵树的深度
+   *   旧实现只挡住 Eval、仍然把 PV/Depth 记进 pvs[0]，于是同一个 pvs[0] 里
+   *   eval 是我们的、bestline 是对手的、depth 被抬到 ponder 的深度：
+   *     - `collectCandidates` 的 candidates[0] ⇒ **对手的落点**（自动落子会把它落下去）
+   *     - onTick / softAt / REALTIME 兜底全都拿这个错点 ⇒「优势点被算偏、惨输」
+   *     - 一旦 ponder 深度 ≥ 本手深度，真正的搜索结果反而被 `<=` 判据挡在门外
+   *   用户口径：「把 Bridge 里的 eval 处理全删掉，按官方 Rapfi 重做」——
+   *   正解就是：ponder 行属于**另一棵树**，不参与本手模型。
+   */
   C.parseLine = function (line, pvs, N) {
     if (!line || !line.trim()) return;
     var i = line.indexOf(' ');
@@ -94,7 +135,7 @@
         return;
       }
       var isPonder = /^\s*\[/.test(tail);
-      if (isPonder) return;
+      if (isPonder) return;                       // ★ 另一棵树：整行丢弃（见函数头注释）
       var mpv = tail.match(/^\((\d+)\)\s+([^\s|]+)\s*\|\s*(\d+)(?:-(\d+))?\s*\|\s*(.*)$/);
       if (mpv) {
         var pvi = +mpv[1] - 1;
@@ -153,7 +194,14 @@
     }
   };
 
-  
+  /**
+   * 终局判定 —— 一手搜索「算完了」的唯一判据。
+   *   mbest  : `best x y`（YXNBEST 模式的 ANSWER 指令）
+   *   __final: 裸着法行 `x,y`（YXBOARD+YXNBEST 的最终答案）
+   *   REJECT : 引擎拒答
+   * 优先级：mbest > __final > __best。__best 只是搜索途中的实时最优（可能更浅），
+   * 只在拿不到终局行时兜底 —— 反过来（__best 优先）会让落点停在浅层结果上。
+   */
   C.doneOf = function (raw, pvs, N) {
     var mbest = raw.match(/\bbest\s+(\d+)\s+(\d+)/);
     var chosen = (mbest ? [+mbest[1], N - 1 - (+mbest[2])] : null) || pvs.__final || pvs.__best;
@@ -161,9 +209,18 @@
     return { done: done, best: chosen };
   };
 
-  
+  /* ================= 评分（唯一换算层） ================= */
 
-  
+  /**
+   * ★★ 官方口径（Rapfi search/ab/search.cpp：根节点 `moveValue = value`，
+   *   negamax 返回的就是**轮到走棋那一方**的分数）：
+   *     引擎给的 Eval 永远是「行棋方视角」，不是黑方视角、也不是我方视角。
+   *   所以全软件只允许这一个换算：`(rootSide === viewSide) ? +v : -v`。
+   *   bridge / worker 都不许再自己判断正负 —— 这正是「评分正负颠倒」的来源。
+   *
+   * @returns {{mate:boolean, sign:number, n:number, v:number}|null}
+   *   v = 数值化（mate 用 ±90000 保留旧刻度，供平衡/胜率判断）
+   */
   C.evalAuth = function (raw) {
     var s = (raw == null) ? '' : String(raw).trim();
     if (!s) return null;
@@ -176,13 +233,19 @@
     return { mate: false, sign: sign, n: v, v: sign * v };
   };
 
+  // 权威分值 → 显示串（`+M17` / `-503` / `+0`）
   C.evalText = function (a) {
     if (!a) return '-';
     if (a.mate) return (a.sign < 0 ? '-' : '+') + 'M' + a.n;
     return (a.sign < 0 ? '-' : '+') + a.n;
   };
 
-  
+  /**
+   * 引擎原始分 → 指定视角的显示串。
+   * @param raw       引擎原文（如 `-M24` / `+285`）
+   * @param rootSide  我们送进引擎的 side（1=黑 2=白）＝那次搜索的行棋方
+   * @param viewSide  要显示给谁看（1=黑 2=白）
+   */
   C.evalFor = function (raw, rootSide, viewSide) {
     var a = C.evalAuth(raw);
     if (!a) return '-';
@@ -193,6 +256,7 @@
     return C.evalText(a);
   };
 
+  // 曲线/胜率用：clamp 到 ±1000（mate 记满）
   C.evalScore = function (raw, flip) {
     var a = C.evalAuth(raw);
     if (!a) return 0;
@@ -201,9 +265,26 @@
     return Math.max(-1000, Math.min(1000, v));
   };
 
-  
+  /* ================= 批次纪元闸门 ================= */
 
-  
+  /**
+   * ★★ 只收「本手这一次搜索」的输出。
+   *
+   * 官方 Rapfi 每次搜索开始时必打一行
+   *   `MESSAGE OptiTime <opt> | MaxTime <max> ms`   （searchoutput.cpp printSearchStarts，
+   *   条件是 timeLimit && !inPonder —— 我们每批都发 TIMEOUT_TURN 且发批前不 ponder）
+   * 这就是天然的**纪元标记**：它之前的行全部属于上一轮（ponder / 收手尾巴），必须丢掉。
+   * 不丢就会 0.1~0.2 秒就"算完"，并且用上一盘面的 PV、上一棵树的分。
+   *
+   * 但有两种情况**没有**这行（真机实测）：
+   *   · 根节点已成五 / 一步杀 —— Rapfi 直接给答案，不进入计时搜索（`OptiTime=0`）；
+   *   · 换构建 / 换引擎，标记不存在。
+   * 所以不能"先丢后解析"，而是**先扣住**：见到标记就把扣住的全丢；超时没等到标记，
+   * 就把扣住的按原序回放给 parseOne。两边都不会丢结果，也都不会把残渣当成本手。
+   *
+   * @param fallbackMs 等标记的上限（默认 400ms；真机标记在 0~95ms 内到）
+   * @param parseOne   真正解析一行（必须有副作用）
+   */
   C.makeEpochGate = function (fallbackMs, parseOne) {
     var age = +fallbackMs || 400;
     var armedAt = 0, held = [], stale = 0, replay = 0;
@@ -217,8 +298,8 @@
     return {
       arm: function () { armedAt = Date.now(); held = []; stale = 0; replay = 0; },
       armed: function () { return !!armedAt; },
-      staleCount: function () { return stale; },
-      replayCount: function () { return replay; },
+      staleCount: function () { return stale; },      // 被判定为上一轮残留、丢掉的行数
+      replayCount: function () { return replay; },    // 没有标记时补解析的行数
       heldCount: function () { return held.length; },
       feed: function (line) {
         if (!armedAt) { C._gateParse(parseOne, line); return; }
@@ -229,9 +310,10 @@
       },
     };
   };
+  // 把"用哪个函数解析"收敛到一处：调用方可以换 parser 而不必重建闸门
   C._gateParse = function (fn, line) { if (typeof fn === 'function') fn(line); };
 
-  
+  /* ================= 盘面工具 ================= */
 
   C.countStones = function (board, N) {
     var n = 0;
@@ -239,9 +321,14 @@
     return n;
   };
 
-  
+  /**
+   * 行棋方（1=黑 2=白）。**全软件唯一的轮次判据**。
+   * 黑先手 ⇒ 子数相等时轮到黑。送进引擎的 `side`、本手「是不是我」、评分视角，
+   * 三者必须都从这里取 —— 各自判一次就会出现「落点是对手的、分数是我的」。
+   */
   C.sideToMove = function (bl, wh) { return (bl.length <= wh.length) ? 1 : 2; };
 
+  // 保证最后一步是「对方刚走的」⇒ 行棋方 = side。★ 行棋方必须显式传，别猜。
   C.applySideToMove = function (out, side) {
     if (side !== 1 && side !== 2) return out;
     if (!out.length) return out;
@@ -255,6 +342,7 @@
     return out;
   };
 
+  // 面板坐标（y=0 顶）→ 引擎着法序列（数字着法 = y=0 底，0 基）
   C.toEngineMoveList = function (board, moveList, side, N) {
     var black = [], white = [];
     for (var y = 0; y < N; y++) for (var x = 0; x < N; x++) {
@@ -297,9 +385,13 @@
     return C.applySideToMove(out, side);
   };
 
-  
+  /* ================= 一手搜索的固定不变量 ================= */
 
-  
+  /**
+   * 思考预算：**严格等于用户设置**。
+   * 任何"对手想多久我们想多久""威胁加时 ×1.5""重算 ×1.5"之类的倍率都已删除 ——
+   * 用户设 2 秒就必须是 2 秒（他曾实测到 4 秒，就是倍率叠出来的）。
+   */
   C.budgetMs = function (userMs, floorMs) {
     var m = +userMs || 0;
     var f = +floorMs || 0;
@@ -307,7 +399,15 @@
     return Math.round(m);
   };
 
-  
+  /**
+   * STOP → 等输出静默 → 清缓冲。**每手 analyze 之前必须走一遍。**
+   * 不做这一步，上一轮 ponder/收手残留的裸着法行会落在缓冲里，被 doneOf 当成
+   * 本手终局 ⇒ 本手在 0.2~0.4 秒"完成"且用上一盘面的 PV 落子。
+   * 传输无关：调用方给出 send / 读长度 / 清缓冲 三个回调。
+   *
+   * @param {{send:Function, len:Function, clear:Function, quietMs?:number, maxMs?:number, tickMs?:number}} o
+   * @returns {Promise<void>}
+   */
   C.makeStopQuiet = function (o) {
     return new Promise(function (resolve) {
       var quietMs = o.quietMs || 110, maxMs = o.maxMs || 450, tickMs = o.tickMs || 35;
@@ -329,7 +429,10 @@
     });
   };
 
-  
+  /**
+   * pvs → 候选列表（已去重，按 PV 顺序）。
+   * 所有消费方都用这一份，落点/评分的口径才不会分叉。
+   */
   C.collectCandidates = function (pvs, wantTopN) {
     var top = Math.max(1, Math.min(8, wantTopN || 8));
     var out = [], seen = {};
@@ -351,6 +454,7 @@
     return out;
   };
 
+  // 把终局落点排到候选首位（没有就合成一条），调用方直接取 candidates[0]。
   C.promoteBest = function (cands, best) {
     if (!best || best.length !== 2) return cands;
     for (var q = 0; q < cands.length; q++) {
@@ -367,6 +471,7 @@
     return cands;
   };
 
+  // 节流器：live 流 / 诊断上报共用（不要用重搜来"刷新"）。
   C.makeTick = function (ms) {
     var last = 0;
     return function () {

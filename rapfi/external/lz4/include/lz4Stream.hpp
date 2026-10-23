@@ -1,3 +1,4 @@
+// Bundled RapFi engine (upstream: github.com/dhbloo/rapfi) — Meter Gomoku Link v4.43
 /*
     Copyright (c) 2015, Kasper Laudrup <laudrup@stacktrace.dk>
     All rights reserved.

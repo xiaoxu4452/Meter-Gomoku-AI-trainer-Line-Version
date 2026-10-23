@@ -1,3 +1,4 @@
+// Bundled RapFi engine (upstream: github.com/dhbloo/rapfi) — Meter Gomoku Link v4.43
 /* Alignment
  * Created by Evan Nemerson <evan@nemerson.com>
  *

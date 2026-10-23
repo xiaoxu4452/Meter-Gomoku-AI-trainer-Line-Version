@@ -1,3 +1,4 @@
+// Bundled RapFi engine (upstream: github.com/dhbloo/rapfi) — Meter Gomoku Link v4.43
 #ifndef BS_THREAD_POOL_HPP
 #define BS_THREAD_POOL_HPP
 /**

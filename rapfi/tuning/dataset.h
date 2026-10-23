@@ -1,3 +1,4 @@
+// Bundled RapFi engine (upstream: github.com/dhbloo/rapfi) — Meter Gomoku Link v4.43
 /*
  *  Rapfi, a Gomoku/Renju playing engine supporting piskvork protocol.
  *  Copyright (C) 2022  Rapfi developers
@@ -22,6 +23,7 @@
 #include "dataformat.h"
 
 #include <cstddef>
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -87,6 +89,7 @@ class SimpleBinaryDataset : public Dataset
 public:
     // Throws exception when an error occurred when reading the file
     SimpleBinaryDataset(const std::vector<std::string> &filenames);
+    SimpleBinaryDataset(const std::vector<std::filesystem::path> &filenames);
     ~SimpleBinaryDataset();
 
     bool next(DataEntry *entry) override;
@@ -136,6 +139,7 @@ public:
     /// Creates a packed binary dataset from a list of filenames.
     /// @note Throws exception when an error occurred when reading the file.
     PackedBinaryDataset(const std::vector<std::string> &filenames);
+    PackedBinaryDataset(const std::vector<std::filesystem::path> &filenames);
     ~PackedBinaryDataset();
 
     bool next(DataEntry *entry) override;

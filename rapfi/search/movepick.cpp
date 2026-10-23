@@ -1,3 +1,4 @@
+// Bundled RapFi engine (upstream: github.com/dhbloo/rapfi) — Meter Gomoku Link v4.43
 /*
  *  Rapfi, a Gomoku/Renju playing engine supporting piskvork protocol.
  *  Copyright (C) 2022  Rapfi developers
@@ -18,6 +19,7 @@
 
 #include "movepick.h"
 
+#include "../eval/classicalpolicy.h"
 #include "../eval/evaluator.h"
 #include "../eval/scoretables.h"
 #include "../game/board.h"
@@ -25,6 +27,9 @@
 #include "searchthread.h"
 
 #include <algorithm>
+#include <optional>
+#include <array>
+#include <limits>
 
 namespace {
 
@@ -109,8 +114,7 @@ namespace Search {
 template <>
 MovePicker::MovePicker(Rule rule, const Board &board, ExtraArgs<MovePicker::ROOT> args)
     : board(board)
-    , mainHistory(nullptr)
-    , counterMoveHistory(nullptr)
+    , historyScoring()
     , stage(ALLMOVES)
     , rule(rule)
     , ttMove(Pos::NONE)
@@ -118,6 +122,9 @@ MovePicker::MovePicker(Rule rule, const Board &board, ExtraArgs<MovePicker::ROOT
     , hasPolicy(false)
     , useNormalizedPolicy(args.useNormalizedPolicy)
     , normalizedPolicyTemp(args.normalizedPolicyTemp)
+#ifdef POLICY_TRAINING
+    , traceEligible(false)
+#endif
 {
     Color self = board.sideToMove(), oppo = ~self;
     curMove = moves;
@@ -141,7 +148,7 @@ MovePicker::MovePicker(Rule rule, const Board &board, ExtraArgs<MovePicker::ROOT
         endMove = generate<DEFEND_FOUR | ALL>(board, curMove);
         endMove = generateVCFMoves(rule, board, endMove);
         if (useNormalizedPolicy)
-            scoreAllMoves<ScoreType(BALANCED | POLICY)>();
+            scoreAllMoves<POLICY>();
     }
     else if (board.p4Count(oppo, C_BLOCK4_FLEX3)
              && (rule != Rule::RENJU || validateOpponentCMove(board))) {
@@ -153,12 +160,12 @@ MovePicker::MovePicker(Rule rule, const Board &board, ExtraArgs<MovePicker::ROOT
             endMove = generateVCFMoves(rule, board, endMove);
 
         if (useNormalizedPolicy)
-            scoreAllMoves<ScoreType(BALANCED | POLICY)>();
+            scoreAllMoves<POLICY>();
     }
     else {
         endMove = generate<ALL>(board, curMove);
         if (useNormalizedPolicy)
-            scoreAllMoves<ScoreType(BALANCED | POLICY)>();
+            scoreAllMoves<POLICY>();
     }
 
     if (useNormalizedPolicy)
@@ -169,15 +176,17 @@ MovePicker::MovePicker(Rule rule, const Board &board, ExtraArgs<MovePicker::ROOT
 template <>
 MovePicker::MovePicker(Rule rule, const Board &board, ExtraArgs<MovePicker::MAIN> args)
     : board(board)
-    , mainHistory(args.mainHistory)
-    , counterMoveHistory(args.counterMoveHistory)
+    , historyScoring(args.historyScoring)
     , rule(rule)
     , allowPlainB4InVCF(false)
     , hasPolicy(false)
     , useNormalizedPolicy(args.useNormalizedPolicy)
     , normalizedPolicyTemp(args.normalizedPolicyTemp)
+#ifdef POLICY_TRAINING
+    , traceEligible(true)
+#endif
 {
-    Color oppo = ~board.sideToMove();
+    Color self = board.sideToMove(), oppo = ~self;
     bool  ttmValid;
 
     if (board.p4Count(oppo, A_FIVE)) {
@@ -212,7 +221,7 @@ MovePicker::MovePicker(Rule rule, const Board &board, ExtraArgs<MovePicker::MAIN
 template <>
 MovePicker::MovePicker(Rule rule, const Board &board, ExtraArgs<MovePicker::QVCF> args)
     : board(board)
-    , mainHistory(nullptr)
+    , historyScoring()
     , rule(rule)
     , allowPlainB4InVCF(
           args.depth >= DEPTH_QVCF_FULL
@@ -220,6 +229,9 @@ MovePicker::MovePicker(Rule rule, const Board &board, ExtraArgs<MovePicker::QVCF
     , hasPolicy(false)
     , useNormalizedPolicy(false)
     , normalizedPolicyTemp(1.0f)
+#ifdef POLICY_TRAINING
+    , traceEligible(true)
+#endif
 {
     Color self = board.sideToMove(), oppo = ~self;
     bool  ttmValid;
@@ -255,8 +267,32 @@ Pos MovePicker::pickNextMove(Pred filter)
             std::swap(*curMove,
                       *std::min_element(curMove, endMove, ScoredMove::ScoreComparator {}));
 
-        if (curMove->pos != ttMove && (!forbidden || !board.checkForbiddenPoint(curMove->pos))
-            && filter()) {
+        const bool isTtMove    = curMove->pos == ttMove;
+        const bool isForbidden = forbidden && board.checkForbiddenPoint(curMove->pos);
+        const bool accepted    = !isTtMove && !isForbidden && filter();
+#ifdef POLICY_TRAINING
+        if (Tuning::PolicyTraceCandidate *candidate = policyTraceCandidate(curMove->pos)) {
+            if (candidate->disposition == Tuning::PolicyTraceDisposition::Pending) {
+                if (isTtMove) {
+                    candidate->filter      = Tuning::PolicyTraceFilter::TtMove;
+                    candidate->disposition = Tuning::PolicyTraceDisposition::Filtered;
+                }
+                else if (isForbidden) {
+                    candidate->filter      = Tuning::PolicyTraceFilter::Forbidden;
+                    candidate->disposition = Tuning::PolicyTraceDisposition::Filtered;
+                }
+                else if (accepted) {
+                    if (candidate->policyOrdinal == std::numeric_limits<uint16_t>::max())
+                        candidate->policyOrdinal = tracePolicyOrdinal++;
+                }
+                else {
+                    candidate->filter      = Tuning::PolicyTraceFilter::RootExcluded;
+                    candidate->disposition = Tuning::PolicyTraceDisposition::Filtered;
+                }
+            }
+        }
+#endif
+        if (accepted) {
             curScore = curMove->score;
             if (useNormalizedPolicy)
                 curPolicy = curMove->policy;
@@ -281,8 +317,16 @@ void MovePicker::scoreAllMoves()
     Color               self = board.sideToMove(), oppo = ~self;
     PolicyBuffer       *policyBuf = reinterpret_cast<PolicyBuffer *>(&policyBufferStorage);
     Evaluator *evaluator = board.thisThread() ? board.thisThread()->evaluator.get() : nullptr;
+    const bool useEvaluatorPolicy = bool(Type & POLICY) && evaluator;
+    std::optional<Evaluation::ClassicalPolicyScorer> classicalPolicy;
+    if (!useEvaluatorPolicy)
+        classicalPolicy.emplace(rule, board);
+#ifdef POLICY_TRAINING
+    if (!useEvaluatorPolicy)
+        beginPolicyTrace();
+#endif
 
-    if (bool(Type & POLICY) && evaluator) {
+    if (useEvaluatorPolicy) {
         new (policyBuf) Evaluation::PolicyBuffer(board.size());
 
         // Set compute flag for all moves in move list
@@ -295,47 +339,47 @@ void MovePicker::scoreAllMoves()
     }
 
     for (auto &m : *this) {
-        if (bool(Type & POLICY) && evaluator) {
-            m.score = m.rawScore = policyBuf->score(m.pos);
-            maxPolicyScore       = std::max(maxPolicyScore, m.rawScore);
+        int score;
+        if (useEvaluatorPolicy) {
+            score = m.rawScore = policyBuf->score(m.pos);
+            maxPolicyScore     = std::max(maxPolicyScore, m.rawScore);
         }
         else {
-            // Scores are not cached on the cell: recompute both sides' move scores from the
-            // pattern codes (same values as Board::score(), batched for the whole list).
             const auto [pcodeBlack, pcodeWhite] = board.pcodePair(m.pos);
-            MoveScorePair scoreBlack      = Evaluation::getMoveScorePair(rule, BLACK, pcodeBlack);
-            MoveScorePair scoreWhite      = Evaluation::getMoveScorePair(rule, WHITE, pcodeWhite);
-            Score         scores[SIDE_NB] = {
-                Score(scoreBlack.self + scoreWhite.oppo),
-                Score(scoreWhite.self + scoreBlack.oppo),
-            };
-            if constexpr (bool(Type & BALANCED))
-                m.score = m.rawScore = scores[self];
-            else if constexpr (bool(Type & ATTACK))
-                m.score = m.rawScore = (scores[self] * 2 + scores[oppo]) / 3;
-            else if constexpr (bool(Type & DEFEND))
-                m.score = m.rawScore = (scores[self] + scores[oppo] * 2) / 3;
-            else
-                assert(false && "incorrect score type");
+            score = m.rawScore = classicalPolicy->score(pcodeBlack,
+                                                        pcodeWhite,
+                                                        board.pattern4(m.pos, self),
+                                                        board.pattern4(m.pos, oppo));
         }
 
-        if (bool(Type & MAIN_HISTORY) && mainHistory) {
-            if (board.pattern4(m.pos, self) >= H_FLEX3)
-                m.score += (*mainHistory)[self][m.pos][HIST_ATTACK] / 128;
-            else
-                m.score += (*mainHistory)[self][m.pos][HIST_QUIET] / 256;
-        }
-
-        if (bool(Type & COUNTER_MOVE) && counterMoveHistory) {
-            if (Pos lastMove = board.getLastMove(); board.isInBoard(lastMove)) {
-                const int CounterMoveBonus = 21;
-                auto [counterMove, counterMoveP4] =
-                    (*counterMoveHistory)[oppo][lastMove.moveIndex()].get();
-
-                if (counterMove == m.pos && counterMoveP4 <= board.pattern4(m.pos, self))
-                    m.score += CounterMoveBonus;
+        int historyBonus = 0;
+        if (bool(Type & MAIN_HISTORY) && historyScoring.mainHistory) {
+            if (board.pattern4(m.pos, self) >= H_FLEX3) {
+                historyBonus = (*historyScoring.mainHistory)[self][m.pos][HIST_ATTACK]
+                               * historyScoring.attackWeight / MoveHistoryScoring::WeightScale;
+            }
+            else {
+                historyBonus = (*historyScoring.mainHistory)[self][m.pos][HIST_QUIET]
+                               * historyScoring.quietWeight / MoveHistoryScoring::WeightScale;
             }
         }
+
+        int counterMoveBonus = 0;
+        if (bool(Type & COUNTER_MOVE) && historyScoring.counterMoveHistory) {
+            if (Pos lastMove = board.getLastMove(); board.isInBoard(lastMove)) {
+                auto [counterMove, counterMoveP4] =
+                    (*historyScoring.counterMoveHistory)[oppo][lastMove.moveIndex()].get();
+
+                if (counterMove == m.pos && counterMoveP4 <= board.pattern4(m.pos, self)) {
+                    counterMoveBonus = historyScoring.counterMoveBonus;
+                }
+            }
+        }
+
+        m.score = Evaluation::clampMoveScore(score + historyBonus + counterMoveBonus);
+#ifdef POLICY_TRAINING
+        recordPolicyTraceCandidate(m, historyBonus, counterMoveBonus);
+#endif
     }
 
     // Compute normalized policy score if needed
@@ -369,13 +413,16 @@ template <MovePicker::ScoreType ExtraFlags>
 void MovePicker::scoreAndSortMoves()
 {
     if (useNormalizedPolicy) {
-        scoreAllMoves<ScoreType(BALANCED | POLICY)>();
+        scoreAllMoves<POLICY>();
         fastPartialSort(curMove, endMove, 0, ScoredMove::PolicyComparator {});
     }
     else {
-        scoreAllMoves<ScoreType(BALANCED | POLICY | ExtraFlags)>();
+        scoreAllMoves<ScoreType(POLICY | ExtraFlags)>();
         fastPartialSort(curMove, endMove, 0, ScoredMove::ScoreComparator {});
     }
+#ifdef POLICY_TRAINING
+    capturePolicyTraceOrder();
+#endif
 }
 
 /// Pick the next legal move until there is no legal move left.
@@ -455,8 +502,11 @@ top:
                                                                     RANGE_SQUARE2_LINE4.size());
         }
 
-        scoreAllMoves<BALANCED>();
+        scoreAllMoves<CLASSICAL_ONLY>();
         fastPartialSort(curMove, endMove, 0, ScoredMove::ScoreComparator {});
+#ifdef POLICY_TRAINING
+        capturePolicyTraceOrder();
+#endif
 
         stage = ALLMOVES;
         [[fallthrough]];
@@ -468,5 +518,110 @@ top:
     assert(false && "unknown MovePicker stage occurred");
     return Pos::NONE;
 }
+
+#ifdef POLICY_TRAINING
+void MovePicker::beginPolicyTrace()
+{
+    if (!traceEligible || curMove == endMove || traceEvent || !board.thisThread())
+        return;
+    Tuning::PolicyTraceSession *session = board.thisThread()->engine.policyTraceSession();
+    if (!session)
+        return;
+
+    // Trace the actual context even when zero residual tables let the scorer skip it.
+    const Evaluation::PolicyContext context = Evaluation::classifyPolicyContext(board);
+    const bool                      p3Active =
+        Evaluation::policyCrossActiveMask(rule, board.sideToMove()) & uint8_t(1U << context);
+    const Tuning::PolicyTraceEventContext eventContext =
+        session->beginEvent(board.thisThread()->id);
+    traceEvent                = std::make_unique<Tuning::PolicyTraceEvent>();
+    traceEvent->identity      = eventContext.identity;
+    traceEvent->openingFamily = eventContext.openingFamily;
+    traceEvent->split         = eventContext.split;
+    traceEvent->rule          = rule;
+    traceEvent->boardSize     = static_cast<uint8_t>(board.size());
+    traceEvent->sideToMove    = board.sideToMove();
+    traceEvent->policyContext = context;
+    traceEvent->p3Active      = p3Active;
+    traceEvent->positionKey   = board.zobristKey();
+    traceEvent->ttMove        = ttMove;
+    traceEvent->bestMove      = Pos::NONE;
+    traceEvent->bestValue     = VALUE_NONE;
+    traceEvent->bestBound     = BOUND_NONE;
+    traceEvent->completion    = Tuning::PolicyTraceCompletion::Terminated;
+    traceEvent->domain        = stage == DEFENDFOUR_MOVES   ? Tuning::PolicyTraceDomain::DefendFour
+                                : stage == DEFENDB4F3_MOVES ? Tuning::PolicyTraceDomain::DefendB4F3
+                                : stage == QVCF_MOVES       ? Tuning::PolicyTraceDomain::Qvcf
+                                                            : Tuning::PolicyTraceDomain::Main;
+    traceEvent->history.reserve(board.ply());
+    for (int i = 0; i < board.ply(); i++)
+        traceEvent->history.push_back(board.getHistoryMove(i));
+}
+
+void MovePicker::recordPolicyTraceCandidate(const ScoredMove &move,
+                                            int               historyBonus,
+                                            int               counterMoveBonus)
+{
+    if (!traceEvent || policyTraceCandidate(move.pos))
+        return;
+
+    const Color self                    = board.sideToMove();
+    const auto [pcodeBlack, pcodeWhite] = board.pcodePair(move.pos);
+    const int baseScore = Evaluation::classicalPolicyBaseScore(rule, self, pcodeBlack, pcodeWhite);
+    Tuning::PolicyTraceCandidate candidate {};
+    candidate.move             = move.pos;
+    candidate.generatedOrdinal = static_cast<uint16_t>(traceEvent->candidates.size());
+    candidate.selectionOrdinal = std::numeric_limits<uint16_t>::max();
+    candidate.policyOrdinal    = std::numeric_limits<uint16_t>::max();
+    candidate.filter           = Tuning::PolicyTraceFilter::None;
+    candidate.disposition      = Tuning::PolicyTraceDisposition::Pending;
+    candidate.selfPattern      = board.pattern4(move.pos, self);
+    candidate.opponentPattern  = board.pattern4(move.pos, ~self);
+    candidate.positionScore    = baseScore;
+    candidate.p3Residual       = int(move.rawScore) - baseScore;
+    candidate.mainHistory      = historyBonus;
+    candidate.counterMove      = counterMoveBonus;
+    candidate.finalScore       = move.score;
+    candidate.teacherLogit     = move.rawScore;
+    candidate.bound            = BOUND_NONE;
+    traceEvent->candidates.push_back(candidate);
+}
+
+void MovePicker::capturePolicyTraceOrder()
+{
+    for (uint16_t ordinal = 0; ordinal < uint16_t(endMove - curMove); ordinal++) {
+        if (traceEvent) {
+            if (Tuning::PolicyTraceCandidate *candidate = policyTraceCandidate(curMove[ordinal].pos);
+                candidate
+                && candidate->selectionOrdinal == std::numeric_limits<uint16_t>::max())
+                candidate->selectionOrdinal = ordinal;
+        }
+    }
+}
+
+Tuning::PolicyTraceCandidate *MovePicker::policyTraceCandidate(Pos move)
+{
+    if (!traceEvent)
+        return nullptr;
+    auto candidate = std::find_if(
+        traceEvent->candidates.begin(),
+        traceEvent->candidates.end(),
+        [move](const Tuning::PolicyTraceCandidate &entry) { return entry.move == move; });
+    return candidate == traceEvent->candidates.end() ? nullptr : &*candidate;
+}
+
+void MovePicker::commitPolicyTrace()
+{
+    if (!traceEvent)
+        return;
+    Tuning::PolicyTraceSession *session =
+        board.thisThread() ? board.thisThread()->engine.policyTraceSession() : nullptr;
+    if (!session)
+        throw std::logic_error("policy trace session detached before event commit");
+    session->commit(std::move(*traceEvent));
+    traceEvent.reset();
+}
+
+#endif
 
 }  // namespace Search

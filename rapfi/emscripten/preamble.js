@@ -1,3 +1,4 @@
+// Bundled RapFi engine (upstream: github.com/dhbloo/rapfi) — Meter Gomoku Link v4.43
 Module["sendCommand"] = Module["sendCommand"] || null;
 Module["terminate"] = Module["terminate"] || null;
 Module["onReceiveStdout"] = Module["onReceiveStdout"] || ((o) => console.log(o));

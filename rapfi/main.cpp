@@ -1,3 +1,4 @@
+// Bundled RapFi engine (upstream: github.com/dhbloo/rapfi) — Meter Gomoku Link v4.43
 /*
  *  Rapfi, a Gomoku/Renju playing engine supporting piskvork protocol.
  *  Copyright (C) 2022  Rapfi developers
@@ -117,7 +118,13 @@ int main(int argc, char *argv[])
 
 #ifdef COMMAND_MODULES
     switch (runMode) {
-    case BENCHMARK: Command::benchmark(); break;
+    case BENCHMARK:
+        Command::benchmark();
+        // Benchmark restores worker state for protocol callers. The standalone command
+        // must finish that work and release workers before static process teardown.
+        Search::Engine.waitForIdle();
+        Search::Engine.setNumThreads(0);
+        break;
     case OPENGEN: Command::opengen(argc, argv); break;
     case TUNING: return Command::tuning(argc, argv);
     case SELFPLAY: Command::selfplay(argc, argv); break;

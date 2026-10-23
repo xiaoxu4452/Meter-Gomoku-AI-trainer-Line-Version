@@ -1,3 +1,4 @@
+// Bundled RapFi engine (upstream: github.com/dhbloo/rapfi) — Meter Gomoku Link v4.43
 /* SPDX-License-Identifier: MIT
  *
  * Permission is hereby granted, free of charge, to any person

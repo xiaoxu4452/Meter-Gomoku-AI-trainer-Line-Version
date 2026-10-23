@@ -1,4 +1,5 @@
-﻿/* Meter Gomoku Trainer - desktop overlay data bridge. Exposes page-facing APIs for board sync, engine analysis, balance-point suggestions and auto-move; the C++ host drives screen scanning and click injection. */
+// Meter Gomoku Link — v4.43
+/* Meter Gomoku Trainer - desktop overlay data bridge. Exposes page-facing APIs for board sync, engine analysis, balance-point suggestions and auto-move; the C++ host drives screen scanning and click injection. */
 
 
 (function () {
@@ -6,13 +7,18 @@
 
   var S = window.GB_S || (window.GB_S = {});
 
-  var GB_VER = 'v4.42';
+  var GB_VER = 'v4.43';
+  // 自检钩子（必须尽早挂上：后面任何一句抛异常都不影响它；正常流程不用）
   try { window.__gbTacTest = engineTacTest; } catch (e) {}
   var UI = window.GBUI || {};
   var N = 15;
 
+  // 引擎/识别通信已统一为「纯 C++ 硬链接」：引擎走宿主 /engine/* 进程内拦截（零 TCP），
+  // 识别结果由宿主 postMessage 推送。旧的 :8964 / :8975 HTTP 直连已移除。
 
   var HOST = !!(window.chrome && window.chrome.webview && window.chrome.webview.addEventListener);
+  // ★★ 2026-10-19 回归 4.36：解析 / 终局判定 / 候选拼装 / 预算全部**自含**（见下方实现），
+  //   与 4.36 Trainer 的调用口径一致；engine-core.js 单源层整体退役。
   var GB_CORE = null;
 
   var uiWarned = {};
@@ -34,6 +40,10 @@
     } catch (e) {}
   }
 
+  // ★★ 2026-10-18：**模块级诊断**。以前 bridgeDiag 定义在 natEng 的函数体里，而
+  //   analyze()/runSwapEval() 在模块作用域 ⇒ 那 6 处调用是未定义标识符，被外层
+  //   try{}catch{} 静默吞掉（日志里 LINK_BUDGET / LINK_TACTIC / LINK_ANALYZE 从未出现）。
+  //   诊断必须永远可用：这里直接走 tellHost，宿主按 [bridge-ui] 记一行。
   function bridgeDiag(text) {
     tellHost({ type: 'status', text: String(text) });
   }
@@ -245,6 +255,9 @@
 
 var lastBoardKey = '';
 var emptyStreak = 0;
+// ★ 2026-10-18（用户：「TT 要跨手复用，别让识别抖动误判新局而清表」）：
+//   空盘持续计时。整盘积累的置换表一旦被 YXHASHCLEAR 扔掉，后面每一手都从零开始搜，
+//   表现出来就是「中后盘忽然变弱」。
 var emptySinceMs = 0;                 
 
 var pendingKey = '';
@@ -260,10 +273,17 @@ var analyzeRetryTimer = null;
 var lastBl = [], lastWh = [];        
 var lastAdoptBl = [], lastAdoptWh = [];   
 
-var linkOppTurnAt = 0;
-var linkOppThinkMs = 0;
-var LINK_TURN_CAP_MS = 15000;
-var lastEvalFp = '';
+// ★ 2026-10-18（用户：「科学且激进且疯狂的调用引擎（疯狂不代表着超标越界）」）：
+//   连线一手的搜索时长不再只吃用户设定的那个固定值。依据两条**事实**：
+//   ① 对手思考期间棋盘不动、我们的引擎闲着（只有 ponder 在跑）⇒ 那段时间是**免费思考窗口**；
+//   ② 对手实际思考多久，识别帧的节奏里就写着多久（我方落子被确认 → 对手新子出现）。
+//   所以本手预算 = max(用户设定, 对手上一手思考时长)，再夹在 LINK_TURN_CAP_MS 之下。
+//   「不超标越界」的边界就在这里：一分不多占（对手想多久我们就想多久）+ 单手上限 15s，
+//   线程/哈希/ponder 全部走既有的满核 + 大表 + PONDERING 通路，不额外改引擎配置。
+var linkOppTurnAt = 0;        // 轮次交给对手的时刻（0 = 当前轮到我方）
+var linkOppThinkMs = 0;       // 对手上一手实际思考时长（墙钟）
+var LINK_TURN_CAP_MS = 15000; // 单手搜索上限
+var lastEvalFp = '';          // S.myEval 是哪一帧盘面的评估（M 快速出子只认当前盘面）
 
 var balBusy = false;
 
@@ -304,8 +324,15 @@ var LBAL = {
     swBalMax: '交换平衡点仅限开局五手（3 手 + 2 手），当前盘面已超出交换阶段',
     swBalStage: '交换平衡点只在空盘（两黑一白 3 点）或已有 3 子（一黑一白 2 点）时可用；当前手数不在交换窗口',
     swBalDone: '交换平衡点已标出（浅蓝=白、浅紫=黑）：', swPlacing: '自动摆点：第 %1/%2 个（',
+    // ★ 2026-10-13：连线窗以前**从不报平衡分**，所以用户只能看面板那条「对弈引擎评估」
+    //   （禁手下实测 +546，被当成「平衡点评估」来看 →「接近 1000 分的误差」）。现在把
+    //   平衡引擎自己那一对的分报出来：|评估| ≤ 50 才是官方 balanceWindow 内的「平」。
     swBalEval: '（平衡引擎判定：|评估| ≈ %1，≤ 50 才算平）',
     swBalEvalNone: '（平衡引擎未回传评估分）',
+    // ★ 2026-10-13（用户）：开局定平衡点该评估几个 —— 官方指定开局只有三手（黑1 天元 ·
+    //   白2 在 3×3 · 黑3 在 5×5，中国五子棋竞赛规则 2025 / RIF），所以开局评估 3 个最合理。
+    //   ★ 2026-10-13（用户：「这个提示文案是多条的，是灵活多变的，不应该只是一个大段话，
+    //     这个文案在连线器中要精简」）：连线窗位置窄，改成**短句池 + 每次随机 1 条**。
     swBalOpenHints: [
       '官方开局 3 手，评估 3 个点最合理（此处固定 3 个）。',
       '评估 4 个以上已走出开局，分数不可靠。',
@@ -399,6 +426,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     return out;
   }
 
+  // （已移除）fetchJSON：页面侧不再直连 HTTP。
     var mainChain = Promise.resolve();
   function onMainLane(fn) {
     var run = mainChain.then(fn, fn);              
@@ -420,6 +448,9 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     if (isWaitTimeout(e)) return LT('engineBusyTimeout');
     if (e instanceof TypeError || /failed to fetch|fetch failed|networkerror|load failed/i.test(m)) {
       pingEnsureDeps();
+      // ★ 2026-10-16：把**真实原因**附在后面。以前只返回「连不上本地引擎（硬链接）—— 桌面
+      //   助手正在自动重启它」这一句，用户/日志都拿不到任何可定位的信息；现在原始 message
+      //   一起显示（并随 status 日志落到宿主供取证）。
       return LT('engineUnreachable') + '（' + m + '）';
     }
     if (/connection lost/i.test(m)) { pingEnsureDeps(); return LT('engineUnreachable') + '（' + m + '）'; }
@@ -433,17 +464,25 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
   }
 
   // ───────────────────────────────────────────────────────────────────────
+  // 引擎通道（2026-10-19 重建）：宿主单实例 Rapfi「极速版」。
+  //   页面只发 ask / stop / caps / config 四种 op；协议编排与解析 100% 在 C++
+  //   （desktop-connect/src/engine_host.cpp）。页面里不再有任何协议文本解析、
+  //   不再有车道（main/sub/fwd）、不再有轮询、不再有 HTTP / WebSocket。
+  //   宿主推回两条消息：
   //     {"type":"engineAck","id":N,"op":"ask","ok":bool,["err":..,]"res":{...}}
+  //     {"type":"engineAsk","id":N,"phase":"tick","res":{...}}   ← 中间过程
+  //   返回口径与旧 doAnalyze 完全一致（candidates[].line/speed/winrate、
+  //   best / elapsed / superseded / error），故 analyze()/heat/swap 调用点无需改动。
   // ───────────────────────────────────────────────────────────────────────
   var NATENG = null;
-  var NATENG_CAPS = null;
+  var NATENG_CAPS = null;          // 最近一次 caps（变体/线程/哈希），供 UI 与诊断
   function natEng() {
     if (NATENG) return NATENG;
     NATENG = (function () {
       var seq = 0;
-      var pend = {};
-      var capWait = {};
-      var cur = null, wait = null;
+      var pend = {};               // id -> job（在途 ask）
+      var capWait = {};            // caps 的 id -> resolve
+      var cur = null, wait = null; // 单实例：同时只允许一个 ask 在途（宿主只有一个引擎）
 
       function post(o) {
         var cv = window.chrome && window.chrome.webview;
@@ -455,11 +494,15 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         return { candidates: [], best: null, elapsed: 0, depth: 0, nodeCount: 0,
                  superseded: !!sup, error: err || '' };
       }
+      // 宿主结构化结果 → 旧 doAnalyze 口径
       function mapRes(r) {
         r = r || {};
         var cands = (r.candidates || []).map(function (c) {
           var wr = (typeof c.winrateBp === 'number' && c.winrateBp >= 0 && c.winrateBp <= 10000)
                      ? c.winrateBp / 10000 : 0.5;
+          // ★ 2026-10-19（用户：「节点和速度不会差十倍」）：speed 是全局口径
+          //   （INFO SPEED = 全线程总节点 / 耗时），节点必须同源用全局 TOTALNODES（r.nodes）。
+          //   以前这里配的是单手指子树 INFO NODES，两者差 ≈ 线程数倍（实测 ≈ 9.08x）。
           return { x: c.x, y: c.y, eval: c.eval || '', depth: c.depth || 0,
                    speed: r.speed || 0, nodes: r.nodes || 0, winrate: wr,
                    line: (c.pv || []).map(function (p) { return [p[0], p[1]]; }) };
@@ -504,7 +547,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
                   side: (b.side === 1 || b.side === 2) ? b.side : 0,
                   rule: b.rule | 0,
                   budgetMs: Math.max(200, b.turnMs | 0),
-                  key: b.key || 0 };
+                  key: b.key || 0 };          // ★ 真实盘面指纹（此前硬编码 0，宿主无法识别同盘面连问）
         if (op === 'balance') {
           q.topN = 1; q.pondering = false;
           q.mode = (b.mode === 'two') ? 'two' : 'one';
@@ -516,6 +559,9 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         return { id: ++seq, timer: null, resolve: resolve, onTick: b.onTick, op: op || 'ask',
                  exclusive: !!b.exclusive, timeoutMs: timeoutMs || 8000, q: q };
       }
+      // 页面侧串行（宿主只有一个引擎）：同时只跑一个 ask。新的「要落子」请求
+      // （exclusive）可抢占在途的辅助请求（热度图 / 换位评估）；其余请求排队，
+      // 且只保留最新的一个排队项（更旧的就地作废，避免拿旧盘面把预算跑满）。
       function submit(job) {
         if (wait) { wait.resolve(emptyRes(true)); wait = null; }
         if (!cur) { startJob(job); return; }
@@ -532,6 +578,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
       function ask(body, timeoutMs) {
         return new Promise(function (resolve) { submit(makeJob(body, timeoutMs, resolve, 'ask')); });
       }
+      // 官方平衡点（宿主 YXBALANCEONE / YXBALANCETWO，一次性算完即停）。
       function balance(body, timeoutMs) {
         return new Promise(function (resolve) { submit(makeJob(body, timeoutMs, resolve, 'balance')); });
       }
@@ -554,9 +601,12 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
                      variant: (c && c.variant) || '', diag: (c && c.diag) || '' };
           });
         }
+        // swap2board 依赖的 YXSWAP2BOARD 协议尚未在新宿主重建：
+        // 返回空结果而不抛错，让调用方走既有的「无解 / 本地定式兜底」分支。
         bridgeDiag('LINK_ENG_API_RETIRED ' + api);
         return Promise.resolve(emptyRes(false, 'api retired: ' + api));
       }
+      // 宿主 balance 结果 → 旧口径 { moves:[[x,y]…], eval:num|null, swap, error }
       function balanceRes(r) {
         r = r || {};
         var pts = (r.pts || []).map(function (p) { return [p[0], p[1]]; });
@@ -593,6 +643,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         job.resolve(r);
         pump();
       }
+      // 中间过程：宿主对同一 id 每 ≥120ms 推一次结构化 res（不重搜、不换手）。
       function onOut(msg) {
         if (!msg || msg.type !== 'engineAsk' || msg.phase !== 'tick' || !msg.id) return;
         var job = pend[msg.id];
@@ -608,12 +659,17 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
                      ' diag=' + ((c && c.diag) || '-'));
         }).catch(function () {});
       }
+      // 引擎复位（空盘新局 / 规则切换）：只作废在途搜索；引擎进程由宿主常驻，不重启。
       function hardReset(reason) {
         try { post({ engine: 1, op: 'stop', id: ++seq, q: {} }); } catch (e) {}
         if (cur) { clearTimeout(cur.timer); delete pend[cur.id]; cur.resolve(emptyRes(true)); cur = null; }
         if (wait) { wait.resolve(emptyRes(true)); wait = null; }
         bridgeDiag('LINK_ENG_RESET ' + (reason || ''));
       }
+      // ★★ 2026-10-19（用户：「在交换平衡点、交换评估后面再添加一个取消按键，点击取消后可以停止
+      //   交换平衡的计算」）：中断在途的 ask / balance（向宿主发 op:'stop'）并让等待方立刻拿到
+      //   「已作废」的结果。注意 balance 的口径必须按 balanceRes 的形状给（moves/eval/swap/error），
+      //   否则 runSwapBal 侧读 .moves 会直接炸。
       function cancelAll() {
         try { post({ engine: 1, op: 'stop', id: ++seq, q: {} }); } catch (e) {}
         var jobs = [], i, j;
@@ -637,6 +693,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
   function wsCall(api, body, timeoutMs) {
     return natEng().call(api, body, timeoutMs);
   }
+  // 置换表清空 / 引擎复位（空盘新局、规则切换时调用）。
   function engineHardReset(reason) {
     try { natEng().reset(reason); } catch (e) {
       try { console.warn('[bridge] engineHardReset failed:', e); } catch (e2) {}
@@ -646,6 +703,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     try { natEng().diag(why); } catch (e) {}
   }
 
+  // 自检钩子：用合成棋盘验证战术加固层（正常流程不用；窗口全局便于无头自检读取）
   function engineTacTest(cells, toMove) {
     var m = [], x, y;
     for (y = 0; y < N; y++) { m.push([]); for (x = 0; x < N; x++) m[y].push(0); }
@@ -741,6 +799,12 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     return false;
   }
 
+  // ★ 2026-10-13：**和主界面 calc.js 的 engineRule() 同口径**。
+  //   原生引擎只认 rule = 0/1/2/5；本面板历史上用 6/7/8 表示禁手族。以前这里把
+  //   S.rule **原样**传下去，engine-ai.js 的 doBalance/doAnalyze 会做
+  //   `[0,1,2,5].indexOf(rule)>=0 ? rule : 0` —— 6/7/8 被静默降级成 0（无禁手），
+  //   于是「有禁手」的局面拿到的是无禁手的平衡点/评估。统一在这里映射，
+  //   保证「有禁手就是有禁手」（用户：「一定要分清有禁手和无禁手」）。
   function engRuleOf(r) {
     var v = +r;
     if (v === 6 || v === 7 || v === 8) return 2;
@@ -836,6 +900,12 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     return out;
   }
 
+  // ★★ 2026-10-17 战术加固层（移植自练习器 calc.js 的 aiTurnBudget / mustAnswer /
+  //    nearStoneGuard —— 用户「智力上远不如 4.39」的机制就在这里）。
+  //    连线窗以前是**引擎裸输出**：固定 2 秒、不做必应、不做近点护栏。同样的引擎、
+  //    同样的 12 线程，练习器会「对手成五就加时 1.5×、必堵必应、开局不飞到天涯海角」，
+  //    连线窗全都没有 ⇒ 同一个局面连线显得更笨。加固只在**引擎给出候选之后**兜底，
+  //    因此永远不会把一个正常的好手强行换掉（只接管「明显必应/必赢」的情形）。
   function bNearAny(m, x, y) {
     for (var dy = -3; dy <= 3; dy++) for (var dx = -3; dx <= 3; dx++) {
       var px = x + dx, py = y + dy;
@@ -845,6 +915,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     return false;
   }
 
+  // 活四点 = 落子后同时形成 ≥2 个成五点（两路都成五，对手只能堵一路）
   function bOpenFourPoints(m, side) {
     var out = [];
     for (var y = 0; y < N; y++) for (var x = 0; x < N; x++) {
@@ -863,6 +934,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     return false;
   }
 
+  // 必应：① 行棋方成五点直接赢 ② 对手唯一成五点必堵 ③ 对手活四且本方无四 → 破活四
   function bMustAnswer(m, toMove, cands, oppWin, oppFour, myFour) {
     var myWin = findWinningFive(m, toMove);
     if (myWin.length) return { x: myWin[0][0], y: myWin[0][1], why: 'win' };
@@ -875,12 +947,13 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
       return { x: oppWin[0][0], y: oppWin[0][1], why: 'block5' };
     if (oppFour && oppFour.length && !(myFour && myFour.length)) {
       for (var i = 0; i < (cands || []).length; i++)
-        if (bInList(oppFour, cands[i].x, cands[i].y)) return null;
+        if (bInList(oppFour, cands[i].x, cands[i].y)) return null;   // 引擎已选破点
       return { x: oppFour[0][0], y: oppFour[0][1], why: 'block4' };
     }
     return null;
   }
 
+  // 近点护栏：开局（≤10 子）不把子下到离所有棋子 >3 的地方
   function bNearGuard(m, x, y) {
     var n = 0;
     for (var j = 0; j < N; j++) for (var i = 0; i < N; i++) if (m[j][i]) n++;
@@ -888,6 +961,9 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     return bNearAny(m, x, y);
   }
 
+  // 威胁感知预算 —— ★★ 2026-10-19 回归 4.36 的 aiTurnBudget：恢复威胁乘数
+  //   （对手成五点 ×1.5、对手活四 ×1.25、行棋方自己已成五/活四 ×0.8 快出）。
+  //   结果同时供必应兜底（bMustAnswer）使用。
   function tacPlan(m, toMove, baseMs) {
     var out = { ms: baseMs, why: '', oppWin: null, oppFour: null, decided: boardDecided(m) };
     if (out.decided) return out;
@@ -904,8 +980,12 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     return sideToMove(bl, wh) === myColOf();
   }
 
+  // 本手送入引擎的 side（1=黑 2=白）。★ 4.36 口径：子数相等 ⇒ 黑行棋（自含实现）。
   function sideToMove(bl, wh) { return (bl.length <= wh.length) ? 1 : 2; }
 
+  // ★★ 2026-10-19 回归 4.36：**eval 原样透传，不做任何翻号换算**。
+  //   4.36 的界面（fmtEval）就是把引擎原文直接格式化展示 —— 没有换算层，也就没有
+  //   「正负颠倒」这类 bug 的容身之处。数值化（曲线/平衡判定用）才解析：mate 记 ±90000。
   function evalForSide(rawEval, rootSide, viewSide) {
     var s = (typeof rawEval === 'string') ? rawEval.trim() : '';
     return s || '-';
@@ -925,6 +1005,9 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
 
   function coordOf(x, y) { return String.fromCharCode(65 + x) + (N - y); }
 
+  // ★ 2026-10-18：「等待超时」与「只回裸着法行」两条路径共用同一条**有界重算**
+  //   （1.5s 起、最多 8 次）。两者都是「这一拍没拿到有搜索依据的结果」，
+  //   按既有口径必须重算，绝不能把这手当候选直接落下。
   function scheduleAnalyzeRetry() {
     if (analyzeRetryTimer) return;
     var tryRetry = function () {
@@ -941,6 +1024,16 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     analyzeRetryTimer = setTimeout(tryRetry, 1500);
   }
 
+  // ★ 2026-10-18：本手搜索预算 = max(用户设定, 对手上一手思考时长)，上限 15s。
+  //   对手在等 = 我们的免费思考窗口。**「不超标越界」的边界**：一分不多占 ——
+  //   对手想多久我们就想多久（同一盘棋的总时钟不会被我们吃掉更多），
+  //   多的只是「同样的时间用在满核 + 512MB~6GB 大表 + PONDERING 的 Rapfi 上」。
+  // ★★ 2026-10-18（用户：「我设置的是 2 秒，它居然算了 4 秒」）：**预算严格 = 用户设置**。
+  //   旧实现是「对手上一手想了多久，我们就想多久（下限 = 用户设置、上限 15s）」——
+  //   对手想 4 秒，我们就搜 4 秒，用户看到的思考时长和他自己设的 2 秒完全对不上。
+  //   对手思考时长仍然采集（linkOppThinkMs / LINK_BUDGET 诊断），但**不参与预算**。
+  // ★ 2026-10-19 回归 4.36：预算 = 用户设置（下限 300，与训练器 aiTurnBudget 同款）；
+  //   威胁乘数由 tacPlan 负责（×1.5 / ×1.25 / ×0.8）。
   function linkTurnBudget() {
     return Math.max(300, S.turnMs || 2000);
   }
@@ -951,26 +1044,36 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     engineBusy = true;
     try {
       var ply = bl.length + wh.length;
+      // ★ 一个盘面只判一次轮次：这一帧送进引擎的 side、本手「是不是我」、评分视角
+      //   全部从 rootSide 推出来（以前三处各判一次，任一处分叉就是「正负颠倒」）。
       var rootSide = sideToMove(bl, wh);
       var mySide = myColOf();
+      // 「是不是我这一手」现在只用于语义判断；评分视角一律用 (rootSide, mySide) 两个事实。
 
       var turnMsNow = linkTurnBudget();
       bridgeDiag('LINK_BUDGET base=' + (S.turnMs || 0) + ' opp=' + linkOppThinkMs +
                        ' ms=' + turnMsNow + ' ad=' + (adOn ? 1 : 0));
 
 
-      var tmc = rootSide;
+      // ── 威胁感知预算（练习器 aiTurnBudget 同款）：对手有成五点 → ×1.5；
+      //    对手有活四 → ×1.25；行棋方自己已成五点 → ×0.8（已必胜，快出即可）。
+      var tmc = rootSide;                                  // 行棋方颜色
       var bmTac = boardMatrix(bl, wh);
       var _tac = tacPlan(bmTac, tmc, turnMsNow);
       turnMsNow = _tac.ms;
       var _oppWin = _tac.oppWin, _oppFour = _tac.oppFour;
       if (_tac.why) { bridgeDiag('LINK_TACTIC budget why=' + _tac.why + ' ms=' + turnMsNow); }
       
+      // ── 完全信任引擎落点（2026-10-19 用户：「不如官方整合包，应该是调用的算法层面的问题」
+      //    —— 去掉 JS 战术覆盖/近点护栏/必应兜底，不再改写引擎的首选）。评估视角一律用
+      //    (rootSide, mySide) 两个事实换算；预算只由 tacPlan 的威胁乘数调整，不影响落点。
 
+      // ── 每一轮结果的展示（mid = 加深过程中，final = 收官）：
+      //    分数/深度/曲线/推荐落点全部实时刷；只有 final 才写 lastBest/lastEvalFp 并（自动落子时）落子。
       var publish = function (r, final) {
         var c00 = r.candidates[0];
-        S.rawEval = c00.eval || '';
-        S.myEval = evalForSide(c00.eval, rootSide, mySide);
+        S.rawEval = c00.eval || '';                                  // 引擎原文（行棋方视角）
+        S.myEval = evalForSide(c00.eval, rootSide, mySide);          // 唯一换算
         S.candCache = r.candidates;
         S.history = S.history.filter(function (p) { return p.i !== ply; });
         S.history.push({ i: ply, v: evalNumOf(c00.eval, rootSide, mySide) });
@@ -978,7 +1081,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         S.lastStat = { c0: { depth: c00.depth, speed: c00.speed, nodes: c00.nodes, line: (c00.line || []).map(function (p) { return [p[0], p[1]]; }) }, elapsed: 0 };
         ui('setStatPanel', S.lastStat.c0, 0);
         ui('drawChart');
-        var bx = r.best || [c00.x, c00.y];
+        var bx = r.best || [c00.x, c00.y];                           // 引擎首选，零改写
         ui('setStatus', (final ? (S.lang === 'en' ? 'Best move ' : '推荐落点 ')
                               : (S.lang === 'en' ? 'Analyzing… best ' : '分析中… 当前最佳 ')) +
           '<b>' + coordOf(bx[0], bx[1]) + '</b>' +
@@ -992,6 +1095,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         return bx;
       };
 
+      // 引擎只回一行裸着法（PV 为空 ⇒ 无搜索证据）且在 90% 预算前结案：按既有口径不落子 + 有界重算。
       var failRawOnly = function (r) {
         var c0r = r && r.candidates && r.candidates[0];
         if (c0r) { bridgeDiag('LINK_EVAL_RAWBEST ' + coordOf(c0r.x, c0r.y) + ' elapsed=' + (r.elapsed | 0)); }
@@ -1014,6 +1118,14 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
       };
 
       var laneSlack = (swBusy || balBusy) ? (SWBAL_BUDGET_MS + 800) : 0;
+      // ★★ 2026-10-18（用户：「2 秒内会重新评估多次，没有充分思考，很多都是失误点；要把内耗
+      //   换成能算得更准落点的能力」）：**一手只许一次 YXNBEST**。
+      //   旧实现是 while 分轮（首轮取预算 45%，后续取剩余 60%），日志实测 2 秒被切成 3 次独立搜索：
+      //     同一盘面 `TIMEOUT_TURN 1719`，1.99s 后又是一次 `TIMEOUT_TURN 1096`。
+      //   每一轮都要 STOP 掉上一轮留下的 ponder、等输出静默（上限 1500ms）、再重新发 YXBOARD ——
+      //   Rapfi 的迭代加深只能从浅层重走一遍，而递减的 TIMEOUT_TURN 又让它自己的时间管理越来越保守。
+      //   净效果：名义预算 2 秒，真正连续的搜索只有 0.9~1.7 秒 ⇒ 深度掉、优势点被算偏。
+      //   现在：全额预算一次下发；中途由 waitForMove 的 onTick 把深度/推荐点实时刷出去（**不重搜**）。
       var lastTickAt = 0;
       var onTick = function (t) {
         var nowMs = Date.now();
@@ -1032,6 +1144,8 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         } catch (eTK) {}
       };
       var res = await onMainLane(function () {
+        // side = 行棋方颜色。**必须与上面 rootSide 是同一个值**（同一个盘面只判一次轮次），
+        // 否则引擎搜的是另一方，返回的落点是对手要走的那一手、分数也是对手视角。
         return wsCall('analyze', {
           board: boardMatrix(bl, wh), moveList: [],
           matchMs: S.matchMs || 600000, turnMs: turnMsNow,
@@ -1047,13 +1161,14 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
       var _rawOnly = !!c0raw && !(c0raw.line && c0raw.line.length) && _early;
       if (_rawOnly) return failRawOnly(res);
       if (!res || res.error || !res.candidates || !res.candidates.length) return failEmpty(res);
-      if (fpNow !== boardKey(lastBl, lastWh)) return;
+      if (fpNow !== boardKey(lastBl, lastWh)) return;    // 这一手的结论已过期，作废
+      // ★ 诊断口径对齐：root / raw / my 三个值一起打，任何一次符号问题都能一眼定位。
       bridgeDiag('LINK_ANALYZE one-shot turnMs=' + turnMsNow +
                        ' elapsed=' + (res.elapsed | 0) + ' depth=' + ((c0raw && c0raw.depth) || 0) +
                        ' root=' + (rootSide === 1 ? 'B' : 'W') + ' my=' + (mySide === 1 ? 'B' : 'W') +
                        ' raw=' + (c0raw && c0raw.eval ? c0raw.eval : '-') +
                        ' myEval=' + evalForSide(c0raw && c0raw.eval, rootSide, mySide));
-      publish(res, true);
+      publish(res, true);               // 收官：写 lastBest 并（自动落子时）落子
     } catch (e) {
       
       var em = String((e && e.message) || e);
@@ -1184,6 +1299,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         if (lastMainC0.depth) cands[0].depth = lastMainC0.depth;
       }
       S.candCache = cands;
+      // 热力图标签的分值也必须走同一个换算：rootSide = 这一帧的行棋方。
       var heatRoot = sideToMove(bl, wh), heatMine = myColOf();
 
       var tiers = heatTiers(cands);
@@ -1267,6 +1383,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
   var adRetryWatch = null, adRetryWatchN = 0; 
   var newGamePending = false;              
   var plyPrev = 0;                         
+  // ★ 2026-10-16：空盘「进入沿」只做一次清表/复位（空盘帧每 ~50ms 来一次，不能每次都清）。
   var emptyResetDone = false;
 
   function adBtnSync() {
@@ -1401,17 +1518,23 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
   var balPointN = 2;
   try { var _bpn = parseInt(localStorage.getItem('gb_bal_point_n') || '2', 10); if (_bpn >= 1 && _bpn <= 6) balPointN = _bpn; } catch (e) {}
   var swBusy = false, swEvalBusy = false;
+  // ★★ 2026-10-19（用户：「在交换平衡点、交换评估后面再添加一个取消按键，点击取消后，可以停止
+  //   交换平衡的计算，以及清除上面的平衡标记，恢复正常的初始连线状态」）：
+  //   swGen 是交换平衡/评估的**取消令牌**。runSwapBal 在 await 之后验令牌，一旦不等就直接
+  //   return（连同 finally 复位 busy）—— 否则「取消」后引擎虽然被停，函数体醒来还会继续
+  //   摆平衡标记、把 balPts 塞进 swQueue 排队落子，等于白取消。
+  //   runSwapEval 不用改：cancelAll 给它的结果带 superseded=true，它本来就有早退分支。
   var swGen = 0;
   function swapCancel() {
-    swGen++;
-    try { natEng().cancelAll(); } catch (e) {}
-    swQueue = null; swIdx = 0;
+    swGen++;                                     // 令在途的 runSwapBal 到期即退
+    try { natEng().cancelAll(); } catch (e) {}   // 中断引擎搜索（宿主 op:'stop'）+ 让等待方立刻返回
+    swQueue = null; swIdx = 0;                   // 清掉已排序的平衡落点
     adWaiting = false; pendingBal = null;
-    adFail = 0; adFailKey = null;
+    adFail = 0; adFailKey = null;                // 取消不计入自动落子的失败计数
     if (adTimer) { clearTimeout(adTimer); adTimer = null; }
     if (adRetryWatch) { clearTimeout(adRetryWatch); adRetryWatch = null; } adRetryWatchN = 0;
     swQuietSide = false;
-    balOff();
+    balOff();                                    // 清平衡标记（含宿主 overlay 的 balance on:false）
     try { swBtnState(); } catch (e2) {}
     try { adBtnSync(); } catch (e3) {}
     bridgeDiag('LINK_SWAP_CANCEL');
@@ -1456,6 +1579,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
       return;
     }
     swBusy = true;
+    // ★ 2026-10-19：本次运行的取消令牌基线 —— 见 swapCancel 的注释。
     var swGen0 = swGen;
     var swDead = function () { return swGen0 !== swGen; };
     
@@ -1468,6 +1592,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     var budget = Math.max(1500, Math.min(SWBAL_BUDGET_MS, Math.round((S.turnMs || 5000) * 1.5)));
     
     var turnMs = Math.max(2000, Math.min(S.turnMs || 5000, 4500));
+    // ★ 2026-10-13：走 engRuleOf（禁手族 6/7/8 → 2）；原来 6/7/8 会被降级成 0。
     var rule = engRuleOf(S.rule);
     
     var t0 = Date.now();
@@ -1476,9 +1601,26 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
       ui('setStatus', '<span style="color:#0e7490">' + LT(empty ? 'swBalEmpty' : 'swBalPair') + '</span>');
       var marks = [];
       var balFromEngine = 0;      
+      // ★ 2026-10-13：连线窗也要把**平衡引擎自己的**评估分报出来（以前只有坐标，
+      //   用户只能去看面板那条对弈引擎的评估 —— 禁手下那是几百上千分的「对弈分」，
+      //   被误当成「平衡点评估」就是「接近 1000 分的误差」的来源）。
       var balEv = null;
       if (empty) {
         
+        // ★★ 2026-10-13 回退 + 分规则（用户：「连线功能里面的交换平衡点运用之前的逻辑（用定式，
+        //   和中途第二手计算）（昨天 4.39 16点30 的那一版）」＋「无禁手公式+有禁手公式，
+        //   只利用里面的平衡定式，必胜定式不可添加」）：
+        //   空盘开局重新走**官方定式**，不再用原生成对搜索：
+        //     ① 引擎按当前规则给官方开局（SWAP2BOARD，禁手/无禁手各有一套公式库）；
+        //     ② 引擎不可用 ⇒ 退到下面这两张本地公式表（已按引擎实测逐条筛过）；
+        //     ③ 再不行才退回中心区逐手。
+        //   两张表必须分开：禁手(rule 2) 用 RIF 三手，无禁手用 Swap2 三手 —— 混用就是
+        //   「一直用的是有禁手模式的平衡点」那个毛病。
+        //   筛选依据（RapfiEngine-avx512vnni，跑 YXBALANCETWO 取「白这一手＋黑应手」这一对
+        //   最接近 0 的分；|评估| ≤ 50 = 官方 balanceWindow 内的「平」）：
+        //     无禁手公式 9 组  → |评估| 5~19，9/9 平衡，无必胜
+        //     有禁手公式 26 组 → |评估| 1~17，26/26 平衡（RIF 这一族本身就是筛掉必胜后的开局）
+        //   所以两张表都只保留平衡定式，必胜定式一条都不加。
         var BAL_FREE = [
           [[6, 7], [6, 4], [4, 2]],
           [[3, 3], [5, 5], [6, 6]],
@@ -1490,6 +1632,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
           [[11, 7], [10, 6], [13, 5]],
           [[3, 7], [1, 8], [0, 4]],
         ];
+        // RIF 26：白 2 落在 I9(8,8) 为斜（间接）、H9(7,8) 为直（直接），黑 1 恒在天元。
         var BAL_RENJU = [
           [[7, 7], [8, 8], [9, 9]], [[7, 7], [8, 8], [9, 8]], [[7, 7], [8, 8], [9, 7]],
           [[7, 7], [8, 8], [9, 6]], [[7, 7], [8, 8], [9, 5]], [[7, 7], [8, 8], [8, 7]],
@@ -1550,12 +1693,21 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
           return true;
         };
         var libSource = 'none';
+        // ★★ 2026-10-13：**去掉本轮的「原生成对搜索」**，空盘恢复成 4.39(10-12 16:30) 的
+        //   「官方定式」逻辑 —— 先让引擎按规则吐官方开局，再退本地公式表，最后才中心区逐手。
+        //   实测原生成对搜索虽然分很平（|评估| ≤ 44），但那不是用户要的「定式」口径，
+        //   而且它挡在定式前面，等于 16:30 那版的好开局一次都用不上。
+        //   同步 INFO RULE 不能省：SWAP2BOARD 的开局库是按规则分的，不同步就会把**无禁手**
+        //   的公式喂给禁手局面（10-12 21:59 修过的老问题）。
         try {
+          // 规则由宿主按每次 ask 的 q.rule 下发（线程计划同样由宿主 C++ 决定），
+          // 页面不再手工发 INFO RULE / 线程计划。
           var s2 = await wsCall('swap2board', {}, 8000);
           if (s2 && s2.pts && s2.pts.length === 3 && !isLibFallback(s2.pts) && takeLib(s2.pts))
             libSource = 'engine';
         } catch (eS2) {  }
         if (libSource === 'none' && N === 15) {
+          // 本地公式表兜底：按规则取表（禁手 RIF 26 / 无禁手 Swap2 9），两张都只含平衡定式。
           if (takeLib(BAL_OPEN[Math.floor(Math.random() * BAL_OPEN.length)]))
             libSource = 'local';
         }
@@ -1585,6 +1737,10 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
             if (ms < 400) break;
             
             var reqBody = {
+              // ★ 2026-10-13：**一律成对 TWO**（原来这个深退路是 mode:'one' 单点，
+              //   实测禁手 +165 / 无禁手 +132，正是「评估差距过大」的另一个来源）。
+              //   bias 恒 0：TWO 模式下引擎内部会取反，传 15 等于让平衡搜索去追 −15，
+              //   对「求最平」没有好处。
               board: b2, moveList: [], n: 1, mode: 'two', bias: 0,
               rule: rule, turnMs: ms, lane: 'main',
               cid: 'desktop-swbal1-' + (lastBl.length + lastWh.length) + '-' + step + '-' + tries,
@@ -1597,10 +1753,13 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
                 return wsCall('balance', reqBody, ms + 6000);
               });
             } catch (eShot) { jw = null; }          
+            // ★ 2026-10-19「取消」：引擎已停 / 结果被作废时立刻退出，别把这份空结果当失败报错。
             if (swDead()) return;
             if (!jw || jw.error || jw.swap || !jw.moves || !jw.moves.length) { pt2 = null; break; }
             if (jw.eval != null) balEv = jw.eval;
             pt2 = jw.moves[0];
+            // 成对 TWO 给出的就是权威的「最平一对」；不再用「必须落在天元 5×5」去挑
+            // —— 用户：「有时候这三个平衡点不仅仅只在中心那几个位置」。
             break;
           }
           if (!pt2) break;                                   
@@ -1650,6 +1809,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
             return wsCall('balance', pairBody, pairMs + 6000);
           });
         } catch (ePair) { j1 = null; }
+        // ★ 2026-10-19「取消」：同上 —— 先验令牌，再谈「没结果 / 该交换」。
         if (swDead()) return;
         if (!j1 || j1.error) {
           ui('setStatus', '<span style="color:#c0392b">' + LT('balFail') + ((j1 && j1.error) || 'no response') + '</span>');
@@ -1664,6 +1824,10 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         balFromEngine = 2;
       }
       
+      // ★ 2026-10-13：空盘走的是「官方定式」通道（不经过平衡搜索），所以 balEv 还是空的。
+      //   用户要的判据是「分差应该在 0 附近」，光给坐标看不出来 —— 这里把公式给的这 3 手
+      //   摆进盘面，**让平衡引擎给这一对打分**，报出来的才是真正可核对的 |评估|
+      //   （实测 RIF 26 组 1~17、Swap2 9 组 5~19，全在官方 balanceWindow(50) 内）。
       if (balEv == null && marks.length === 3 && leftMs() >= 900) {
         try {
           var b3 = boardMatrix(lastBl, lastWh);
@@ -1683,6 +1847,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
           if (jE && !jE.swap && jE.eval != null) balEv = jE.eval;
         } catch (eE) {  }
       }
+      // ★ 2026-10-19「取消」：走到这里说明引擎步骤都回来了 —— 验一次令牌再摆标记 / 排队落子。
       if (swDead()) return;
 
       var parts = [], names = [];
@@ -1730,6 +1895,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     } finally { swBusy = false; }
   }
 
+  // ★ 2026-10-13：连线器的开局提示 —— 从短句池随机抽**一条**（用户：「在连线器中要精简」）。
   function swBalOpenHintTxt() {
     var pool = LT('swBalOpenHints');
     if (!pool || !pool.length || typeof pool === 'string') return '';
@@ -1791,7 +1957,8 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         ui('setStatus', swTipCol(LT('swEvalFail') + ((j && j.error) || 'no candidates'), '#c0392b'));
         return;
       }
-      var ev = j.candidates[0].eval || '';
+      var ev = j.candidates[0].eval || '';           // 引擎原文（行棋方视角）
+      // 交换评估关心的是「黑优还是白优」⇒ 换成黑方视角（rootSide 由同一判据给出）。
       var swRoot = sideToMove(lastBl, lastWh);
       var blackView = evalNumOf(ev, swRoot, 1);
       var msg;
@@ -1805,6 +1972,12 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     } finally { swEvalBusy = false; }
   }
 
+  // ★ 2026-10-16（用户：「检测到棋盘空的时候，应该重新清空置换表重新评估计算」）：
+  //   空盘 = 新一局 ⇒ ① 清引擎置换表（Rapfi 的 TT 跨局共用，不清就会让新局前几手
+  //   直接命中上一局的条目：曲线与推荐点「沿用上一局」）② 复位本地状态（曲线/推荐点/
+  //   热力/平衡标记）③ **不管执黑执白、也不管有没有选边**都要做。
+  //   以前这段在 `sideUnset()`、`!myIsToMove` 之后 —— 执白或还没选边时空盘什么都不做，
+  //   而且原实现只 resetForEmpty（本地缓存），从不碰引擎。
   function handleEmptyBoard(bl, wh) {
     if (!emptyResetDone) {
       emptyResetDone = true;
@@ -1862,8 +2035,11 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     var key = boardKey(bl, wh);
     var emptyNow = (bl.length + wh.length === 0);
     if (emptyNow) emptyStreak++; else emptyStreak = 0;
+    // ★ 2026-10-18：新一局（空盘）把「对手思考时长」清零 —— 上一局的节奏不能拿到这一局用。
     if (emptyNow) { linkOppThinkMs = 0; linkOppTurnAt = 0; }
     
+    // ★★ 空盘要**连续 ≥3 帧 且 持续 ≥700ms** 才算真新局。
+    //   原来 2 帧（约 300ms）就能打穿：识别一次抖成全空 ⇒ 清表 ⇒ 整盘从零重搜。
     if (emptyNow) {
       if (!emptySinceMs) emptySinceMs = Date.now();
       if (emptyStreak < 3 || Date.now() - emptySinceMs < 700) return;
@@ -1898,6 +2074,9 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     if (rmPrev >= 2) newGamePending = true;
     lastAdoptBl = bl; lastAdoptWh = wh;      
 
+    // ★ 2026-10-18：在**已稳定采纳**的这一帧上给对手计时 —— 轮次交到对手手上时打点
+    //   （我方落子被识别确认的那一刻），轮次回到我方时结算成 linkOppThinkMs。
+    //   这就是「免费思考窗口」的实测长度，analyze() 用它定这一手的搜索预算。
     if (!myIsToMove(bl, wh)) { if (!linkOppTurnAt) linkOppTurnAt = Date.now(); }
     else if (linkOppTurnAt) {
       linkOppThinkMs = Math.max(0, Date.now() - linkOppTurnAt);
@@ -1916,6 +2095,8 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     
     if (balMarks.length && balSticky) return;
     
+    // ★ 2026-10-16：空盘处理提前到所有「有边/轮次」判断之前 —— 空盘就是新一局，
+    //   清置换表与复位不应该依赖「我方是否该走」「有没有选边」。
     if (emptyNow) { handleEmptyBoard(bl, wh); return; }
     emptyResetDone = false;
     
@@ -1979,6 +2160,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     }
     
     if (emptyNow) {
+      // （空盘已在前面提前处理并 return —— 这里保留判定只为可读性提示：不该到达）
       return;
     }
     if (!myIsToMove(bl, wh)) {
@@ -2041,7 +2223,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
       if (typeof msg === 'string') { try { msg = JSON.parse(msg); } catch (e) { return; } }
       if (!msg) return;
       if (msg.type === 'engineAck') {
-        natEng().onAck(msg);
+        natEng().onAck(msg);                    // ★ 闭包内部分发（在途 ask 表私有）
       }
       else if (msg.type === 'engineAsk' || msg.type === 'engineOut') { natEng().onOut(msg); }
       else if (msg.type === 'scan') {
@@ -2049,6 +2231,10 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         busy = true;
         Promise.resolve(handleScan(msg.data)).finally(function () { busy = false; });
       }
+      // ★★ 2026-10-18（用户：「线程多于核心…要齐心协力，而不是打架」）：连线窗原来**不处理**
+      //   host 握手消息（只有 boot() 的 onHostMsg 处理，而连线窗走 bootLink），
+      //   于是 threadsMax / userThreads 永远读不到，线程数一直停在上次存档的中间值。
+      //   这里补上分发：G.host 更新 + 一次性拓扑校正（calc.js: window.GB_onHost）。
       else if (msg.type === 'host') {
         try { if (window.GB_onHost) window.GB_onHost(msg); } catch (eHO) {}
       }
@@ -2056,6 +2242,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
       
       else if (msg.type === 'setSide') { setSide(msg.v); }
       else if (msg.type === 'engineCfg') {
+        // 引擎配置（线程 / 哈希）由主窗口经宿主统一落盘；连线窗只需转发一个 config op。
         var ct = msg.threads | 0, ch = msg.hashMB | 0;
         bridgeDiag('LINK_ENG_CFG threads=' + ct + ' hashMB=' + ch + ' (follow main window)');
         try {
@@ -2117,6 +2304,8 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     });
   }
 
+  // 识别统一由 C++ 宿主经 postMessage {"type":"scan"} 推送（零 TCP）；
+  // 页面侧已无 HTTP 识别通道，非宿主环境无识别来源。
   async function tick() {
     if (busy || HOST) return;
   }
@@ -2423,6 +2612,11 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     });
   }
 
+  // ★ 2026-10-16（用户：「变规则的时候不能顺利的切换规则而评估」）：
+  //   判据必须是「**引擎当前配置的规则**」而不是「上一次点击的值」—— 因为
+  //   calc.js 的 lkBridgeRule() 会先把 window.GB_S.rule 改成新值、再 click 面板按钮
+  //   （主界面 → 连线窗同步走的就是这条路）。若按「点击前后 S.rule 是否变化」判断，
+  //   那条路永远判定为「没变」⇒ 清表不会发生。这里记引擎侧真实生效的规则。
   var lastEngineRule = (typeof engRuleOf === 'function') ? engRuleOf(S.rule) : null;
   function syncEngineRule() {
     var r = engRuleOf(S.rule);
@@ -2440,7 +2634,16 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     el.addEventListener('click', function () {
       S.rule = +el.getAttribute('data-rule');
       saveNow(); ui('paintSel');
+      // 规则真的变了才清置换表重算 —— Rapfi 的置换表条目不分规则，旧规则下的分数会直接
+      // 污染新规则下的搜索（禁手/无禁手同一局面分数完全不同）。以前这里只 kickAnalyze()
+      // 直接重算，等于「用旧规则的记忆算新规则」⇒ 用户看到的就是「切了规则但评估没变」。
       var ruleChanged = syncEngineRule();
+      // ★★ 2026-10-17（用户：「变规则的时候不能顺利的切换规则而评估」）：
+      //   换规则后**立刻**按新规则重算一次，不等下一帧视觉扫描。
+      //   原因：kickAnalyze() 自身**不发起** analyze —— 它只是把 lastBoardKey 清空、
+      //   forceScan 置位，真正的 analyze 由**下一帧 scan** 触发。而画面静止/未框选/
+      //   帧率低时识别不一定推帧 ⇒ 表现就是「选项高亮切过去了，评估数字一动不动」。
+      //   analyze() 里的 rule: engRuleOf(S.rule) 是调用时读取，所以这里发起的就是新规则。
       if (ruleChanged && lastBl && (lastBl.length + lastWh.length) > 0) {
         try { analyze(lastBl, lastWh); } catch (eAR) {}
       }

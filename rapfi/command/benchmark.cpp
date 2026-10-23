@@ -1,3 +1,4 @@
+// Bundled RapFi engine (upstream: github.com/dhbloo/rapfi) — Meter Gomoku Link v4.43
 /*
  *  Rapfi, a Gomoku/Renju playing engine supporting piskvork protocol.
  *  Copyright (C) 2022  Rapfi developers
@@ -61,6 +62,18 @@ static const std::vector<BenchEntry> benchSet = {
     {RENJU, 15, 19, "h8h9j9j8f8i7g7i9h6e9f6k7l6i10i6f9g9g11h10i11i8"},
     {RENJU, 15, 19, "h8h9h6i10i6i9g9g8j11i7"},
 };
+
+const std::vector<Command::BenchPosition> &Command::benchPositions()
+{
+    static const std::vector<BenchPosition> positions = [] {
+        std::vector<BenchPosition> list;
+        list.reserve(benchSet.size());
+        for (const BenchEntry &entry : benchSet)
+            list.push_back({entry.rule, entry.boardSize, entry.positionString});
+        return list;
+    }();
+    return positions;
+}
 
 struct EngineState
 {

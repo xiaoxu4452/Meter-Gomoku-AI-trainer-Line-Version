@@ -1,4 +1,5 @@
-﻿/* Meter Gomoku Trainer - analysis and calculation bridge. Wraps the native rapfi engine through in-process hard links and exposes evaluation/analysis APIs to the overlay UI. */
+// Meter Gomoku Link — v4.43
+/* Meter Gomoku Trainer - analysis and calculation bridge. Wraps the native rapfi engine through in-process hard links and exposes evaluation/analysis APIs to the overlay UI. */
 
 
 'use strict';
@@ -54,6 +55,8 @@ var I18N = {
     turnAiBoth: 'AI 自打 · 轮到{c}',
     turnYouBoth: '轮到你 · {c}（双方都你下）',
     showNum: '显示序号', showNumHint: '棋子上标出第几手',
+    bgThink: '后台思考', bgThinkHint: '轮到你时引擎继续深算（速度/节点持续上涨），落子后 AI 应手直接命中热置换表',
+    bgThinkOffAi: 'AI 对打期间已自动关闭', bgThinkOffBusy: '有计算在跑，已自动暂停',
     
     rvNum: '序号', rvNumHint: '在棋子上标出它是第几手',
     rvKeyHint: 'Ctrl+Z 上一手 · Ctrl+R 重来（回到开局）',
@@ -74,7 +77,7 @@ var I18N = {
     fwdVctHit: '找到VCT杀，共{n}手；进攻方：{c}（序号：奇数=进攻方落子，偶数=防守方落子）',
     fwdVcfNone: '当前局面，{c}（所选进攻方）不存在VCF强制连续冲四杀棋',
     fwdVctNone: '当前局面，{c}（所选进攻方）不存在VCT强制连续冲四杀棋',
-    fwdClear: '清除标记',
+    fwdClear: '清除计算',
     
     markCleared: '已清除棋盘上的所有分析标记（计算 / 多点分析 / 平衡点 / 扫描防守 / 前瞻 · VCF · VCT）',
     vcxPopTitle: '算杀结果',
@@ -115,10 +118,10 @@ var I18N = {
       ]},
       { t: '三、计算评估', ps: [
         '「计算」= 单路深搜当前局面并把最佳点标在棋盘上（再点一次 = 停止计算）；「多点分析」按「分析点数」一次给出 2~8 个候选，圆圈里是名次与评估分。',
-        '「平衡点」= 官方平衡搜索（引擎原生 **YXBALANCETWO 成对**，**不是**对弈引擎的搜索）按你选的「点数」给出黑白双方都没有明显优势的候选点，并把引擎给的评估分一并报出来（|评估| ≤ 50 才是官方平衡窗口内的「平」；评估刻度 ScalingFactor=200 ⇒ 胜率 = sigmoid(评估/200)）；「点数」可在 1~6 之间切换（空盘固定 3 个：黑 1 固定天元，白 2 / 黑 3 由一次**成对**平衡搜索联合给出 —— 成对搜索才是官方口径的「平」，单点搜索在近乎空盘上评估会到 −350~−470，那是「一眼看出谁占优」的根源）；点数为奇数时**收尾那手也走成对搜索、只取这一对的第 1 手**，所以报出的评估分同样在 0 附近；「扫描防守」= 在 9×9 邻域逐个空点打分，给出该防的点（W = 距赢几步，L = 距输几步），徽标颜色按危险度连续渐变 —— 越危险越红、安全的一头是青；点过一次后随落子**自动重扫**（Yixin 式动态刷新），「清除标记」或重开才停。',
+        '「平衡点」= 官方平衡搜索（引擎原生 **YXBALANCETWO 成对**，**不是**对弈引擎的搜索）按你选的「点数」给出黑白双方都没有明显优势的候选点，并把引擎给的评估分一并报出来（|评估| ≤ 50 才是官方平衡窗口内的「平」；评估刻度 ScalingFactor=200 ⇒ 胜率 = sigmoid(评估/200)）；「点数」可在 1~6 之间切换（空盘固定 3 个：黑 1 固定天元，白 2 / 黑 3 由一次**成对**平衡搜索联合给出 —— 成对搜索才是官方口径的「平」，单点搜索在近乎空盘上评估会到 −350~−470，那是「一眼看出谁占优」的根源）；点数为奇数时**收尾那手也走成对搜索、只取这一对的第 1 手**，所以报出的评估分同样在 0 附近；「扫描防守」= 引擎原生 **YXSEARCHDEFEND**（Rapfi 整合包同一算法）：先补一手 PASS 把行棋方让给对手，再对全盘候选点持续深算 —— 每个点的 % 就是「对手下在这里」的胜率，越高越要防；棋盘按危险度分五档：1 档最大圆环 + 半透明填充，2~4 档圆环依次减小、透明度依次升高（最小圆环 = 1 档的一半），5 档（边角 / 低危点）只铺一个数字、外围一圈更细的小环（大小与 4 档一致），像扫盘一样铺开；整套配色为天蓝色系（高危深、低危偏白）；搜索越算越深、越算越准，点「停止扫描」后**最后一帧保留在棋盘上**，落子或「清除计算」才消失。',
         '「AI 视图」= AI 思考期间在棋盘上铺它的候选点（圆形、格内是评估分），AI 一落子就撤掉；「指导视图」= 轮到你时用方形四色提示最佳落点，你一落子就消失。',
         '「分析计算」= 棋盘下方的开关型功能键：开启后在**主车道**持续深算当前局面，铺出引擎当前榜单（最佳点+候选，最多 8 个）；随搜索加深自然微变并收敛，用户落子 / 悔棋自动重开会话，仪表盘用时跨轮累加；再点一次 = 停止。摆盘 / 残局 / 双人手动对弈同样可用。',
-        '「清除标记」与「计算」并排：一键擦掉**本卡里任意项目**留在棋盘上的标记 —— 计算 / 多点分析 / 平衡点的徽标与评估分、扫描防守的百分比与 W/L 徽标，以及前瞻 · VCF · VCT 的序号、虚线与代码链；只清标记，不动局面本身。',
+        '「清除计算」与「计算」并排：一键擦掉**本卡里任意项目**留在棋盘上的标记 —— 计算 / 多点分析 / 平衡点的徽标与评估分、扫描防守的五档圆环与百分比，以及前瞻 · VCF · VCT 的序号、虚线与代码链；只清标记，不动局面本身。',
         '仪表盘同步给出深度、速度、节点、用时与评估分；下方评估曲线按黑 / 白两条记录整局走势（纵轴随分数自动进位）。',
       ]},
       { t: '四、前瞻 / VCF / VCT', ps: [
@@ -160,6 +163,7 @@ var I18N = {
     aboutVer: '版本', aboutFeat: '功能', aboutOss: '开源组件', aboutLic: '许可',
     aboutUpdates: '最近更新',
     aboutUpdateList: [
+      '扫描防守重写：改走 Rapfi 整合包同款引擎原生 YXSEARCHDEFEND（补一手 PASS 让对手行棋，每个点的 % = 对手下在这里的胜率）；按危险度分五档显示 —— 1 档最大圆环 + 半透明填充，2~4 档圆环依次缩小、变淡（最小 = 1 档的一半），5 档边角点铺数字、外围一圈更细的同尺寸小环扫盘；整套配色改为偏白的天蓝色系，最大圆环缩到与棋子等大、圆环更细；按钮变「停止扫描」，停止后最后一帧保留，落子或「清除计算」才消失；「清除标记」改名「清除计算」；多点分析 / 前瞻 / 文字提示统一改用虚线矩形框',
       '识图图片适应性大升级：深色 / 浅色主题、旋转截图、拍屏照片、低对比与模糊图都能读 —— 新增「局部对比读子」第三套判别器（按每个交点自己的底色定阈值，深色盘不再丢黑子、浅色盘不再把空格读成白子）、找盘阶梯（3×3 高斯 → CLAHE 均衡 → 1.5× 放大）与几何校验兜底（网格没对上时自动改用旧识别器重算）',
       '识图「识别参数」面板：打开即自动收起棋盘代码框；提示行改成固定高度的虚线文本框 —— 拖滑动条时整列不再上下抖',
       '界面资源改为单一 ui.pak（不再是一堆 .enc 加密文件）：避免被杀毒软件当成「加密文档」误删导致窗口白屏；真缺文件时会显示一张诊断页（告诉你加白名单后重装），而不是一片空白',
@@ -192,7 +196,7 @@ var I18N = {
     aboutFeatList: [
       '三种模式：对弈（AI 执黑 / AI 执白可自由开关，两个都开即 AI 自打）/ 自由摆盘 / 残局（自摆局面 + 「确定」定盘，重新开始回到该局面）',
       '前瞻推演：一路走到盘面真的五子连珠；VCF / VCT 本地算杀（多线程并行 + 迭代加深）',
-      '计算评估：计算 / 清除标记 / 多点分析 / 平衡点 / 点数 / 扫描防守，另配 AI 视图与指导视图',
+      '计算评估：计算 / 清除计算 / 多点分析 / 平衡点 / 点数 / 扫描防守，另配 AI 视图与指导视图',
       '评估曲线：纵轴随分数动态进位，最大可到 ±1200；仪表盘给出深度 / 速度 / 节点 / 用时',
       '三种规则：无禁手 / 无禁手 · 长连不赢 / 连珠（有禁手）',
       '识图：截图或上传自动贴盘识别，VC 算杀题模式，人工修改（换色 / 删子 / 补子 / 裁剪）与图片抽屉',
@@ -210,14 +214,19 @@ var I18N = {
     
     tagAiMove: 'AI 落子', tagAssist: '辅助建议', tagHeat: '热力图', tagCoach: '教练',
 tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
-    tagLiveAna: '分析计算', liveAna: '分析计算', liveAnaStop: '停止分析',
+    tagLiveAna: '分析计算', tagBg: '后台思考', liveAna: '分析计算', liveAnaStop: '停止分析',
     liveAnaBan: 'AI 自打：黑白双方都由 AI 走，没有用户执子方可分析，功能键停用',
+    liveAnaRun: '分析计算 · 持续深算中 · 当前深度 {d}',
+    anCalcRun: '计算评估 · 持续深算中 · 当前深度 {d}',
+    anNbestRun: '多点分析 · 持续深算中 · 当前深度 {d}',
+    liveAnaStopped: '已停止计算 · 深度 {d} · 保留停止时刻的标记与评估',
     btnAiside: 'AI 执子', btnSet: '设置', pinFix: '固定',
     pinFixTtl: '固定这张卡片：设置里开其它卡片时它不再被收起',
     pinCloseTtl: '取消固定并关闭这张卡片',
     aiSideB: 'AI 执黑', aiSideW: 'AI 执白', aiTurnLbl: '思考时间',
     tagBal1: '一手平衡', tagBal2: '二手平衡', tagFwd: '前瞻推演', tagTen: '十打选点',
     eval: '评估', best: '最佳', curve: '评估曲线', blackCurve: '黑子', whiteCurve: '白子',
+    score: '分数', winRate: '胜率',
     
     history: '历史', saved: '保存历史', openDrawer: '历史',
     saveSel: '保存选中', delSel: '删除', openSel: '打开', closeDr: '关闭',
@@ -297,11 +306,13 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     
     analysis: '计算评估',
     
-    anCalc: '计算', anStop: '停止计算', anDefend: '扫描防守',
+    anCalc: '计算', anStop: '停止计算', anDefend: '扫描防守', anStopScan: '停止扫描',
     anNbest: '多点分析', anBal: '平衡点', anBaln: '点数',
     anDefendDone: '扫 {c} 点：%越高越要防，W=距赢 L=距输',
     anDefendRefine: '持续加深…第 {r} 轮 · 每轮 {t}s',
     anDefendStable: '已收敛，结论稳定',
+    anScanRun: '扫描防守 · 引擎全点深算中… 深度 {d} · 已扫 {c} 点（%越高越要防）',
+    anScanFrozen: '已停止扫描：保留最后一帧（{c} 点）——落子 / 清除计算后消失',
     
     shell: '搜索',
     
@@ -322,6 +333,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     visTitle: '识图 · 把棋盘图片变成局面',
     visTtl: '把棋盘图片变成局面',
     visHint: '支持一次选多张（至多 150 张）；白框里可直接 Ctrl+V 粘贴图片，截屏弹出三键选择',
+    // ★ 2026-10-19 补：中文表缺这两个键 ⇒ 识图窗输入框占位符直接显示 "visBoxHintCode"（原样露键名）
     visBoxHint: '在这里输入或粘贴局面代码（如 h8h9g7…，回车即载入）\n也可以 Ctrl+V 直接粘贴棋盘图片',
     visBoxHintCode: '局面代码（改完回车重新解析；Ctrl+V 可粘贴图片）',
     visUpload: '上传图片', visShot: '屏幕截图',
@@ -332,6 +344,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     visCropSmall: '框选区域太小，请拖一个大一点的矩形',
     visCropDone: '已裁剪（{w} × {h}）', visCropFail: '裁剪失败，图片可能已损坏',
     visRec: '重新识别', visLoad: '加载到练习',
+    // ★★ 2026-10-19：识图「识别参数」（原「保存到历史」位）—— 5 项阈值 + 「通用 / 取消 / 确定」一行
     visRc: '识别参数', visRcGeneral: '通用', visRcCancel: '取消', visRcOk: '确定',
     visRcOn: '识别参数：拖动滑动条立即重新识别（实时预览）并自动保存；「通用」恢复默认，「取消」回到打开时那组值',
     visRcOff: '识别参数已收起（这 5 项阈值仍按当前值生效）',
@@ -421,6 +434,12 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     anBalBusy: '官方平衡搜索中…',
     anBalDone: '已给出 {n} 个平衡点：{list}',
     anBalEval: '（引擎判定这一手最平：|评估| ≈ {v}，≤ 50 才是官方平衡窗口内）',
+    // ★ 2026-10-13（用户）：「如果用户想在开局的时候定平衡点的话，应该要评估几个才合理」。
+    //   依据 = 中国五子棋竞赛规则(2025) 第 11 条 / RIF 指定开局：官方开局**只有三手**
+    //   （黑1 天元 · 白2 在以天元为中心的 3×3 内 · 黑3 在 5×5 内），所以开局评估 3 个点最合理；
+    //   第 4 手起进入白4(7×7)/黑5(9×9) 阶段（塔拉山口-10 走满 5 手），再多评估评估分就失真。
+    //   ★ 2026-10-13（用户：「这个提示文案是多条的，是灵活多变的，不应该只是一个大段话」）：
+    //     原来的单条长句拆成**短句池**，每次评估随机抽 1~2 条、分行显示（见 balOpenHintTxt）。
     anBalOpenHints: [
       '官方指定开局只有 3 手（黑1 天元 · 白2 在 3×3 内 · 黑3 在 5×5 内），开局评估 3 个点最合理。',
       '天元是固定的第 1 手，不必评估；真正要搜的只有白 2 与黑 3 这两手。',
@@ -490,6 +509,8 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     turnAiBoth: 'AI vs AI · {c} to move',
     turnYouBoth: 'Your turn · {c} (both sides)',
     showNum: 'Move numbers', showNumHint: 'Mark each stone with its move number',
+    bgThink: 'Background thinking', bgThinkHint: 'Keep searching during your turn (nodes keep rising) so the AI reply hits a hot transposition table',
+    bgThinkOffAi: 'auto-off while AI plays both sides', bgThinkOffBusy: 'paused while a calculation runs',
     
     rvNum: 'Numbers', rvNumHint: 'Mark each stone with its move number',
     rvKeyHint: 'Ctrl+Z previous · Ctrl+R restart',
@@ -510,7 +531,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     fwdVctHit: 'VCT win found: {n} moves; attacker: {c} (odd numbers = attacker, even = defender)',
     fwdVcfNone: 'No VCF (forcing fours) win exists for {c} (the chosen attacker) in this position',
     fwdVctNone: 'No VCT (continuous threats) win exists for {c} (the chosen attacker) in this position',
-    fwdClear: 'Clear marks',
+    fwdClear: 'Clear calc',
     markCleared: 'Cleared every analysis mark on the board (Calculating / Multi-point / Balance picks / Scan def / Lookahead \u00b7 VCF \u00b7 VCT)',
     vcxPopTitle: 'Solver result',
     fwdAtkAuto: 'Attacker: auto - the side to move (mate puzzles: the majority side, as usual). The black/white frames are indicators only, not clickable',
@@ -549,9 +570,9 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
       ]},
       { t: '3. Evaluation', ps: [
         '"Compute" deep-searches the position and marks the best point (press again to stop); "Multi-point" returns 2-8 candidates with rank and score in each badge.',
-        '"Balanced 1" picks the candidate whose evaluation is closest to zero; "Balanced 2" plays each candidate out and reads the reply before choosing; "Defense scan" scores every empty point in a 9x9 neighbourhood (W = moves to a win, L = moves to a loss), with badge colours on a continuous gradient - the more dangerous, the redder; safe points stay cyan.',
+        '"Balanced 1" picks the candidate whose evaluation is closest to zero; "Balanced 2" plays each candidate out and reads the reply before choosing; "Defense scan" runs the engine-native YXSEARCHDEFEND (the same algorithm as the Rapfi bundle): a pass is inserted so the opponent is to move, then every candidate point is searched continuously - each point\'s % is the opponent\'s win rate there, so higher = more urgent. Points are drawn in five tiers: tier 1 is the largest ring with a translucent fill, tiers 2-4 shrink and fade (the smallest ring is half the largest), and tier 5 (edges / low risk) shows just a number inside a thinner ring of the same size as tier 4, sweeping the board; the whole palette is sky blue (deeper = more urgent, paler = low risk). The search keeps deepening; "Stop scan" keeps the last frame on the board until you play or press "Clear calc".',
         '"AI view" shows the AI candidates (circles with scores) only while it thinks, and clears the moment it moves; "Coach view" hints your best move in four colours and disappears as soon as you play.',
-        '"Clear marks" sits next to "Compute": one press wipes whatever any card item left on the board - badges and scores from Compute / Multi-point / Balanced 1 / Balanced 2, the percentages and W/L badges of Defense scan, and the numbers, dashed lines and code chain of Look-ahead / VCF / VCT. It clears marks only, never the position.',
+        '"Clear calc" sits next to "Compute": one press wipes whatever any card item left on the board - badges and scores from Compute / Multi-point / Balanced 1 / Balanced 2, the five-tier rings and percentages of Defense scan, and the numbers, dashed lines and code chain of Look-ahead / VCF / VCT. It clears marks only, never the position.',
         'The dashboard shows depth, speed, nodes, time and evaluation; the curve below tracks the whole game for both colours (the axis rescales itself).',
       ]},
       { t: '4. Look-ahead / VCF / VCT', ps: [
@@ -593,6 +614,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     aboutVer: 'Version', aboutFeat: 'Features', aboutOss: 'Open-source components', aboutLic: 'Licence',
     aboutUpdates: 'Recent updates',
     aboutUpdateList: [
+      'Defense scan rewritten: it now uses the engine-native YXSEARCHDEFEND that ships with the Rapfi bundle (one PASS hands the move to the opponent, so each % is the opponent\'s win rate if they play there); danger is shown in five tiers - tier 1 is the full-size ring with a translucent fill, tiers 2-4 shrink and fade (the smallest ring is half of tier 1), tier 5 edge points show a number inside a thinner ring of the same size as tier 4, sweeping the board; the palette is now a pale sky-blue ramp, the largest ring is shrunk to stone size and all rings are thinner; the key turns into "Stop scan" and the last frame stays on the board after stopping - only a new move or "Clear calc" wipes it; "Clear marks" is renamed "Clear calc"; the multi-point list, look-ahead panels and hint lines now share the same dashed box style',
       'Vision adapts far better to real pictures: dark and light board themes, rotated screenshots, photos of a screen, low-contrast and blurry images all read now - a third "local contrast" reader judges each intersection against its own background (dark boards no longer lose black stones, light boards no longer read empty cells as white stones), board search climbs a ladder (3x3 blur, CLAHE equalisation, 1.5x upscale), and a geometry check falls back to the legacy recogniser when the grid does not line up',
       'Vision "Recognition params": opening the panel now hides the position-code box automatically, and the hint line is a fixed-height dashed box - dragging the sliders no longer makes the column jump',
       'UI assets are now one ui.pak instead of many .enc files - antivirus products no longer mistake the encrypted documents for ransomware and delete them (which used to leave a blank window); if the file really is missing, a diagnostic page explains how to whitelist and reinstall',
@@ -622,7 +644,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     aboutFeatList: [
       'Three modes: play the AI / free placement / endgame (set up a position and Confirm it; Restart returns to it)',
       'Look-ahead that runs to a real five-in-a-row; local VCF / VCT mate solver (multi-worker, iterative deepening)',
-      'Evaluation: Compute / Clear marks / Multi-point / Balanced 1 / Balanced 2 / Defense scan, plus AI view and Coach view',
+      'Evaluation: Compute / Clear calc / Multi-point / Balanced 1 / Balanced 2 / Defense scan, plus AI view and Coach view',
       'Eval curve with a self-rescaling axis up to +/-1200; dashboard with depth / speed / nodes / time',
       'Three rules: freestyle / overline-loses / Renju (forbidden moves)',
       'Vision: screenshot or upload with auto board snapping, VC mate-puzzle mode, manual editing (swap / remove / fill / crop) and a picture drawer',
@@ -639,14 +661,19 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     calcOn: 'Thinking', calcIdle: 'Idle',   
     tagAiMove: 'AI move', tagAssist: 'Hint', tagHeat: 'Heat map', tagCoach: 'Coach',
 tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
-    tagLiveAna: 'Live analysis', liveAna: 'Analyze', liveAnaStop: 'Stop analysis',
+    tagLiveAna: 'Live analysis', tagBg: 'Background thinking', liveAna: 'Analyze', liveAnaStop: 'Stop analysis',
     liveAnaBan: 'AI self-play: both sides are played by AI - no user side to analyze',
+    liveAnaRun: 'Live analysis · deep search · depth {d}',
+    anCalcRun: 'Eval · continuous deep search · depth {d}',
+    anNbestRun: 'Multi-PV · continuous deep search · depth {d}',
+    liveAnaStopped: 'Stopped · depth {d} · markers and eval kept from the stop moment',
     btnAiside: 'AI side', btnSet: 'Settings', pinFix: 'Pin',
     pinFixTtl: 'Pin this card: it stays when other cards are opened from Settings',
     pinCloseTtl: 'Unpin and close this card',
     aiSideB: 'AI Black', aiSideW: 'AI White', aiTurnLbl: 'Think time',
     tagBal1: 'Balance 1', tagBal2: 'Balance 2', tagFwd: 'Look-ahead', tagTen: 'Ten-call',
     eval: 'Eval', best: 'Best', curve: 'Eval curve', blackCurve: 'Black', whiteCurve: 'White',
+    score: 'Score', winRate: 'Win rate',
     history: 'History', saved: 'Saved', openDrawer: 'History',
     saveSel: 'Save selected', delSel: 'Delete', openSel: 'Open', closeDr: 'Close',
     selAll: 'Select all', selNone: 'Clear',
@@ -717,11 +744,13 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     cards: 'Cards', cardsHint: 'Pick the panels shown right of the board',
     cardSideL: 'L', cardSideR: 'R',
     analysis: 'Analysis',
-    anCalc: 'Compute', anStop: 'Stop', anDefend: 'Defend scan',
+    anCalc: 'Compute', anStop: 'Stop', anDefend: 'Defend scan', anStopScan: 'Stop scan',
     anNbest: 'Multi-point', anBal: 'Balance picks', anBaln: 'Points',
     anDefendDone: 'Scanned {c} points: higher % = more urgent (W = to win, L = to lose)',
     anDefendRefine: 'Deepening… round {r} · {t}s each',
     anDefendStable: 'Converged: result stable',
+    anScanRun: 'Defend scan · all-point engine search… depth {d} · {c} points (% = urgency)',
+    anScanFrozen: 'Scan stopped: last frame kept ({c} points) — cleared by a move / Clear calc',
     
     shell: 'Search',
     shell: 'Search',
@@ -905,9 +934,15 @@ var S = {
   rule: 0,
   cores: 0, hashMB: 0,
   hashDefMig: false,          
-  coresDefault: '',
+  coresDefault: '',           // ★ 线程默认口径迁移标记（'v439' = 已按「下拉上限」口径校正过一次）
   
   coach: false,
+  
+  // ★ 2026-10-22（用户：「对局设置里的对局，添加一个后台思考的选择键，参考 gomocalc 的预热算法」）：
+  //   开启后轮到你（或双方都你下）时，引擎用最低优先级的常驻 live 搜索继续深算当前局面，
+  //   不画标记、不占「分析计算」的 UI，只把速度/节点/深度实时喂给仪表盘，并把置换表养热。
+  //   默认关（与 gomocalc 一致）；AI 落子 / 计算评估等真正的 ask 会抢占它，结束后自动续上。
+  bgThink: false,
   
   showNum: false,
   
@@ -991,7 +1026,7 @@ function setMissBox() {
   els.rvMiss.textContent = T('miss') + ' ' + n;
 }
 function resetGame(keepLoaded) {
-  engMsgClear();                               
+  engMsgClear();                               /* ★ 消息框（2026-10-16）：新局 / 重置时清空消息区 */
   G.moves = []; G.board = newBoard(); G.curve = [];
   clearHeat();                                 
   clearCoach();                                
@@ -1030,6 +1065,11 @@ function setAiSides(b, w) {
   }
   S.aiB = !!b; S.aiW = !!w;
   S.side = (S.aiB === S.aiW) ? '' : (S.aiB ? 'w' : 'b');   
+  // ★ 2026-10-23：执子方一变，「评估」的视角口径立刻跟着翻（不必等下一次引擎 tick）。
+  try { dashEvalRefresh(); } catch (e) {}
+  // ★ 2026-10-23（用户：「AI 黑白同时开（AI 对打）直接自动关掉后台思考」）：
+  //   勾成双 AI 的这一刻就把在跑的后台思考停掉（原来是等下一次 kick 才停，中间白烧 CPU）。
+  try { bgThinkYield(); } catch (e2) {}
 }
 
 var els = {};
@@ -1073,15 +1113,17 @@ function grab() {
    't_coach','chk_coach','t_coachHint',
    'heatLegend','t_heatBest','t_heatGood','t_heatFair','t_heatPoor',
    't_showNum','chk_num','t_showNumHint',
+   't_bgThink','chk_bgThink','t_bgThinkHint',
    'btn_rv_num',                                   
    't_preview','chk_preview','t_previewHint',
    'fwdBox','btn_fwd','btn_fwd_vcf','btn_fwd_vct','btn_fwd_ok','btn_fwd_prev','btn_fwd_next','fwdBody','fwdMsg','fwdSeq','fwdLg','fwdLgB','fwdLgW','btn_fwd_clear',
    'vcxPop','vcxPopBody','vcxPop_close','t_vcxPop',
    't_engine','t_depth','t_speed','t_nodes','t_time','t_eval','t_best',
-   'st_depth','st_speed','st_nodes','st_time','st_eval','st_best','st_line',
+   'st_depth','st_speed','st_nodes','st_time','st_eval','st_best','st_line','pvBox',
    
-  'turnPillRow','turnPill',
-   't_curve','t_curveTtl','curve','curveAxis','curveScroll','curveWrap','t_blackCurve','t_whiteCurve',
+  'turnPill',
+   't_curve','t_curveTtl','curve','curveAxis','curveScroll','curveWrap','curveHover','curveInfo',
+   't_blackCurve','t_whiteCurve','ci_b_score','ci_b_win','ci_w_score','ci_w_win',
    'drawer','drList','drCount','dr_save','dr_open','dr_del','dr_close','dr_all',
    'dr_exp','dr_imp','ctxMenu','file_imp',
    
@@ -1369,35 +1411,9 @@ function paint() {
     G.heat.forEach(drawHeatNum);                   
   }
 
-  if (LIVE_AN.items.length && aiDecorOn()) {
-    var ln = LIVE_AN.items.length;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
-    LIVE_AN.items.forEach(function (it, li) {
-      var lpx = pad + it.x * gap, lpy = pad + it.y * gap;
-      var lpal = LIVE_PAL[liveTier(li, ln)];
-      var lcr = r * 0.72;
-      ctx.beginPath(); ctx.arc(lpx, lpy, lcr, 0, Math.PI * 2);
-      ctx.fillStyle = lpal.fill; ctx.fill();
-      if (li === 0) {
-        
-        var lrr = lcr * 1.22;
-        ctx.strokeStyle = lpal.ring;                 
-        ctx.lineWidth = Math.max(2.4, gap * 0.10);
-        ctx.beginPath(); ctx.arc(lpx, lpy, lrr, 0, Math.PI * 2); ctx.stroke();
-        ctx.strokeStyle = 'rgba(255,255,255,.85)';    
-        ctx.lineWidth = Math.max(1.2, gap * 0.04);
-        ctx.beginPath(); ctx.arc(lpx, lpy, lrr, 0, Math.PI * 2); ctx.stroke();
-      }
-      if (it.ev) {
-        ctx.font = '500 ' + Math.max(8, gap * 0.24) + 'px "Segoe UI",system-ui,sans-serif';
-        ctx.lineWidth = Math.max(2.2, gap * 0.09);
-        ctx.strokeStyle = 'rgba(255,255,255,.9)';
-        ctx.strokeText(it.ev, lpx, lpy);
-        ctx.fillStyle = '#1d2b30';
-        ctx.fillText(it.ev, lpx, lpy);
-      }
-    });
-  }
+  // ★ 2026-10-22（用户：「新的着色点和旧的着色点重合了，没有清理历史的着色点的绘制」）：
+  //   这里原来还会把 LIVE_AN.items **全部候选**再画一遍大圆点（旧 LIVE_PAL 橙/红），
+  //   与新标记圈叠在同一张盘面上 = 历史着色点残留。整段删除，只保留 drawLiveMarks 一层。
 
   if (G.busy && G.think.length && aiDecorOn()) {
     var t = (Date.now() % 1200) / 1200;
@@ -1433,6 +1449,70 @@ function paint() {
       ctx.arc(lx, ly, Math.max(2.2, r * 0.22), 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+
+  // ★ 2026-10-22：点击「路线」某一手 → 从当前局面把这条线按黑白交替展开成半透明棋子
+  //   （颜色比真棋子浅一档），和 gomocalc 的 PV 预览一样；纯画布绘制，不再向引擎要算力。
+  //   ★ 2026-10-22（用户：「悬浮在某一个代码上…扩展到那个代码所在的棋子局面」）：
+  //   悬停也展开同一段（临时预览）；点击仍然钉住。悬停优先，移开即回到钉住的那一段。
+  var gpv = null, psd = curColor();
+  if (PV_HOVER && PV_RENDER.length) {
+    var ghi = PV_HOVER.i | 0;
+    if (ghi >= 0 && ghi < PV_RENDER.length) {
+      gpv = PV_RENDER.slice(0, ghi + 1);
+      psd = (PV_SIDE === 1 || PV_SIDE === 2) ? PV_SIDE : curColor();
+    }
+  }
+  if (!gpv && PV_PREVIEW && PV_PREVIEW.moves.length) {
+    gpv = PV_PREVIEW.moves;
+    psd = (PV_PREVIEW.side === 1 || PV_PREVIEW.side === 2) ? PV_PREVIEW.side : curColor();
+  }
+  if (gpv && gpv.length && aiDecorOn() &&
+      S.mode !== 'place' && S.mode !== 'endgame') {
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    ctx.font = '600 ' + Math.max(7, gap * 0.36) + 'px "Segoe UI",system-ui,sans-serif';
+    gpv.forEach(function (p, i) {
+      if (p[0] < 0 || p[1] < 0 || p[0] >= N || p[1] >= N) return;
+      if (G.board[p[1]] && G.board[p[1]][p[0]]) return;
+      var col = (i % 2 === 0) ? psd : 3 - psd;
+      var cx = pad + p[0] * gap, cy = pad + p[1] * gap;
+      ctx.globalAlpha = (col === 1) ? 0.56 : 0.66;         // 只透一点点：仍像真棋子，又能和已下的区分
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = (col === 1) ? css('--blk') : css('--wht'); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = Math.max(1.2, gap * 0.045);
+      ctx.strokeStyle = (col === 1) ? 'rgba(255,255,255,.42)' : 'rgba(70,58,35,.45)';
+      ctx.stroke();
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = (col === 1) ? '#f4f1e8' : '#2b261c';
+      ctx.fillText(String(i + 1), cx, cy);
+    });
+    ctx.restore();
+  }
+
+  // ★ 2026-10-22：引擎仪表盘「路线」代码的悬停指示 —— 鼠标停在某个走法代码上时，
+  //   在棋盘对应交叉点画一圈虚线 + 手数徽标（参考 gomocalc 的 PV 预览）。
+  if (PV_HOVER && aiDecorOn() && S.mode !== 'place' && S.mode !== 'endgame') {
+    var hx = pad + PV_HOVER.x * gap, hy = pad + PV_HOVER.y * gap;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(122,90,248,.95)';
+    ctx.lineWidth = Math.max(2, gap * 0.075);
+    if (ctx.setLineDash) ctx.setLineDash([gap * 0.16, gap * 0.11]);
+    ctx.beginPath(); ctx.arc(hx, hy, Math.max(9, gap * 0.44), 0, Math.PI * 2); ctx.stroke();
+    if (ctx.setLineDash) ctx.setLineDash([]);
+    // ★ 悬停已展开棋子时，最后一颗（悬停点）本身就带手数 —— 不再叠一层紫色数字，只留虚线圈。
+    var hb = (gpv && gpv.length) ? '' : String(PV_HOVER.seq || '');
+    if (hb) {
+      ctx.font = '700 ' + Math.max(8.5, gap * 0.30) + 'px "Segoe UI",system-ui,sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+      ctx.lineWidth = Math.max(2.4, gap * 0.10);
+      ctx.strokeStyle = 'rgba(255,255,255,.95)';
+      ctx.strokeText(hb, hx, hy);
+      ctx.fillStyle = '#7a5af8';
+      ctx.fillText(hb, hx, hy);
+    }
+    ctx.restore();
   }
 
   if (openActive() && aiDecorOn() && OPEN.kind === 'tar' && OPEN.tar && OPEN.tar.called.length) {
@@ -1554,6 +1634,18 @@ function paint() {
     var isStage2 = G.ana.marks.some(function (mk) { return String(mk.badge) === '4'; });
     if (G.moves.length >= (isStage2 ? 5 : 3)) balHide = true;
   }
+  // ★ 2026-10-22 分析计算的新标记圈（最多 4 个）：细圆环 + 半透明填充，
+  //   上半圆胜率、下半圆分数（分数=引擎评估），最佳点圆环稍粗。
+  if (aiDecorOn()) {
+    var lm = G.ana.marks.filter(function (m) { return m && m.live; });
+    if (lm.length) drawLiveMarks(ctx, lm, pad, gap);
+  }
+  // ★ 2026-10-22（用户：「扫描防守……第一等级是一个较大的圆环，里面有半透明的填充……」）：
+  //   扫描防守按五档样式画在棋盘上（1~4 档圆环 + 半透明填充、逐档变小变淡；5 档只剩数字）。
+  //   注意：判据只看 defCells，**不看 kind** —— 用户要求「停止扫描后最后一帧保留在棋盘上」，
+  //   停止时 kind 已被清空，标记必须继续画，直到落子 / 清除计算把 defCells 置空。
+  if (aiDecorOn() && G.ana.defCells && G.ana.defCells.length)
+    drawDefendMarks(ctx, G.ana.defCells, pad, gap);
   if (G.ana.marks.length && (aiDecorOn() || G.ana.kind === 'bal' || G.ana.kind === 'bal1') && !balHide) {
     
     var mr = Math.max(6, gap * 0.40);
@@ -1561,9 +1653,9 @@ function paint() {
     var taken = [];
     // A balance pick that has already been played is covered by its stone, so
     // drop exactly those marks while the rest keep counting down.
-    var balDraw = (G.ana.kind === 'bal')
-      ? G.ana.marks.filter(function (m) { return !G.board[m.y][m.x]; })
-      : G.ana.marks;
+    var balDraw = G.ana.marks.filter(function (m) { return !m.live; });
+    if (G.ana.kind === 'bal')
+      balDraw = balDraw.filter(function (m) { return !G.board[m.y][m.x]; });
     function hits(a, b) {
       return !(a.x2 < b.x1 || b.x2 < a.x1 || a.y2 < b.y1 || b.y2 < a.y1);
     }
@@ -1661,6 +1753,66 @@ function paint() {
 }
 
 function aiDecorOn() { return !RV_MODE && !G.review; }
+
+// ★ 2026-10-22：分析计算标记圈 ——
+//   · 最多 4 个（通常 1~3 个），rank 0 是最佳点：圆环稍粗；
+//   · 外面一圈细圆环，里面半透明填充（颜色按名次）；
+//   · 上半圆写胜率（数字稍大），下半圆写引擎分数；文字带暗色描边，深浅棋盘都清楚。
+/* ★ 2026-10-22（用户：「蓝绿——绿——黄绿（其他颜色不要出现了）」）：
+   标记圈只允许这三档颜色；第 4 名沿用黄绿、略淡一档，不再出现橙/红。 */
+var LIVE_MARK_PAL = [
+  { fill: 'rgba(0,194,201,.34)',  ring: 'rgba(0,210,218,.98)' },   // 蓝绿
+  { fill: 'rgba(96,200,120,.30)', ring: 'rgba(110,214,134,.96)' }, // 绿
+  { fill: 'rgba(196,216,86,.30)', ring: 'rgba(212,228,104,.96)' },// 黄绿
+  { fill: 'rgba(196,216,86,.20)', ring: 'rgba(212,228,104,.80)' },// 黄绿（第 4 名稍淡）
+];
+// 圆环内的两行字：上半胜率 / 下半分数。
+// ★ 2026-10-22（用户：「百分比和下面的分数字号再大一点点，就是不超过圆环就行」）：
+//   字号基数从 gap*.235 / .185 提到 r*.56 / r*.44（约 +12%），并加宽度上限：
+//   文字一旦超过环内宽度（r*1.8）就自动缩，始终不压到圆环。
+function drawRingLabels(ctx, px, py, r, topTxt, botTxt, fsScale, fitF) {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  var sc = fsScale || 1;
+  var fit = fitF || 1.8;
+  var fsT = Math.max(9, r * 0.56 * sc);
+  ctx.font = '700 ' + fsT + 'px "Segoe UI",system-ui,sans-serif';
+  while (fsT > 7.5 && ctx.measureText(topTxt).width > r * fit) {
+    fsT -= 0.4;
+    ctx.font = '700 ' + fsT + 'px "Segoe UI",system-ui,sans-serif';
+  }
+  ctx.lineWidth = Math.max(2, fsT * 0.24); ctx.strokeStyle = 'rgba(0,0,0,.55)';
+  var ty = botTxt ? py - r * 0.29 : py;
+  ctx.strokeText(topTxt, px, ty);
+  ctx.fillStyle = '#ffffff'; ctx.fillText(topTxt, px, ty);
+  if (!botTxt) return;
+  var fsB = Math.max(7.5, r * 0.44 * sc);
+  ctx.font = '600 ' + fsB + 'px "Segoe UI",system-ui,sans-serif';
+  while (fsB > 6.5 && ctx.measureText(botTxt).width > r * fit) {
+    fsB -= 0.4;
+    ctx.font = '600 ' + fsB + 'px "Segoe UI",system-ui,sans-serif';
+  }
+  ctx.lineWidth = Math.max(1.8, fsB * 0.24); ctx.strokeStyle = 'rgba(0,0,0,.55)';
+  ctx.strokeText(botTxt, px, py + r * 0.32);
+  ctx.fillStyle = '#ffffff'; ctx.fillText(botTxt, px, py + r * 0.32);
+}
+
+function drawLiveMarks(ctx, marks, pad, gap) {
+  marks.slice(0, 4).forEach(function (mk) {
+    var px = pad + mk.x * gap, py = pad + mk.y * gap;
+    var r = Math.max(9, gap * 0.47);
+    var best = (mk.rank === 0);
+    var pal = LIVE_MARK_PAL[Math.max(0, Math.min(LIVE_MARK_PAL.length - 1, mk.rank | 0))];
+    // 半透明填充 + 细圆环（最佳点圆环稍粗）
+    ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fillStyle = pal.fill; ctx.fill();
+    ctx.lineWidth = best ? Math.max(2.2, gap * 0.072) : Math.max(1.1, gap * 0.038);
+    ctx.strokeStyle = pal.ring; ctx.stroke();
+    // 上半圆：胜率；下半圆：分数
+    drawRingLabels(ctx, px, py, r,
+      Math.round((typeof mk.wr === 'number' ? mk.wr : 0.5) * 100) + '%',
+      String(mk.ev || ''));
+  });
+}
 
 function drawOpenGuide(ctx, g, r) {
   var pad = g.pad, gap = g.gap, n = G.moves.length;
@@ -1921,72 +2073,1298 @@ function mustAnswer(b, cc, cands, op, of, myFour) {
   return null;                                                           
 }
 
-function nearStoneDist(b, x, y) {
-  for (var r = 1; r <= 8; r++) {
-    for (var dy = -r; dy <= r; dy++) {
-      var sy = y + dy;
-      if (sy < 0 || sy >= N) continue;
-      for (var dx = -r; dx <= r; dx++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;   
-        var sx = x + dx;
-        if (sx < 0 || sx >= N) continue;
-        if (b[sy][sx]) return r;
-      }
+// ★ 2026-10-23 清理：nearStoneDist / nearStoneGuard / crossCheckMove / crossCheckPick
+//   是 4.39 之前「JS 战术覆盖 AI 落点」的遗留死代码（无任何调用点，注释里也早已声明删除），
+//   一并移除，避免再被误接回落子链。
+
+// 引擎通信（2026-10-19 重建）：宿主单实例 Rapfi「极速版」。
+//   页面只发 ask / stop / caps / config 四种 op；协议编排与解析 100% 在 C++
+//   （desktop-connect/src/engine_host.cpp）。页面里不再有 Worker、不再有协议文本解析、
+//   不再有车道（main/sub/fwd）、不再有 /engine/* HTTP 拦截与轮询。
+//   宿主推回：{"type":"engineAck","id":N,"op":"ask","ok":bool,["err":..,]"res":{...}}
+//             {"type":"engineAsk","id":N,"phase":"tick","res":{...}}  ← 中间过程
+//   返回口径与旧 engine-ai.js 的 done 结果兼容：{candidates[{x,y,eval,depth,speed,
+//   nodes,winrate,line}], best, timeout, elapsed, nodeCount, superseded, error}。
+var LocalAI = (function () {
+  var seq = 0, liveSeq = 0;
+  var pend = {};                        // id -> job（在途 ask）
+  var capWait = {};                     // caps 的 id -> resolve
+  var cur = null, wait = null;          // 单实例：同时只允许一个 ask 在途（宿主只有一个引擎）
+  var cfgT = 0, cfgKB = 0;              // 线程数 / 哈希 KB
+  var capsCache = null;                 // 最近一次 caps
+
+  function post(o) {
+    if (!HOST) return false;
+    try { tellHost(o); return true; } catch (e) { return false; }
+  }
+  function emptyRes(sup, err) {
+    return { candidates: [], best: null, timeout: false, elapsed: 0, nodeCount: 0,
+             superseded: !!sup, error: err || '' };
+  }
+  function mapRes(r) {
+    r = r || {};
+    var cands = (r.candidates || []).map(function (c) {
+      var wr = (typeof c.winrateBp === 'number' && c.winrateBp >= 0 && c.winrateBp <= 10000)
+                 ? c.winrateBp / 10000 : 0.5;
+      // ★ 2026-10-19（用户：「节点和速度不会差十倍」）：面板口径统一 ——
+      //   speed 一直是全局口径（INFO SPEED = 全线程总节点 / 耗时），节点必须同源用
+      //   全局 TOTALNODES（r.nodes）。以前这里配的是**单手指子树** INFO NODES，
+      //   两者差 ≈ 线程数倍（实测 297731 vs 2702466 ≈ 9.08x），看着就像「幻觉」。
+      return { x: c.x, y: c.y, winrate: wr, eval: c.eval || '', depth: c.depth || 0,
+               speed: r.speed || 0, nodes: r.nodes || 0,
+               line: (c.pv || []).map(function (p) { return [p[0], p[1]]; }) };
+    });
+    var best = (r.bestX >= 0 && r.bestY >= 0) ? [r.bestX, r.bestY]
+                                              : (cands.length ? [cands[0].x, cands[0].y] : null);
+    return { candidates: cands, best: best, timeout: !r.finished && !r.bestEval,
+             elapsed: r.timeMs || 0, nodeCount: r.nodes || 0,
+             depth: r.depth || 0, superseded: !!r.superseded, error: r.err || '' };
+  }
+  // 宿主 tick 的结构化 res → 旧 live 口径（paintLiveDash / G.ana 的实时面板）
+  function liveOf(job, r) {
+    r = r || {};
+    var pvs = (r.candidates || []).map(function (c) {
+      // 同 mapRes：节点用全局 TOTALNODES，与 speed 同口径（PV 列不显示单手指节点）。
+      return { x: c.x, y: c.y, eval: c.eval || '', depth: c.depth || 0,
+               speed: r.speed || 0, nodes: r.nodes || 0,
+               line: (c.pv || []).map(function (p) { return [p[0], p[1]]; }) };
+    });
+    return { searching: true, t0: job.t0, cid: job.cid, lane: 'main', tag: job.tag,
+             speed: r.speed || 0, nodes: r.nodes || 0, depth: r.depth || 0,
+             eval: (pvs[0] && pvs[0].eval) || '', best: (pvs[0] ? [pvs[0].x, pvs[0].y] : null),
+             pvs: pvs };
+  }
+  function emitLive(job, r) {
+    if (job.liveId == null) return;
+    try { onEngineLive(liveOf(job, r)); } catch (e) {}
+  }
+  function startJob(job) {
+    cur = job;
+    job.t0 = Date.now();
+    pend[job.id] = job;
+    // ★ 2026-10-22：常驻分析 live 没有 JS 侧超时 —— 它由用户落子 / 停止分析 / 新 ask 抢占来结束。
+    if (job.op !== 'live') {
+      job.timer = setTimeout(function () {
+        if (cur === job) cur = null;
+        delete pend[job.id];
+        if (job.op === 'balance') job.res({ moves: [], eval: null, swap: false, error: 'timeout' });
+        else job.rej(new Error('timeout'));
+        pump();
+      }, job.timeoutMs);
+    }
+    if (!post({ engine: 1, op: job.op || 'ask', id: job.id, q: job.q })) {
+      clearTimeout(job.timer); delete pend[job.id]; cur = null;
+      if (job.op === 'balance') job.res({ moves: [], eval: null, swap: false, error: 'engine unavailable' });
+      else if (job.onEnd) { try { job.onEnd({ error: 'engine unavailable', stopped: true }); } catch (e) {} }
+      else job.rej(new Error('engine unavailable'));
+      pump();
     }
   }
-  return 9;
+  // live 作业结束（被抢占 / 主动停止 / 引擎异常）统一从这里回调，不再依赖 Promise。
+  function endJob(job, res) {
+    if (!job) return;
+    if (job.onEnd) { try { job.onEnd(res || {}); } catch (e) {} return; }
+    try { job.res(res); } catch (e) {}
+  }
+  function stopLiveJob(job) {
+    if (!job) return;
+    if (wait === job) { wait = null; endJob(job, { stopped: true }); return; }
+    // ★ 2026-10-22：只有「真的在跑」的 live 才发 STOP —— 引擎忙时被退回（busy）的 live 从未下发，
+    //   它残留在 LIVE_AN.handle 里再被 stop 会把别人（AI 落子 / 提示）正在跑的搜索打断。
+    var running = (cur === job);
+    if (job.id != null && pend[job.id]) { delete pend[job.id]; clearTimeout(job.timer); running = true; }
+    if (cur === job) cur = null;
+    if (running) { try { post({ engine: 1, op: 'stop', id: ++seq, q: {} }); } catch (e) {} }
+    endJob(job, { stopped: true });
+    pump();
+  }
+  function pump() {
+    if (cur || !wait) return;
+    var j = wait; wait = null; startJob(j);
+  }
+  function makeJob(body, timeoutMs, res, rej, op) {
+    var b = body || {};
+    var q = { board: b.board,
+              side: (b.side === 1 || b.side === 2) ? b.side : 0,
+              rule: b.rule | 0,
+              budgetMs: Math.max(200, b.turnMs | 0),
+              key: b.key || 0 };            // ★ 真实盘面指纹（此前硬编码 0）
+    if (op === 'balance') {
+      q.topN = 1; q.pondering = false;
+      q.mode = (b.mode === 'two') ? 'two' : 'one';
+      q.bias = b.bias | 0;
+    } else {
+      q.topN = Math.max(1, Math.min(8, b.topN | 0));
+      q.pondering = !b.noPonder;
+      // ★ 2026-10-22：扫描防守走宿主的 mode=3（YXSEARCHDEFEND，全点 multipv）。
+      if (b.scan) q.mode = 3;
+    }
+    if (op === 'live') { q.live = true; q.pondering = false; }
+    return { id: ++seq, timer: null, res: res, rej: rej, op: op || 'ask',
+             liveId: (b.liveId == null ? null : b.liveId), tag: b.tag || '', cid: b.cid || '',
+             exclusive: !!b.exclusive, timeoutMs: timeoutMs || 20000, t0: Date.now(), q: q };
+  }
+  // 页面侧串行（宿主只有一个引擎）：同时只跑一个 ask。新的「要落子」请求
+  // （exclusive）可抢占在途的辅助请求（实时面板 / 换位评估）；其余请求排队，
+  // 且只保留最新的一个排队项（更旧的就地作废，避免拿旧盘面把预算跑满）。
+  function submit(job) {
+    // ★ 2026-10-22：常驻分析（live）是**最低优先级**——
+    //   引擎忙（提示 / 教练 / 评估 / AI 落子…）时它不排队、不占 wait 槽，直接退回让页面稍后重试；
+    //   反之任何常规请求都可以立刻抢占 live（否则 live 会一直占着引擎，把其它功能饿死）。
+    if (job.op === 'live') {
+      if (cur) { endJob(job, { busy: true, stopped: true }); return; }
+      startJob(job);
+      return;
+    }
+    if (wait) { endJob(wait, emptyRes(true)); wait = null; }
+    if (cur && cur.op === 'live') {
+      var oldL = cur; cur = null; delete pend[oldL.id]; clearTimeout(oldL.timer);
+      try { post({ engine: 1, op: 'stop', id: ++seq, q: {} }); } catch (e) {}
+      endJob(oldL, emptyRes(true));
+      startJob(job);
+      return;
+    }
+    if (!cur) { startJob(job); return; }
+    if (job.exclusive && !cur.exclusive) {
+      var old = cur; cur = null; delete pend[old.id];
+      clearTimeout(old.timer);
+      try { post({ engine: 1, op: 'stop', id: ++seq, q: {} }); } catch (e) {}
+      endJob(old, emptyRes(true));
+      startJob(job);
+      return;
+    }
+    wait = job;
+  }
+  function ask(body, timeoutMs) {
+    return new Promise(function (res, rej) { submit(makeJob(body, timeoutMs, res, rej, 'ask')); });
+  }
+  // 官方平衡点（宿主 YXBALANCEONE / YXBALANCETWO，一次性算完即停）。
+  // 返回 { moves:[[x,y]…], eval:num|null, swap, error }。
+  function balance(body, timeoutMs) {
+    return new Promise(function (res, rej) { submit(makeJob(body, timeoutMs, res, rej, 'balance')); });
+  }
+  function caps() {
+    return new Promise(function (resolve) {
+      var id = ++seq;
+      capWait[id] = resolve;
+      if (!post({ engine: 1, op: 'caps', id: id, q: {} })) { delete capWait[id]; resolve(null); return; }
+      setTimeout(function () {
+        if (capWait[id]) { delete capWait[id]; resolve(capsCache); }
+      }, 3000);
+    });
+  }
+  // 宿主 balance 结果 → { moves:[[x,y]…], eval:num|null, swap, error }
+  function balanceResOf(r) {
+    r = r || {};
+    var pts = (r.pts || []).map(function (p) { return [p[0], p[1]]; });
+    var ev = r.bestEval, num = null;
+    if (typeof ev === 'string' && ev) {
+      if (/^[+-]?M/.test(ev)) num = (ev.charAt(0) === '-') ? -1000 : 1000;
+      else { var n = parseInt(ev, 10); num = isNaN(n) ? null : n; }
+    }
+    return { moves: pts, eval: num, swap: !!r.swap, error: r.err || '' };
+  }
+  function onAck(m) {
+    if (!m || !m.id) return;
+    if (m.op === 'caps') {
+      var cw = capWait[m.id];
+      if (cw) { delete capWait[m.id]; capsCache = m.res || null; cw(capsCache); }
+      return;
+    }
+    var job = pend[m.id];
+    if (!job) return;
+    delete pend[m.id];
+    clearTimeout(job.timer);
+    if (cur && cur.id === m.id) cur = null;
+    if (job.op === 'balance') {
+      var br = balanceResOf(m.res);
+      if (m.ok === false && m.err) br.error = String(m.err);
+      job.res(br);
+      pump();
+      return;
+    }
+    if (job.liveId != null) {
+      try { onEngineLive({ lane: 'main', tag: job.tag, searching: false }); } catch (e) {}
+    }
+    if (m.ok === false) {
+      var er = String(m.err || 'engine error');
+      if (job.op === 'live' || job.onEnd) {
+        endJob(job, { superseded: (er === 'superseded'), stopped: true, error: er });
+      } else if (er === 'superseded') job.res(emptyRes(true));
+      else if (er === 'search timeout') {
+        // ★ 2026-10-23（用户：「引擎的调用又出问题了，智力层大有下降」）：
+        //   宿主超时前会发 STOP，m.res 里通常已经带着**当前最优候选**。旧代码直接
+        //   emptyRes 丢掉它们 → aiMove 拿不到落点、界面显示离线，看起来就是「突然变笨」。
+        //   有候选就照常返回（只标记 timeout），真的空才按超时处理。
+        var tr = (m.res && (m.res.candidates || []).length) ? mapRes(m.res)
+                                                            : emptyRes(false, 'search timeout');
+        tr.timeout = true;
+        job.res(tr);
+      }
+      else job.rej(new Error(er));
+    } else if (job.op === 'live' || job.onEnd) {
+      endJob(job, mapRes(m.res));
+    } else {
+      job.res(mapRes(m.res));
+    }
+    pump();
+  }
+  function onTickMsg(m) {
+    if (!m || m.phase !== 'tick' || !m.id) return;
+    var job = pend[m.id];
+    if (!job) return;
+    if (m.res) {
+      job.last = m.res;
+      // ★ 常驻分析的 tick 也走 mapRes（winrateBp→winrate、depth/节点口径统一），
+      //   否则标记圈里的胜率会全部回落成 50%。
+      if (job.onTick) { try { job.onTick(mapRes(m.res)); } catch (e) {} }
+    }
+    emitLive(job, m.res);
+  }
+  function failAll(err) {
+    if (cur) {
+      clearTimeout(cur.timer); delete pend[cur.id];
+      if (cur.onEnd) { try { cur.onEnd({ stopped: true, error: String(err) }); } catch (e) {} }
+      else { try { cur.rej(err); } catch (e) {} }
+      cur = null;
+    }
+    for (var k in pend) {
+      clearTimeout(pend[k].timer);
+      if (pend[k].onEnd) { try { pend[k].onEnd({ stopped: true, error: String(err) }); } catch (e) {} }
+      else { try { pend[k].rej(err); } catch (e) {} }
+    }
+    pend = {};
+    if (wait) {
+      var w = wait; wait = null;
+      if (w.onEnd) { try { w.onEnd({ stopped: true, error: String(err) }); } catch (e) {} }
+      else { try { w.rej(err); } catch (e) {} }
+    }
+  }
+  return {
+    boot: function () { caps(); return HOST; },
+    isReady: function () { return !!(capsCache && capsCache.available) || HOST; },
+    nextLiveId: function () { return ++liveSeq; },
+    analyze: function (body, ms) {
+      if (window.__GB_TEST__) return Promise.reject(new Error('stub: no engine in test'));
+      if (!HOST) return Promise.reject(new Error('engine unavailable'));
+      return ask(body, Math.max(9000, ms || 20000));
+    },
+    // ★ 2026-10-22 常驻分析：一次 ask 持续加深（宿主 TIMEOUT_TURN 放到 1 小时），
+    //   onTick 每次引擎 INFO 刷新都会回调；handle.stop() 结束本次搜索。
+    live: function (body, onTick, onEnd) {
+      if (window.__GB_TEST__ || !HOST) {
+        if (onEnd) { try { onEnd({ error: 'engine unavailable', stopped: true }); } catch (e) {} }
+        return { stop: function () {} };
+      }
+      var job = makeJob(body, 0, function () {}, function () {}, 'live');
+      job.onTick = onTick || null; job.onEnd = onEnd || null;
+      submit(job);
+      return { stop: function () { stopLiveJob(job); } };
+    },
+    // 平衡点通道：走宿主 IPC 的官方 YXBALANCEONE/TWO（一次性算完即停）。
+    balance: function (body, ms) {
+      if (window.__GB_TEST__) return Promise.reject(new Error('stub: no engine in test'));
+      if (!HOST) return Promise.reject(new Error('engine unavailable'));
+      return balance(body, Math.max(9000, ms || 20000));
+    },
+    config: function (threads, hashMB) {
+      cfgT = threads || 0; cfgKB = (hashMB || 0) * 1024;
+      post({ engine: 1, op: 'config', id: ++seq, q: { threads: cfgT, hashMB: Math.round(cfgKB / 1024) } });
+    },
+    restart: function () {
+      post({ engine: 1, op: 'stop', id: ++seq, q: {} });
+      failAll(new Error('engine reconnecting'));
+    },
+    stopLane: function (lane) {
+      post({ engine: 1, op: 'stop', id: ++seq, q: {} });
+    },
+    relay: function (m) {
+      if (!m) return;
+      if (m.type === 'engineAck') onAck(m);
+      else if (m.type === 'engineAsk') onTickMsg(m);
+    },
+  };
+})();
+
+// 平衡通道：走页面内 worker 的原生 YXBALANCEONE/TWO（纯 C++ 硬链接），
+// 不再有 :8964 HTTP。返回 { mode, n, bias, swap, moves, elapsed, rule }。
+function apiBalance(body, ms) {
+  if (window.__GB_TEST__) return Promise.reject(new Error('stub: no engine in test'));
+  return LocalAI.balance(body, ms);
+}
+var RAPFI_MATE = 30000;          
+var RAPFI_MATE_MAX_PLY = 500;    
+var RAPFI_EVAL_MAX = 6000;       
+
+var RIF_OPENINGS = [
+  
+  { w: [8, 7], b: [6, 7] }, { w: [8, 7], b: [7, 9] }, { w: [8, 7], b: [6, 6] },
+  { w: [8, 7], b: [6, 8] }, { w: [8, 7], b: [9, 5] }, { w: [8, 7], b: [7, 6] },
+  { w: [8, 7], b: [8, 6] }, { w: [8, 7], b: [6, 9] }, { w: [8, 7], b: [5, 8] },
+  { w: [8, 7], b: [9, 8] }, { w: [8, 7], b: [5, 7] }, { w: [8, 7], b: [8, 9] },
+  { w: [8, 7], b: [5, 5] },
+  
+  { w: [8, 8], b: [6, 7] }, { w: [8, 8], b: [6, 8] }, { w: [8, 8], b: [9, 6] },
+  { w: [8, 8], b: [6, 6] }, { w: [8, 8], b: [9, 9] }, { w: [8, 8], b: [10, 7] },
+  { w: [8, 8], b: [7, 6] }, { w: [8, 8], b: [8, 5] }, { w: [8, 8], b: [10, 10] },
+  { w: [8, 8], b: [5, 8] }, { w: [8, 8], b: [6, 9] }, { w: [8, 8], b: [8, 9] },
+  { w: [8, 8], b: [5, 6] }
+];
+function evalNum(ev) {
+  if (ev === null || ev === undefined) return NaN;
+  var s = String(ev).trim();
+  if (!s || /^(VAL_NONE|VAL_INF|-VAL_INF)$/i.test(s)) return NaN;
+  var m = /^([+-]?)M(\d+|\*)$/i.exec(s);
+  if (m) {
+    var ply = (m[2] === '*') ? RAPFI_MATE_MAX_PLY
+                             : Math.max(1, Math.min(RAPFI_MATE_MAX_PLY, parseInt(m[2], 10)));
+    var mv = RAPFI_MATE - ply;
+    return (m[1] === '-') ? -mv : mv;
+  }
+  var v = parseFloat(s.replace('+', ''));
+  if (isNaN(v)) return NaN;
+  return Math.max(-RAPFI_EVAL_MAX, Math.min(RAPFI_EVAL_MAX, v));
 }
 
-function nearStoneGuard(b, color, best, cands) {
-  var i, j, n = 0, sx = 0, sy = 0;
-  for (j = 0; j < N; j++) for (i = 0; i < N; i++) if (b[j][i]) { n++; sx += i; sy += j; }
-  if (n === 0) return null;                                  
-  if (n > 10) return null;                                   
-  var renju = (engineRule() === 2);
-  function ok(x, y) {
-    if (!(x >= 0 && x < N && y >= 0 && y < N)) return false;
-    if (b[y][x]) return false;
-    if (renju && color === 1 && vcxForbidden(b, x, y)) return false;
-    return nearStoneDist(b, x, y) <= 2;
-  }
-  if (best && ok(best[0], best[1])) return null;              
-  var list = [];
-  if (best) list.push([best[0], best[1]]);
-  for (i = 0; i < (cands || []).length; i++) list.push([cands[i].x, cands[i].y]);
-  for (i = 0; i < list.length; i++) {                         
-    if (ok(list[i][0], list[i][1])) return { x: list[i][0], y: list[i][1], why: 'near-cand' };
-  }
-  var cxr = Math.round(sx / n), cyr = Math.round(sy / n);     
-  var bp = null, bd = 1e9;
-  for (j = 0; j < N; j++) for (i = 0; i < N; i++) {
-    if (b[j][i]) continue;
-    if (renju && color === 1 && vcxForbidden(b, i, j)) continue;
-    var d = Math.max(Math.abs(i - cxr), Math.abs(j - cyr));
-    if (d < bd) { bd = d; bp = [i, j]; }
-  }
-  if (bp) return { x: bp[0], y: bp[1], why: 'near-centroid' };
-  return null;                                                
+function boardFp() {
+  var n = G.moves.length, l = n ? G.moves[n - 1] : null;
+  return n + ':' + (l ? l.x + ',' + l.y : '-');
 }
 
-async function crossCheckMove(best, budget, wasRecon, mainDepth) {
-  if (!best) return null;
-  if (!wasRecon && G.moves.length > 8) return null;
+function fmtEval(ev) {
+  var s = String(ev == null ? '' : ev).trim();
+  if (!s) return '';
+  var m = /^([+-]?)M(\d+)$/i.exec(s);
+  if (m) return (m[1] === '-' ? '-' : '+') + 'M' + m[2];
+  var n = parseFloat(s.replace('+', ''));
+  if (isNaN(n)) return s.slice(0, 5);
+  return (n > 0 ? '+' : '') + Math.round(n);
+}
+function pushCurve(ply, vFromMover, moverIsBlack) {
+  var b = moverIsBlack ? vFromMover : -vFromMover;
+  G.curve = G.curve.filter(function (p) { return p.i !== ply; });
+  G.curve.push({ i: ply, b: b, w: -b });
+  G.curve.sort(function (a, c) { return a.i - c.i; });
+  
+  if (linkSessionOn()) {
+    try { tellHost({ type: 'linkEval', curve: G.curve.map(function (p) {
+      return { i: p.i, b: Math.max(-999, Math.min(999, Math.round(p.b))) }; }) }); } catch (e) {}
+  }
+}
+
+function engineRule() {
+  var r = +S.rule;
+  if (r === 6 || r === 7 || r === 8) return 2;
+  return (r === 0 || r === 1 || r === 2 || r === 5) ? r : 0;
+}
+
+async function analyze(turnMs, topN, lane, side, tag, opt) {
+  
+  if (linkSessionOn()) return Promise.reject(new Error('link session: main analyze paused'));
+  // ★ 2026-10-23（用户：「任何一项计算分析功能都自动关掉后台思考」）：
+  //   一次性请求（AI 落子 / 计算 / 评估 / 教练 / 热力…）要独占引擎，后台思考先收工。
+  try { bgThinkStop(); } catch (eBG) {}
+  var ply = G.moves.length;
+  // ★ 2026-10-22：记录这次搜索属于哪一方 —— 「路线」点击预览要按黑白交替铺子，
+  //   不能等到 place() 之后再取 curColor()（那时已经轮到对手了）。
+  var effSide = (side === 1 || side === 2) ? side : curColor();
   try {
-    var ms = Math.max(400, Math.min(900, Math.round((budget || 1000) * 0.5)));
-    var r2 = await analyze(ms, 1, null, curColor(), T('tagAiMove'), { exclusive: true, noPonder: true });
-    var cs2 = (r2 && r2.candidates) || [];
-    if (!cs2.length) return null;
-    return crossCheckPick(best, mainDepth, r2.best || [cs2[0].x, cs2[0].y], cs2[0].depth || 0);
-  } catch (e) { return null; }        
+    var r = await LocalAI.analyze({
+      
+      board: (opt && opt.board) || G.board, moveList: [],
+      matchMs: 600000, turnMs: turnMs, timeUsedMs: 0,
+      topN: topN, rule: engineRule(), cid: 'calc-' + ply + (lane ? '-' + lane : ''),
+      lane: lane || 'main', side: (side === 1 || side === 2) ? side : 0,
+      liveId: LocalAI.nextLiveId(), tag: tag || '',
+      
+      exclusive: !!(opt && opt.exclusive),
+      
+      urgent: (opt && opt.user) ? 'user' : !!(opt && opt.urgent),
+      noPonder: !!(opt && opt.noPonder),
+    }, Math.max(9000, turnMs + 9000));
+    if (r && r.candidates) r.candidates.forEach(function (c) { if (c) c.side = effSide; });
+    if (G.engineOffline) { G.engineOffline = false; G.retryLeft = null; refreshUI(); }   
+    return r;
+  } catch (e) {
+    
+    if (!RV_MODE && !G.review) noteEngineDown();
+    throw e;
+  }
 }
 
-function crossCheckPick(main, mainDepth, cc, ccDepth) {
-  if (!main || !cc) return null;
-  if (+cc[0] === +main[0] && +cc[1] === +main[1]) return null;         
-  return ((ccDepth || 0) > (mainDepth || 0)) ? [+cc[0], +cc[1]] : null; 
+// ★★ 2026-10-18（用户：「我设置的是 2 秒，它居然算了 4 秒」「没有充分去计算，还是会内耗」）：
+//   **预算严格等于用户设置**，一分不加。旧实现按威胁翻倍（对手成五点 ×1.5、活四 ×1.25、
+//   自己有四点 ×0.8），再叠上重算的 ×1.5 —— 用户设 2 秒，实际可能跑 3~4.5 秒，
+//   而他看到的「思考时间」就已经和设置对不上了，自然会觉得「软件在乱算」。
+//   威胁判断本身仍然保留（mustAnswer 必应逻辑要用），但**不再影响时间预算**。
+function aiTurnBudget() {
+  return Math.max(300, S.turnMs || 2000);
 }
 
-var ENG_MSG_MAX = 4;
+function heatBudget() {
+  var base = (S.turnMs || 2000) * 0.5;
+  return Math.max(900, Math.min(4000, Math.round(base)));
+}
+
+var HEAT_PAL = [
+  ['rgba(0,191,165,.66)', 'rgba(120,200,80,.50)'],
+  ['rgba(0,191,165,.66)', 'rgba(120,200,80,.50)', 'rgba(255,179,193,.55)'],
+  ['rgba(0,191,165,.60)', 'rgba(120,200,80,.55)', 'rgba(255,179,193,.55)', 'rgba(255,200,215,.42)'],
+];
+
+/* ★ 2026-10-22（用户：「蓝绿——绿——黄绿（其他颜色不要出现了）」）：
+   多点分析 / 列表名次徽标同步收敛到这三档颜色，不再用橙 / 红。 */
+var ANA_PAL = [
+  { badge: 'rgba(0,170,178,.95)',  ring: 'rgba(255,255,255,.95)' },   // 蓝绿
+  { badge: 'rgba(70,168,96,.95)',   ring: 'rgba(255,255,255,.95)' },   // 绿
+  { badge: 'rgba(150,172,40,.95)',  ring: 'rgba(255,255,255,.95)' },  // 黄绿
+  { badge: 'rgba(150,172,40,.95)',  ring: 'rgba(255,255,255,.95)' },  // 黄绿
+  { badge: 'rgba(150,172,40,.95)',  ring: 'rgba(255,255,255,.95)' },  // 黄绿
+];
+var ANA_BAL = { badge: 'rgba(124,77,255,.95)', ring: 'rgba(255,255,255,.95)' };
+
+function anaInlineMetrics(ctx, mk, mr) {
+  var multi = String(mk.badge).length > 1;
+  
+  var rf = Math.max(7, mr * 0.5);
+  var ef = Math.max(7, mr * 0.58);
+  var efMin = Math.max(7, mr * 0.32);
+  
+  var lim = multi ? mr * 2.2 : mr * 1.7;
+  ctx.font = '600 ' + ef + 'px "Segoe UI",system-ui,sans-serif';
+  while (mk.label && ef > efMin && ctx.measureText(mk.label).width > lim) {
+    ef -= 0.5;
+    ctx.font = '600 ' + ef + 'px "Segoe UI",system-ui,sans-serif';
+  }
+  var bw = 0, lw = 0;
+  ctx.font = '700 ' + rf + 'px "Segoe UI",system-ui,sans-serif';
+  bw = ctx.measureText(mk.badge).width;
+  if (mk.label) {
+    ctx.font = '600 ' + ef + 'px "Segoe UI",system-ui,sans-serif';
+    lw = ctx.measureText(mk.label).width;
+  }
+  var pw, ph;
+  if (multi) { pw = Math.min(Math.max(bw, lw) + mr * 0.9, mr * 2.35); ph = mr * 1.9; }
+  else { pw = mr * 2; ph = mr * 2; }
+  return { multi: multi, rf: rf, ef: ef, pw: pw, ph: ph };
+}
+
+var HEAT_FAST_MS = 260;
+
+function clearHeat() {
+  G.heatGen++;
+  G.heat = [];
+  G.nums = [];
+  G.think = [];
+}
+
+function clearCoach() {
+  G.coachGen++;
+  G.coach = [];
+}
+
+async function coachPass(gen, fp, ms) {
+  try {
+    
+    var r = await analyze(ms, 8, 'main', curColor(), T('tagCoach'), { exclusive: true, noPonder: true });
+    var cs = (r && r.candidates) || [];
+    if (gen !== G.coachGen || fp !== boardFp()) return false;   
+    if (!cs.length) return false;
+    G.coach = cs.map(function (c, i) {
+      return { x: c.x, y: c.y, tier: 1 + Math.floor(i * 4 / cs.length), ev: fmtEval(c.eval) };
+    });
+    return true;
+  } catch (e) { return false; }
+}
+
+var COACH_MAX_MS = 8000;
+async function refreshCoach() {
+  
+  if (linkSessionOn()) { clearCoach(); return; }
+  
+  var want = S.coach && !aiVsAi() && S.mode !== 'place' && S.mode !== 'endgame' &&
+             !G.review && !RV_MODE && !G.over;
+  if (!want) { clearCoach(); return; }
+  if (isAiColor(curColor())) { clearCoach(); return; }        
+  if (G.busy) return;                                       
+  var gen = ++G.coachGen;
+  var fp = boardFp();
+  var got = await coachPass(gen, fp, HEAT_FAST_MS);
+  if (gen !== G.coachGen) return;
+  if (got) paint();
+  // ★★ 2026-10-18（用户：「2 秒内会重新评估多次，没有充分思考，很多都是失误点；要把内耗
+  //   换成能算得更准落点的能力」）：**同一盘面最多两轮，第二轮之后不再重搜**。
+  //   旧实现是 while 逐轮加倍（260 → heatBudget → ×2 → ×2 …，上限 8000ms）—— 教练标记
+  //   （S.coach 常开）时，同一个盘面会被连续重搜 5 轮以上，每次 YXBOARD 都让 Rapfi 从浅层
+  //   重走一遍迭代加深；AI 落子到达还要抢占这个循环，用户设 2 秒拿不到 2 秒的连续搜索。
+  //   现在：第一轮 260ms 先把标记摆出来（体感不变），第二轮按该盘面正常预算定型，然后退出；
+  //   盘面变了由下一次 refreshCoach 重新来（不再自己循环）。
+  if (gen !== G.coachGen || fp !== boardFp()) return;
+  if (S.coach && !G.busy && !G.over && !isAiColor(curColor())) {
+    var got2 = await coachPass(gen, fp, heatBudget());
+    if (gen !== G.coachGen) return;
+    if (got2) paint();
+  }
+}
+
+var gAiGen = 0;
+async function aiMove() {
+  if (G.busy) return;
+  var myGen = ++gAiGen;          
+  G.busy = true;
+  G.think = G.nums.length ? G.nums.map(function (n) { return { x: n.x, y: n.y }; }) : [];
+  startPulse();
+  setTurnPill(T('thinking'));
+  
+  try {
+    var t0 = Date.now();                        
+    
+    var budget = aiTurnBudget();
+    var wasRecon = !!G.reconBoost;                 
+    if (wasRecon) { G.reconBoost = false; }   // 重算不再加时（预算严格 = 用户设置）
+    // ★★ 2026-10-19（用户：「去掉 JS 战术覆盖，完全信任引擎」）：练习器与连线统一口径 ——
+    //   AI 落点 = 引擎首选，零 JS 改写。已删除 VCF/VCT 前置搜索、必应兜底、近点护栏、二次校核。
+    // ★ 2026-10-23（用户：「利用…优化并行，优化引擎的计算质量」）：双 AI 自对弈时关掉 pondering。
+    //   一方落子后 220ms 对手就要搜 —— 后台思考（ponder 对手应手）根本来不及产出任何东西，
+    //   却要和下一手的正式搜索抢同一批线程。关掉它，整机 CPU 全给正在下棋的那一方。
+    var r = await analyze(budget, 1, null, curColor(), T('tagAiMove'),
+                          { exclusive: true, urgent: true, noPonder: aiVsAi() });
+    
+    if (myGen !== gAiGen) { G.think = []; G.busy = false; refreshUI(); return; }
+    
+    if (S.paused) { G.think = []; G.busy = false; setTurnPill(T('paused')); refreshUI(); return; }
+    var cs = (r && r.candidates) || [];
+    if (!cs.length) { setStat(null, T('offline')); G.busy = false; refreshUI(); return; }
+    var c0 = cs[0];
+    c0.timeMs = Date.now() - t0;                
+    var best = r.best || [c0.x, c0.y];          // 引擎首选，零 JS 改写
+    G.lastStat = c0;
+    var moverIsBlack = (G.moves.length % 2 === 0);
+    pushCurve(G.moves.length, evalNum(c0.eval), moverIsBlack);
+    G.redo = [];                            
+    place(best[0], best[1], false, true);
+    
+    if (linkSessionOn() && S.linkAuto && !G.over) {
+      adFireAt(best[0], best[1], linkBoardFp(G.board), false, false);
+    }
+    setStat(c0, null);
+    
+    clearHeat();
+    clearCoach();
+    if (settleMove()) { G.busy = false; paint(); bgThinkKick(180); return; }   
+    paint();
+  } catch (e) {
+    setStat(null, T('offline'));
+  }
+  G.busy = false;
+  refreshUI();
+  
+  if (S.coach && !G.over) refreshCoach().then(paint);
+  chainAiIfNeeded();                          
+}
+
+function chainAiIfNeeded() {
+  
+  if (linkSessionOn()) return;
+  
+  if (G.sideSettle) return;
+  if (RV_MODE || S.mode !== 'pve' || S.paused || G.review || G.over || G.busy) return;
+  if (openActive()) return;                   
+  if (!isAiColor(curColor())) return;
+  setTimeout(function () {
+    if (G.sideSettle) return;                 
+    if (RV_MODE || S.mode !== 'pve' || S.paused || G.review || G.over || G.busy) return;
+    if (!isAiColor(curColor())) return;
+    aiMove();
+  }, 220);
+}
+
+async function aiAssistOnce() {
+  
+  if (G.busy || G.review || G.over || openActive() ||
+      S.mode === 'place' || S.mode === 'endgame') return;
+  
+  if (S.mode === 'pve' && isAiColor(curColor())) { aiMove(); return; }
+  var myGen = ++gAiGen;          
+  G.busy = true;
+  G.think = G.nums.length ? G.nums.map(function (n) { return { x: n.x, y: n.y }; }) : [];
+  startPulse();
+  setTurnPill(T('thinking'));
+  try {
+    var t0 = Date.now();                        
+    
+    var ab = aiTurnBudget();                                  
+    var r = await analyze(ab, 1, null, curColor(), T('tagAssist'), { exclusive: true, urgent: true });
+    if (myGen !== gAiGen) { G.think = []; G.busy = false; refreshUI(); return; }   
+    if (S.paused) { G.think = []; G.busy = false; setTurnPill(T('paused')); refreshUI(); return; }   
+    var cs = (r && r.candidates) || [];
+    if (!cs.length) { setStat(null, T('offline')); G.busy = false; refreshUI(); return; }
+    var c0 = cs[0];
+    c0.timeMs = Date.now() - t0;
+    var best = r.best || [c0.x, c0.y];          // 引擎首选，零 JS 改写              
+    G.lastStat = c0;
+    var moverIsBlack = (G.moves.length % 2 === 0);
+    pushCurve(G.moves.length, evalNum(c0.eval), moverIsBlack);
+    G.redo = [];
+    place(best[0], best[1]);
+    setStat(c0, null);
+    clearHeat();                              
+    clearCoach();
+    if (settleMove()) { G.busy = false; paint(); bgThinkKick(180); return; }   
+    paint();
+  } catch (e) {
+    setStat(null, T('offline'));
+  }
+  G.busy = false;
+  refreshUI();
+  if (S.coach && !G.over) refreshCoach().then(paint);   
+}
+
+function place(x, y, fromRedo, byAI) {
+  if (x < 0 || y < 0 || x >= N || y >= N) return false;
+  if (G.board[y][x]) return false;
+  
+  if (!fromRedo) G.redo = [];
+  
+  var c = (S.mode === 'endgame' && !S.egSeq) ? (S.egColor || 1) : curColor();
+  G.board[y][x] = c;
+  G.moves.push({ x: x, y: y, c: c });
+  PV_PREVIEW = null;                  // ★ 盘面变了：收起「路线」点击预览
+  // ★ 2026-10-22（用户：「如果用户落子了，时间重新开始统计」）：
+  //   仪表盘「用时」不再跨轮累加 —— 任何一手真正落下都归零，
+  //   随后 liveAnaStart() 按新盘面重开时重新起算（用户 / AI / 悔棋重做都适用）。
+  LIVE_AN.t0 = 0;
+  
+  G.heat = G.heat.filter(function (h) { return !G.board[h.y][h.x]; });
+  
+  G.ana.gen++;
+  if (G.ana.defTimer) { clearTimeout(G.ana.defTimer); G.ana.defTimer = null; }
+  G.ana.defWinUntil = 0; G.ana.defRefining = false;
+  if (G.ana.kind === 'bal' && G.ana.marks.length) {
+    if (!byAI) {
+      G.ana.balLeft = (G.ana.balLeft || G.ana.marks.length) - 1;
+      if (G.ana.balLeft <= 0) {
+        G.ana.gen++; G.ana.busy = false;
+        G.ana.marks = []; G.ana.rows = []; G.ana.defCells = null;
+        G.ana.kind = '';
+        anaMark(null); renderAna(T('anIdle'), true);
+      }
+    }
+    G.ana.busy = false;
+  } else {
+    G.ana.busy = false; G.ana.kind = '';
+    anaReset();
+  }
+  // ★ 盘面已变：立刻停掉常驻分析、清掉旧标记，再按新盘面重开（落子/悔棋/重做都走这里）。
+  liveAnaBoardChanged();
+  bgThinkKick(140);                    // ★ 后台思考按新盘面接力（轮 AI 时自动让路）
+  paint();
+  
+  if (G.fwd && G.fwd.on && !G.fwd.hold) fwdQueue();
+  return true;
+}
+
+function hoverFromEvent(ev) {
+  var rect = els.board.getBoundingClientRect();
+  
+  return cellAt(ev.clientX - rect.left, ev.clientY - rect.top);
+}
+function bindBoardHover() {
+  els.board.addEventListener('mousemove', function (ev) {
+    var h = hoverFromEvent(ev), c = G.hover;
+    if (!h && !c) return;
+    if (h && c && h.x === c.x && h.y === c.y) return;      
+    G.hover = h; paint();
+  });
+  els.board.addEventListener('mouseleave', function () {
+    if (!G.hover) return;
+    G.hover = null; paint();
+  });
+}
+
+function onBoardClick(ev) {
+  var rect = els.board.getBoundingClientRect();
+  var g = geom();
+  var px = ev.clientX - rect.left, py = ev.clientY - rect.top;
+  var hit = cellAt(px, py);
+  if (!hit) return;
+  var x = hit.x, y = hit.y;
+  // ★ 用户点了棋盘：不论这一下能不能落子，都立刻停算并让标记立刻消失；
+  //   随后 place() 会按新盘面重开（若只是点到空处/非法点，就按当前盘面重开）。
+  liveAnaTouch();
+
+  if (G.review && G.review.kind === 'recite') { reciteStep(x, y); return; }
+  if (G.review) return;                       
+  if (G.busy) return;
+  if (G.over) return;                         
+  
+  if (S.mode === 'pve' && aiVsAi()) { setStat(null, T('sideHintBoth')); return; }
+  
+  if (openActive()) {
+    var cp = openCallPhase();
+    if (cp) {
+      if (cp.mode === 'call') openToggleCall(cp.set, cp.cap, x, y);
+      else pickCallAt(cp.set, x, y);
+      return;
+    }
+    if (openForbid(x, y)) { setStat(null, T('ofRegion')); paint(); return; }
+  }
+  
+  if (S.mode === 'pve' && curColor() === 1 && renjuRule() && forbiddenAt(x, y)) {
+    setStat(null, T('fbBlocked')); paint(); return;
+  }
+  if (!place(x, y)) return;
+  G.redo = [];                                
+  afterMove();
+}
+
+function settleMove() {
+  var last = G.moves[G.moves.length - 1];
+  if (last && winCheck(G.board, last.x, last.y, last.c)) {
+    G.over = true;
+    G.think = [];
+    clearHeat();      
+    setStat(G.lastStat, T('over') + ' · ' + winTextFor(last.c));
+    persistGame();
+    refreshUI();
+    return true;
+  }
+  persistGame();
+  return false;
+}
+
+function winTextFor(winColor) {
+  var my = myColor();
+  if (my === 1 || my === 2) return (winColor === my) ? T('youWin') : T('youLose');
+  return (winColor === 1 ? T('fwdBlack') : T('fwdWhite')) + ' ' + T('youWin');
+}
+
+function afterMove() {
+  clearCoach();   
+  if (settleMove()) { paint(); return; }
+  refreshUI();
+  G.retryLeft = null;        
+  if (openActive() && openStep()) { paint(); return; }   
+  if (S.paused) return;
+  
+  if (boardDecided() && (G.ana.marks.length || G.ana.defCells)) {
+    if (G.ana.kind === 'bal' && G.ana.marks.length) {
+      // Balance picks persist like the Link overlay. Only the user's own
+      // stones count them down (place() with byAI=false); AI auto-moves
+      // never clear the marks.
+      G.ana.busy = false;
+      anaMark(null);
+    } else {
+      G.ana.gen++; G.ana.busy = false;
+      if (G.ana.defTimer) { clearTimeout(G.ana.defTimer); G.ana.defTimer = null; }
+      G.ana.autoDefend = false;
+      G.ana.marks = []; G.ana.rows = []; G.ana.defCells = null;
+      anaMark(null); renderAna(T('anIdle'), true);
+    }
+  }
+  if (S.mode === 'place' || S.mode === 'endgame') {
+    paint(); return;
+  }   
+  
+  // ★ 2026-10-23（用户：「智力降低的因素是速度变得很慢了」）：
+  //   轮 AI 走时不再自动重开扫描 —— 刚起一条全点深算就被 AI 的 ask 抢占 STOP，
+  //   白烧一次 93 点 × 全线程的启动，还让 AI 的搜索多等一轮收尾。等 AI 落子后
+  //   轮到人才续扫（与 liveAnaWanted() 同一口径）。
+  if (G.ana.autoDefend && !G.ana.busy && !G.over && !boardDecided() &&
+      !isAiColor(curColor())) { try { anaDefend(true); } catch (e) {} }
+  if (isAiColor(curColor())) aiMove();        
+}
+
+function persistGame() {
+  try {
+    var mv = G.moves.map(function (m) { return [m.x, m.y, m.c]; });
+    localStorage.setItem('gbcalc.game.v1', JSON.stringify({ moves: mv, rule: S.rule,
+      side: S.side, aiB: S.aiB, aiW: S.aiW, mode: S.mode, ts: Date.now() }));
+  } catch (e) {}
+}
+
+function restoreGame() {
+  var o = null;
+  try { o = JSON.parse(localStorage.getItem('gbcalc.game.v1') || 'null'); } catch (e) { o = null; }
+  if (!o || !Array.isArray(o.moves) || !o.moves.length) return false;
+  G.board = newBoard(); G.moves = []; G.curve = []; G.heat = []; G.nums = []; G.coach = [];
+  o.moves.forEach(function (a) {
+    var c = a[2] || ((G.moves.length % 2 === 0) ? 1 : 2);
+    if (a[0] < 0 || a[1] < 0 || a[0] >= N || a[1] >= N) return;
+    if (G.board[a[1]][a[0]]) return;
+    G.board[a[1]][a[0]] = c;
+    G.moves.push({ x: a[0], y: a[1], c: c });
+  });
+  recomputeOver();
+  paint();
+  refreshCoach();                             
+  return true;
+}
+
+function recomputeOver() {
+  var over = false;
+  for (var i = G.moves.length - 1; i >= 0 && !over; i--) {
+    var m = G.moves[i];
+    if (winCheck(G.board, m.x, m.y, m.c)) over = true;
+  }
+  G.over = over;
+  return over;
+}
+
+var OPEN = null;
+
+function cheb(x, y) { return Math.max(Math.abs(x - 7), Math.abs(y - 7)); }
+
+function tarRegion(n) { return [0, 1, 2, 3, 4][n - 1]; }
+function symTransforms(x, y) {
+  var cx = x - 7, cy = y - 7;
+  return [[cx, cy], [-cx, cy], [cx, -cy], [-cx, -cy],
+          [cy, cx], [-cy, cx], [cy, -cx], [-cy, -cx]].map(function (p) {
+    return [p[0] + 7, p[1] + 7];
+  });
+}
+function symEquivInSet(p, set) {
+  var tr = symTransforms(p[0], p[1]);
+  for (var i = 0; i < set.length; i++) {
+    for (var j = 0; j < tr.length; j++) {
+      if (tr[j][0] === set[i][0] && tr[j][1] === set[i][1]) return true;
+    }
+  }
+  return false;
+}
+function openActive() { return !!OPEN && !OPEN.finished; }
+
+function openStart() {
+  OPEN = null;
+  els.btn_ten.hidden = true;
+  if (els.btn_balcall) els.btn_balcall.hidden = true;
+  els.openBar.hidden = true;
+  if (els.swapPop) els.swapPop.hidden = true;   
+  
+  if (S.mode === 'endgame') return;
+  if (S.egLocked) return;              
+  
+  if (S.rule === 5) OPEN = { kind: 'swap1' };
+  else if (S.rule === 6) OPEN = { kind: 'yama', yama: null };
+  else if (S.rule === 7) OPEN = { kind: 'tar', tar: null };
+  else if (S.rule === 8) OPEN = { kind: 'tara' };
+  if (OPEN && OPEN.kind === 'tar' && !G.moves.length) {
+    place(7, 7);                       
+    afterMove();
+  } else {
+    openHint();
+  }
+}
+function openHint() {
+  if (!openActive() || RV_MODE) {
+    els.openBar.hidden = true;
+    if (els.yamaDecl) els.yamaDecl.hidden = true;
+    if (els.taraSwap) els.taraSwap.hidden = true;
+    return;
+  }
+  
+  if (OPEN.choice) {
+    els.openBar.hidden = true; els.btn_ten.hidden = true;
+    if (els.yamaDecl) els.yamaDecl.hidden = true;
+    if (els.taraSwap) els.taraSwap.hidden = true;
+    return;
+  }
+  var n = G.moves.length, t = '', en = (S.lang === 'en');
+  if (OPEN.kind === 'swap1') {
+    t = en ? 'Swap1: waiting for the reply side to decide' : '一手交换：等待对方决定是否换色';
+  } else if (OPEN.kind === 'yama') {
+    var y = OPEN.yama;
+    if (!y || y.phase === 'declare') {
+      t = en ? 'Yamaguchi: black declares the number of 5th-move picks (1–10)'
+             : '山口：黑方声明第5手打点数（点右侧数字）';
+    } else if (y.phase === 'swap') {
+      t = en ? 'Yamaguchi: waiting for the swap decision' : '山口：等待换色决定';
+    } else if (n === 3) {
+      t = en ? 'Yamaguchi: white plays the 4th move anywhere'
+             : '山口：白第4手（任意位置，官方无区域限制）';
+    } else if (y.phase === 'call' && n >= 4) {
+      t = en ? ('Yamaguchi: black names ' + (y.n - y.called.length) + ' more 5th-move pick(s) (' + y.called.length + '/' + y.n + ')')
+             : ('山口：黑方叫第5手候选（已叫 ' + y.called.length + '/' + y.n + '，对称点不可重复）');
+    } else if (y.phase === 'pick') {
+      t = en ? 'Yamaguchi: white picks one of the offered 5th moves'
+             : '山口：白方从候选中挑一个作为第5手';
+    } else {
+      t = en ? 'Yamaguchi: play on' : '山口：正常对局';
+    }
+  } else if (OPEN.kind === 'tar') {
+    if (OPEN.tar && OPEN.tar.phase === 'call10') {
+      t = en ? ('Ten-call: pick ' + (10 - OPEN.tar.called.length) + ' more candidate(s)')
+             : ('十打：还需叫 ' + (10 - OPEN.tar.called.length) + ' 个候选点（对称点不可重复）');
+    } else if (OPEN.tar && OPEN.tar.phase === 'pickCall') {
+      t = en ? 'Ten-call: white picks one of the offered 5th moves' : '十打：白方正在挑点';
+    } else if (n < 4) {
+      var r = tarRegion(n + 1);
+      t = en ? ('Taraguchi: move ' + (n + 1) + ' within ' + (r * 2 + 1) + '×' + (r * 2 + 1) + ' of centre')
+             : ('塔拉山口：第 ' + (n + 1) + ' 手限天元周围 ' + (r * 2 + 1) + '×' + (r * 2 + 1));
+    } else if (n === 4) {
+      t = en ? 'Taraguchi: play the 5th stone, or use Ten-call'
+             : '塔拉山口：直接下第 5 手（9×9 内），或点「十打」';
+    }
+  } else if (OPEN.kind === 'tara') {
+    if (OPEN.phase === 'swapask') {
+      t = en ? 'Tarannikov: swap sides now?' : '塔拉尼科夫：是否换手？（每手后均有此权）';
+    } else if (n < 5) {
+      var r2 = tarRegion(n + 1);
+      t = en ? ('Tarannikov: move ' + (n + 1) + ' within ' + (r2 * 2 + 1) + '×' + (r2 * 2 + 1) + ' of centre')
+             : ('塔拉尼科夫：第 ' + (n + 1) + ' 手限天元周围 ' + (r2 * 2 + 1) + '×' + (r2 * 2 + 1));
+    } else if (n === 5) {
+      t = en ? 'Tarannikov: white plays the 5th move, last swap option follows'
+             : '塔拉尼科夫：白下第 5 手（9×9 内），之后仍有最后一次换手机会';
+    }
+  }
+  
+  var declOn = !!(OPEN.kind === 'yama' && OPEN.yama && OPEN.yama.phase === 'declare');
+  
+  var swapOn = !!(OPEN.kind === 'tara' && OPEN.phase === 'swapask' && S.mode === 'pve' &&
+                  ((curColor() === 1) ? !S.aiB : !S.aiW));
+  if (els.yamaDecl) els.yamaDecl.hidden = !declOn;
+  if (els.taraSwap) els.taraSwap.hidden = !swapOn;
+  
+  var cp = openCallPhase();
+  var balOk = !!(cp && cp.mode === 'call' && cp.cap - cp.set.called.length > 0);
+  if (els.btn_balcall) els.btn_balcall.hidden = !balOk;
+  if (cp && cp.set.balBusy) t = T('balCallBusy');
+  els.openHint.textContent = t;
+  els.openBar.hidden = !t;
+  els.btn_ten.hidden = !(OPEN.kind === 'tar' && n === 4 && !(OPEN.tar && OPEN.tar.phase));
+}
+
+function openStep() {
+  if (!openActive()) return false;
+  var n = G.moves.length;
+  if (OPEN.kind === 'swap1') {
+    if (n === 1 && !OPEN.done) { showSwapChoice(); return true; }
+    OPEN.finished = true; openHint(); return false;
+  }
+  
+  if (OPEN.kind === 'yama') {
+    var y = OPEN.yama;
+    if (n < 3) { openHint(); return true; }                    
+    if (!y) { OPEN.yama = { phase: 'declare', n: 0, called: [] }; openHint(); return true; }
+    if (y.phase === 'declare') { openHint(); return true; }    
+    if (y.phase === 'swap') { openHint(); return true; }       
+    if (!OPEN.done) { showSwapChoice(); return true; }         
+    if (n === 3) { y.phase = 'call'; openHint(); return true; }  
+    if (n === 4) {                                             
+      if (y.phase === 'pick' && !OPEN.picked && aiShouldPickCall()) { aiPickCall(); return true; }
+      openHint(); return true;
+    }
+    if (n >= 5) { y.phase = 'done'; OPEN.finished = true; openHint(); return false; }
+    openHint(); return true;
+  }
+  if (OPEN.kind === 'tar') {
+    if (OPEN.tar && OPEN.tar.phase === 'call10') { openHint(); return true; }
+    if (n >= 6) { OPEN.finished = true; openHint(); return false; }
+    
+    if (n === 4 && OPEN.tar && OPEN.tar.phase === 'pickCall') {
+      if (aiShouldPickCall()) { aiPickCall(); return true; }   
+      openHint(); return true;                                 
+    }
+    if (n === 5 && !OPEN.done) { showSwapChoice(); return true; }
+    if (n === 5 && OPEN.done) { OPEN.finished = true; openHint(); return false; }
+    openHint(); return true;
+  }
+  
+  if (OPEN.kind === 'tara') {
+    if (n >= 6) { OPEN.finished = true; openHint(); return false; }
+    if (n <= 5 && OPEN.askedN !== n) {         
+      OPEN.askedN = n; OPEN.phase = 'swapask';
+      askTaraSwap(); return true;              
+    }
+    openHint(); return true;
+  }
+  return false;
+}
+
+function openForbid(x, y) {
+  if (!openActive()) return false;
+  var n = G.moves.length + 1;                 
+  if (OPEN.kind === 'tar' || OPEN.kind === 'tara') {
+    if (n > 5) return false;
+    return cheb(x, y) > tarRegion(n);
+  }
+  if (OPEN.kind === 'yama') {
+    if (n > 3) return false;
+    return cheb(x, y) > tarRegion(n);
+  }
+  return false;
+}
+
+function showSwapChoice() {
+  OPEN.choice = true;
+  if (RV_MODE || S.mode !== 'pve') {          
+    chooseSwapSide((curColor() === 1) ? 'b' : 'w', true);
+    return;
+  }
+  els.swapPop.hidden = false;
+  openHint(); paint();
+}
+
+function chooseSwapSide(side, silent) {
+  
+  setAiSides(side !== 'b', side !== 'w');
+  syncSideUI(); save();
+  if (els.swapPop) els.swapPop.hidden = true;
+  OPEN.choice = false;
+  OPEN.done = true;
+  openStep();                                 
+  refreshUI();
+  if (!silent) paint();
+  refreshCoach();
+  maybeAi();                                  
+}
+
+function aiShouldPickCall() {                 
+  return S.mode === 'pve' && !!S.aiW;
+}
+async function aiPickCall() {
+  var set = (OPEN.kind === 'tar') ? OPEN.tar : OPEN.yama;
+  var pts = set.called.slice();
+  if (!pts.length) { OPEN.finished = true; return; }
+  var pick = pts[0], bestV = null;
+  for (var i = 0; i < pts.length; i++) {
+    
+    var b2 = G.board.map(function (row) { return row.slice(); });
+    b2[pts[i][1]][pts[i][0]] = curColor();
+    var r = null;
+    
+    try { r = await analyze(Math.max(400, Math.min(900, S.turnMs)), 1, 'sub', 3 - curColor(), T('tagTen'), { board: b2 }); } catch (e) {}
+    var cs = (r && r.candidates) || [];
+    var v = cs.length ? evalNum(cs[0].eval) : 0;
+    
+    if (bestV === null || v > bestV) { bestV = v; pick = pts[i]; }
+  }
+  OPEN.picked = true;
+  set.phase = 'done';
+  place(pick[0], pick[1]);
+  afterMove();
+}
+function startTenCall() {
+  OPEN.tar = { phase: 'call10', called: [] };
+  openHint(); paint();
+}
+
+function openToggleCall(set, cap, x, y) {
+  var i, found = -1;
+  for (i = 0; i < set.called.length; i++) {
+    if (set.called[i][0] === x && set.called[i][1] === y) { found = i; break; }
+  }
+  if (found >= 0) { set.called.splice(found, 1); }
+  else if (set.called.length >= cap) { return; }
+  else if (symEquivInSet([x, y], set.called)) { return; }                    
+  else if (renjuRule() && curColor() === 1 && forbiddenAt(x, y)) { return; } 
+  else { set.called.push([x, y]); }
+  if (set.called.length >= cap) { set.phase = 'pick'; openStep(); }
+  openHint(); paint();
+}
+
+function pickCallAt(set, x, y) {
+  for (var i = 0; i < set.called.length; i++) {
+    if (set.called[i][0] === x && set.called[i][1] === y) {
+      set.phase = 'done'; OPEN.picked = true;
+      place(x, y);
+      afterMove();
+      return;
+    }
+  }
+}
+
+function openCallPhase() {
+  if (!openActive()) return null;
+  if (OPEN.kind === 'tar' && OPEN.tar) {
+    if (OPEN.tar.phase === 'call10') return { set: OPEN.tar, cap: 10, mode: 'call' };
+    if (OPEN.tar.phase === 'pickCall') return { set: OPEN.tar, mode: 'pick' };
+  }
+  if (OPEN.kind === 'yama' && OPEN.yama) {
+    if (OPEN.yama.phase === 'call' && G.moves.length >= 4)
+      return { set: OPEN.yama, cap: OPEN.yama.n, mode: 'call' };
+    if (OPEN.yama.phase === 'pick') return { set: OPEN.yama, mode: 'pick' };
+  }
+  return null;
+}
+
+function declareYamaN(k) {
+  if (!openActive() || OPEN.kind !== 'yama' || !OPEN.yama || OPEN.yama.phase !== 'declare') return;
+  OPEN.yama.n = Math.max(1, Math.min(10, k));
+  OPEN.yama.phase = 'swap';
+  openHint();
+  showSwapChoice();                            
+}
+
+function askTaraSwap() {
+  if (S.mode !== 'pve' || (!S.aiB && !S.aiW)) { OPEN.phase = null; openHint(); return; }
+  var turn = curColor();                       
+  var aiTurn = (turn === 1) ? !!S.aiB : !!S.aiW;
+  openHint(); paint();
+  if (!aiTurn) return;                         
+  analyze(800, 1, 'sub', turn, T('tagTara')).then(function (r) {
+    if (!openActive() || OPEN.phase !== 'swapask') return;
+    var cs = (r && r.candidates) || [];
+    var v = cs.length ? evalNum(cs[0].eval) : 0;
+    if (v < -200) { doTaraSwap(true); return; }
+    OPEN.phase = null; openHint(); refreshUI(); maybeAi();     
+  }).catch(function () {
+    if (!openActive() || OPEN.phase !== 'swapask') return;
+    OPEN.phase = null; openHint(); refreshUI(); maybeAi();
+  });
+}
+
+function doTaraSwap(byAi) {
+  if (S.mode === 'pve') { setAiSides(!S.aiB, !S.aiW); syncSideUI(); save(); }
+  OPEN.phase = null;
+  toast(byAi ? T('taraSwapAi') : T('taraSwapped'));
+  refreshUI(); openHint(); paint();
+  maybeAi();                                   
+}
+
+async function balCallTen() {
+  if (!openActive()) return;     
+  var cp = openCallPhase();
+  if (!cp || cp.mode !== 'call' || cp.set.balBusy) return;
+  var need = cp.cap - cp.set.called.length;
+  if (need <= 0) return;
+  var t = cp.set, turnMs = Math.max(2000, S.turnMs || 2000);
+  t.balBusy = true;
+  openHint(); paint();
+  try {
+    // ★ 绝不让引擎在**空盘**上叫平衡点：Rapfi 在 ply=0 时把候选区限死在
+    //   expandCandidateHalfBoard()（棋盘左下 9×9），返回的是角上的点。开局第一手
+    //   （黑 1）固定天元；空盘时先在假设盘上落好天元，轮次顺延给白方。
+    var balBoard = G.board.map(function (r) { return r.slice(); });
+    var balSide = curColor();
+    if (!G.moves.length) {
+      var c0 = (N - 1) >> 1;
+      if (!balBoard[c0][c0]) { balBoard[c0][c0] = 1; balSide = 2; }
+    }
+    // 不锁中心区（禁手 / 无禁手的区别交给 rule 参数，引擎自己剔禁手点）。
+    // 成对取点：need ≥ 2 用 YXBALANCETWO（一次给 2 手，两手联合平衡），否则单点 ONE。
+    var j = await apiBalance({
+      board: balBoard, moveList: [], n: Math.max(1, Math.ceil(need / 2)),
+      // ★ 2026-10-13：一律 'two'。单点 ONE 在近乎空盘上评估 −350~−470（实测），
+      //   报出来就是「差距过大」；成对搜索才是官方口径的「平」。
+      mode: 'two', rule: engineRule(),
+      turnMs: turnMs, lane: 'main', cid: 'calc-baltar-' + G.moves.length, side: balSide,
+    }, need * turnMs + 30000);
+    if (!openActive() || openCallPhase() === null || openCallPhase().set !== t) return;
+    if (j && j.swap) { toast(T('balSwapNow')); return; }
+    var pts = (j && j.moves) || [];
+    var added = 0, names = [];
+    for (var i = 0; i < pts.length && t.called.length < cp.cap; i++) {
+      var p = pts[i];
+      if (!G.board[p[1]] || G.board[p[1]][p[0]]) continue;    
+      if (symEquivInSet(p, t.called)) continue;               
+      if (renjuRule() && curColor() === 1 && forbiddenAt(p[0], p[1])) continue;
+      t.called.push([p[0], p[1]]);
+      names.push(coordName(p[0], p[1]));
+      added++;
+    }
+    if (t.called.length >= cp.cap) { t.phase = 'pick'; openStep(); }
+    toast(T('balCallDone').replace('{n}', String(added))
+          .replace('{list}', names.join(', ') || '—'));
+  } catch (e) {
+    if (openActive() && openCallPhase() && openCallPhase().set === t)
+      toast(T('balCallFail') + (e && e.message ? e.message : 'unknown'));
+  } finally {
+    if (OPEN && t) { t.balBusy = false; openHint(); paint(); }
+  }
+}
+
+function syncSideUI() {
+  var map = { b: !!S.aiB, w: !!S.aiW };
+  [].forEach.call(els.seg_side.querySelectorAll('button'), function (b) {
+    var key = b.getAttribute('data-ai');
+    b.classList.toggle('on', !!map[key]);
+    b.setAttribute('aria-pressed', map[key] ? 'true' : 'false');
+  });
+}
+
+var LIVE_LANES = {};
+function onEngineLive(d) {
+  if (!d || !d.lane) return;
+  if (d.searching === false) {
+    
+    if (!(LIVE_AN.on && d.lane === 'main')) delete LIVE_LANES[d.lane];
+    paintLiveDash(); return;
+  }
+  LIVE_LANES[d.lane] = {
+    t0: d.t0 || Date.now(), speed: +d.speed || 0, nodes: +d.nodes || 0,
+    depth: +d.depth || 0, eval: d.eval || '', tag: d.tag || '', best: d.best || null,
+  };
+  
+  if (!RV_MODE && G.ana.busy && G.ana.kind === 'calc' && d.lane === 'main' &&
+      d.pvs && d.pvs.length && d.pvs[0] && d.pvs[0].x != null) {
+    var ap0 = d.pvs[0];
+    G.ana.marks = [{ x: ap0.x, y: ap0.y, badge: '1', label: fmtEval(ap0.eval), tier: 0 }];
+    G.ana.rows = [{ i: 0, badge: '1', coord: coordName(ap0.x, ap0.y), eval: fmtEval(ap0.eval), pv: pvText(ap0.line) }];
+    paint();
+  }
+  paintLiveDash();
+}
+function liveAgg() {
+  var keys = Object.keys(LIVE_LANES);
+  if (!keys.length) return null;
+  var a = { speed: 0, nodes: 0, depth: 0, t0: Infinity, tag: '', n: 0 };
+  for (var i = 0; i < keys.length; i++) {
+    var L = LIVE_LANES[keys[i]];
+    a.speed += L.speed || 0; a.nodes += L.nodes || 0; a.n++;
+    if ((L.depth || 0) > a.depth) a.depth = L.depth || 0;
+    if ((L.t0 || Infinity) < a.t0) a.t0 = L.t0;
+    if (!a.tag && L.tag) a.tag = L.tag;
+  }
+  return a;
+}
+
+function fmtSpeed(nps) {
+  if (!nps || nps < 0) return '-';
+  if (nps >= 1e7) return (nps / 1e6).toFixed(3) + ' M';
+  return String(Math.round(nps));      
+}
+function fmtNodes(n) { return fmtSpeed(n); }   
+
+function paintLiveDash() {
+  if (RV_MODE) return;
+  var a = liveAgg();
+  var busyUI = !!(a || G.busy || G.ana.busy || (G.fwd && G.fwd.busy) || (LIVE_AN.on && LIVE_AN.t0));
+  
+  if (busyUI && a && a.tag) engMsgAdd(T('calcOn') + ' · ' + a.tag);
+  if (!a) return;
+  if (a.depth) els.st_depth.textContent = String(a.depth);
+  els.st_speed.textContent = fmtSpeed(a.speed);
+  els.st_nodes.textContent = fmtNodes(a.nodes);
+  
+  // ★ 2026-10-23（用户：「AI 同时执黑白时评估/数据没反应过来」）：用时必须跟「节点/速度」同源
+  //   —— 都取自同一个在跑的车道。以前 LIVE_AN.t0 无条件优先，双 AI 每 2 秒换一手时
+  //   LIVE_AN.t0 刚被 place() 重置，于是出现「节点 150189 / 速度 13.6M / 用时 0.09s」
+  //   这种三对数互相对不上的画面（0.09s 走 150K 节点只有 1.6M nps）。
+  var tShow = a.t0 || (LIVE_AN.on ? LIVE_AN.t0 : 0) || Date.now();
+  els.st_time.textContent = ((Date.now() - tShow) / 1000).toFixed(1) + ' s';
+  if (a.tag) engMsgAdd(T('calcOn') + ' · ' + a.tag);
+  
+  if (linkSessionOn()) {
+    tellHost({ type: 'linkStats',
+      depth: els.st_depth.textContent, speed: els.st_speed.textContent,
+      nodes: els.st_nodes.textContent, time: els.st_time.textContent,
+      eval: els.st_eval.textContent, best: els.st_best.textContent });
+  }
+}
+
+/* ★ 消息框（2026-10-16 重新设计，用户要求）：评估曲线上方那个「固定 4 行高的虚线框」里的消息。
+   此前所有消息都直接写 els.st_line.textContent —— 谁后写谁把前一条顶掉（引擎状态 / 最佳着法 /
+   提示互相覆盖，看不到上下文）。现在统一走 engMsgAdd()：
+     · 与上一行完全相同 → 不重复占行（paintLiveDash 每次刷新都在报「计算中 · tag」）；
+     · 只保留最近 ENG_MSG_MAX 条（新的在底部，旧的自动挤掉）并自动滚到底；
+     · 空 / null → 不动（空消息不该清空历史），要清空请显式调 engMsgClear()。
+   外框 #engMsg 的高度由 CSS 钉死 ⇒ 消息增减都不改变卡片高度，评估曲线不再上下抖动。
+   #st_line 仍是这些行的容器（既有读法 el.textContent 只是拿到多行拼接）。 */
+/* ★ 2026-10-22（用户：「各种文字讯息例如计算评估里面的讯息等，同样也展现同步到这个框中」）：
+   消息框改成**滚动日志**（最多 200 条，框内滚动，滚动条与「局面代码框」同款 8px），
+   renderAna() 的状态文案也会同步写进来，所以调大上限；不再只留 4 条。 */
+var ENG_MSG_MAX = 200;
 function engMsgAdd(msg) {
   var box = els.st_line;
   if (!box || msg == null) return;
@@ -1994,15 +3372,205 @@ function engMsgAdd(msg) {
   if (!msg) return;
   var last = box.lastElementChild;
   if (last && last.textContent === msg) return;
+  var wrap = box.parentNode;
+  // ★ 2026-10-22（用户：「配合滑动条移动」）：用户往上翻看历史时不再强制跳到底，
+  //   只有原本就在底部（跟随实时）才自动跟随新消息。
+  var atBottom = true;
+  if (wrap) atBottom = (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 28);
   var d = document.createElement('div');
   d.className = 'em-line';
   d.textContent = msg;
   box.appendChild(d);
   while (box.children.length > ENG_MSG_MAX) box.removeChild(box.firstElementChild);
-  var wrap = box.parentNode;
-  if (wrap && wrap.classList && wrap.classList.contains('eng-msg')) wrap.scrollTop = wrap.scrollHeight;
+  if (wrap && wrap.classList && wrap.classList.contains('eng-msg') && atBottom)
+    wrap.scrollTop = wrap.scrollHeight;
 }
 function engMsgClear() { if (els.st_line) els.st_line.innerHTML = ''; }
+
+// ★ 2026-10-22：仪表盘「路线」小框（消息框滚动内容的一部分）+ 悬停指示 + 点击展开预览。
+//   PV_HOVER   = 鼠标正指着的那一手（只画指示圈）；
+//   PV_PREVIEW = 点击某一手后展开的黑白交替半透明棋子快照 —— **只画，不向引擎要算力**；
+//   PV_SIDE    = 这条路线属于哪一方先走（决定预览子色）。
+//   刷新节流：引擎 INFO 可达每秒数百条，PV 条最多每 260ms 重排一次；内容没变直接跳过。
+var PV_HOVER = null, PV_SIDE = 0, PV_PREVIEW = null;
+var PV_RENDER = [], PV_KEY = '', PV_TMR = 0, PV_LAST = 0, PV_PENDING = null;
+var PV_MIN_MS = 260;
+
+function pvPreviewClear() { PV_PREVIEW = null; }
+
+// 把当前展开预览的最后一手在代码条上标出来（sel）
+function pvMarkSel(box) {
+  var kids = box.querySelectorAll('.pv-mv');
+  for (var i = 0; i < kids.length; i++) kids[i].classList.remove('sel');
+  if (!PV_PREVIEW || !PV_PREVIEW.moves.length) return;
+  var k = PV_PREVIEW.moves.length - 1;
+  var last = PV_PREVIEW.moves[k], el = kids[k];
+  if (el && +el.getAttribute('data-x') === last[0] && +el.getAttribute('data-y') === last[1])
+    el.classList.add('sel');
+}
+
+function pvDrawNow() {
+  var box = els.pvBox;
+  if (!box) return;
+  PV_RENDER = PV_PENDING || [];
+  PV_KEY = PV_RENDER.map(function (p) { return p[0] + ',' + p[1]; }).join(' ');
+  if (!PV_RENDER.length) {
+    box.hidden = true; box.innerHTML = ''; PV_RENDER = [];
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = PV_RENDER.map(function (p, i) {
+    return '<span class="pv-mv' + (i === 0 ? ' best' : '') + '" data-x="' + p[0] + '" data-y="' + p[1] +
+           '" data-i="' + i + '" data-seq="' + (i + 1) + '">' + escHtml(coordName(p[0], p[1])) + '</span>';
+  }).join('');
+  pvMarkSel(box);
+  bindPvBox(box);
+  // ★ 2026-10-22：PV 刷新会重建代码节点，悬停本身不会重放 —— 按坐标把 PV_HOVER 重新钉到
+  //   新下标；对不上（这条线已被新搜索换掉）就撤掉悬停预览，避免指到别的点上。
+  if (PV_HOVER) {
+    var hj = -1;
+    for (var hk = 0; hk < PV_RENDER.length; hk++)
+      if (PV_RENDER[hk][0] === PV_HOVER.x && PV_RENDER[hk][1] === PV_HOVER.y) { hj = hk; break; }
+    if (hj < 0) { PV_HOVER = null; paint(); }
+    else if (hj !== PV_HOVER.i) { PV_HOVER.i = hj; PV_HOVER.seq = hj + 1; paint(); }
+  }
+  // 用户原本就在底部（跟随实时）→ 内容长高后继续跟到底；否则不动滚动位置
+  var wrap = box.parentNode;
+  if (wrap && wrap.classList && wrap.classList.contains('eng-msg') &&
+      wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 28)
+    wrap.scrollTop = wrap.scrollHeight;
+}
+
+function bindPvBox(box) {
+  if (box.__pvBound) return;
+  box.__pvBound = 1;
+  box.addEventListener('mouseover', function (e) {
+    var t = e.target && e.target.closest ? e.target.closest('.pv-mv') : null;
+    if (!t) return;
+    PV_HOVER = { i: +t.getAttribute('data-i'), x: +t.getAttribute('data-x'), y: +t.getAttribute('data-y'), seq: +t.getAttribute('data-seq') };
+    paint();
+  });
+  box.addEventListener('mouseout', function (e) {
+    var t = e.target && e.target.closest ? e.target.closest('.pv-mv') : null;
+    if (!t) return;
+    PV_HOVER = null;
+    paint();
+  });
+  // 点击代码：把这条路线从当前局面按黑白交替展开到该手（半透明预览，再点同手收起）。
+  // 纯前端绘制，不触发任何引擎请求 —— 不占用搜算力。
+  box.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest ? e.target.closest('.pv-mv') : null;
+    if (!t) return;
+    var i = +t.getAttribute('data-i');
+    var p = PV_RENDER[i];
+    if (!p) return;
+    var same = PV_PREVIEW && PV_PREVIEW.moves.length === i + 1 &&
+               PV_PREVIEW.moves[i][0] === p[0] && PV_PREVIEW.moves[i][1] === p[1];
+    if (same) {
+      PV_PREVIEW = null;
+    } else {
+      PV_PREVIEW = {
+        moves: PV_RENDER.slice(0, i + 1).map(function (q) { return [q[0], q[1]]; }),
+        side: (PV_SIDE === 1 || PV_SIDE === 2) ? PV_SIDE : curColor(),
+      };
+    }
+    pvMarkSel(box);
+    paint();
+  });
+}
+
+function setPvLine(line, side) {
+  if (side === 1 || side === 2) PV_SIDE = side;
+  var arr = (line || []).slice(0, 30).map(function (p) { return [p[0] | 0, p[1] | 0]; });
+  PV_PENDING = arr;
+  var box = els.pvBox;
+  if (!box) return;
+  if (!arr.length) {                      // 清空（换局面 / 停止 / 无路线）立即生效
+    if (PV_TMR) { clearTimeout(PV_TMR); PV_TMR = 0; }
+    PV_LAST = Date.now();
+    var hadPv = !!PV_PREVIEW, hadHover = !!PV_HOVER;
+    PV_HOVER = null;                     // ★ 路线清空时悬停展开的棋子也必须撤掉
+    pvPreviewClear();
+    pvDrawNow();
+    if (hadPv || hadHover) paint();       // 把画布上的半透明预览一并擦掉
+    return;
+  }
+  var key = arr.map(function (p) { return p[0] + ',' + p[1]; }).join(' ');
+  if (key === PV_KEY && !box.hidden) return;   // 内容没变：不重排 DOM
+  var wait = PV_MIN_MS - (Date.now() - PV_LAST);
+  if (wait <= 0) {
+    PV_LAST = Date.now();
+    pvDrawNow();
+  } else if (!PV_TMR) {
+    PV_TMR = setTimeout(function () { PV_TMR = 0; PV_LAST = Date.now(); pvDrawNow(); }, wait);
+  }
+}
+
+// ★ 2026-10-23（用户：「仪表盘显示的胜率有错误」）：引擎的 EVAL / WINRATE 都是
+//   **行棋方视角**；仪表「评估」与评估曲线此前一个按行棋方、一个按黑方折算，
+//   同一局面会出现「评估 -128」与曲线 +120 并存的矛盾。现在统一成**黑方视角**
+//   （正值 = 黑优，与曲线一致），白方的原始分在曲线下的「黑白信息框」里单独给出。
+function evalBlack(c0) {
+  var v = evalNum(c0 && c0.eval);
+  if (!isFinite(v)) return null;
+  return (c0.side === 2) ? -v : v;
+}
+function scoreTxt(v) {
+  if (v == null || !isFinite(v)) return '-';
+  if (Math.abs(v) > RAPFI_EVAL_MAX) {
+    var mv = Math.round(RAPFI_MATE - Math.abs(v));
+    return (v > 0 ? '+M' : '-M') + mv;
+  }
+  return (v > 0 ? '+' : '') + Math.round(v);
+}
+// 分数 → 胜率：Rapfi 的 ScalingFactor=200 ⇒ 胜率 = sigmoid(评估/200)。
+function scoreWin(v) {
+  if (v == null || !isFinite(v)) return null;
+  if (Math.abs(v) > RAPFI_EVAL_MAX) return v > 0 ? 1 : 0;
+  return 1 / (1 + Math.exp(-v / 200));
+}
+
+/* ★★ 2026-10-23（用户：「「评估」要展示 ai 执子的哪一方，当前有反转的偏差」）
+   —— 仪表盘「评估」从此只有一个口径：
+     ① 引擎 INFO EVAL 是 **行棋方视角**，先经 evalBlack() 折成黑方视角（正 = 黑优）；
+     ② 再按「谁在执子」翻成那个人的视角（正 = 他有利）。
+   以前一直按黑方视角显示，AI 执白时「黑优」看着像「白优」，这就是用户说的反转偏差；
+   执子方写在标题后缀上（评估·黑 / 评估·白）。
+   ⚠ `myColor()` 是**人类**执子方（见 winTextFor），别拿它当 AI 方 —— 上一版就是这么反的。
+   ★★ 17:04 再修（用户：「AI 同时执黑子和白子的时候，评估的分数没有反应过来」）：
+   双 AI 自对弈时两个都是 AI，固定的黑方视角就「不动」了 —— 改成**跟随当前行棋方**，
+   轮到谁就把数字换成谁的视角（后缀同步换成 ·黑 / ·白），一眼能看出这手棋对谁好。 */
+function evalViewColor(sideMove) {
+  // ★ 双 AI：跟随**这次评估所属的行棋方**（不是 curColor() —— aiMove 是先 place 再 setStat，
+  //   那时 curColor 已经翻给对手了，用它会把这手棋的评估反过来显示，正是「没反应过来」）。
+  if (aiVsAi()) return (sideMove === 1 || sideMove === 2) ? sideMove : curColor();
+  if (!!S.aiB === !!S.aiW) return 0;     // 人人对：固定黑方视角
+  return S.aiB ? 1 : 2;                  // AI 执黑 / AI 执白
+}
+function evalToView(ev, sideMove, c) {
+  var b = evalBlack({ eval: ev, side: sideMove });
+  if (b == null || !isFinite(b)) return null;
+  return (c === 2) ? -b : b;
+}
+function dashEvalSet(ev, sideMove) {
+  if (!els.st_eval) return;
+  var c = evalViewColor(sideMove);
+  var v = evalToView(ev, sideMove, c);
+  els.st_eval.textContent = (v == null) ? '-' : scoreTxt(v);
+  if (els.t_eval) {
+    var suf = (c === 1) ? '·黑' : (c === 2 ? '·白' : '');
+    if (S.lang === 'en') suf = (c === 1) ? ' ·B' : (c === 2 ? ' ·W' : '');
+    els.t_eval.textContent = T('eval') + suf;
+    var who = aiVsAi() ? '行棋方' : 'AI';
+    els.t_eval.title = (c === 0) ? '' : (who + '执' + (c === 1 ? '黑' : '白') + '（正值 = 该方有利）');
+  }
+}
+// 执子方变化（切 AI 黑白 / 换模式）后立刻按新口径重画一次，不必等下一次引擎 tick。
+function dashEvalRefresh() {
+  var st = G.lastStat;
+  if (st && st.eval != null) dashEvalSet(st.eval, st.side);
+  else dashEvalSet(null, 0);
+}
 
 function setStat(c0, msg) {
   if (c0) {
@@ -2013,11 +3581,11 @@ function setStat(c0, msg) {
     
     els.st_time.textContent = (c0.timeMs != null)
       ? (c0.timeMs / 1000).toFixed(3) + ' s' : '-';
-    els.st_eval.textContent = c0.eval != null ? c0.eval : '-';
+    dashEvalSet(c0.eval, c0.side);
     els.st_best.textContent = (c0.x != null) ? coordName(c0.x, c0.y) : '-';
-    engMsgAdd((c0.line && c0.line.length)
-      ? c0.line.map(function (p) { return coordName(p[0], p[1]); }).join(' ')
-      : '');
+    setPvLine(c0.line || [], (c0.side === 1 || c0.side === 2) ? c0.side : 0);
+    // ★ 2026-10-22（用户：「旧的代码历史不再展示了」）：路线只显示在「路线」小框里，
+    //   不再逐条追加坐标文本到消息框 —— 那个框只保留实时的状态消息。
     
     if (linkSessionOn()) {
       tellHost({ type: 'linkStats',
@@ -2037,6 +3605,7 @@ function refreshUI() {
   if (els.btn_link) els.btn_link.textContent = (S.lang === 'en') ? 'Link' : '连线';
   if (els.btn_vis) els.btn_vis.textContent = (S.lang === 'en') ? 'Image' : '识图';
   setLangBtn();                        
+  try { bgThinkHintSync(); } catch (eBH) {}
   
   if (RV_MODE) { refreshRvUI(); return; }
   var c = curColor();
@@ -2114,6 +3683,7 @@ function refreshUI() {
     if (els.inp_code.value !== codeTxt) els.inp_code.value = codeTxt;
   }
   drawCurve();
+  bgThinkKick(200);                    // ★ 后台思考：状态变化后按需续上（幂等，同盘面不重开）
 }
 
 var CURVE_TIERS = [
@@ -2208,15 +3778,24 @@ function drawCurve() {
     ctx.beginPath(); ctx.moveTo(x0, gy2); ctx.lineTo(x1, gy2); ctx.stroke();
   }
 
+  CURVE_GEO = { x0: x0, x1: x1, maxPly: maxPly, H: H, w: w };
   if (G.curve.length < 1) {
     ctx.fillStyle = css('--sub');
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(T('curve'), x0 + 8, (y0 + y1) / 2);
+    drawCurveInfo();
     return;
   }
 
+  // ★ 2026-10-13（用户：「在引擎仪表盘上面的评估曲线上带上子数的横坐标小数字」）：
+  //   横轴一直是**按手数线性铺**的（plot 里 x = x0 + (x1-x0) * p.i/maxPly），但轴上没有任何
+  //   刻度数字 —— 只能靠最右端那条「第 N 手」，看不出中间每个点是第几手。
+  //   这里补「子数刻度」：短刻度线 + 小号数字（9px，与纵轴字号一致）。
+  //   · 步长按可用宽度自动选（1/2/5/10/20/25/50 手），保证相邻标签至少隔 22px，不糊成一片；
+  //   · 首尾两个标签会按文字宽度夹回画布内，避免被裁半个字；
+  //   · 画在**滚动画布 #curve 上**（不是在左侧纵轴条上）⇒ 跟数据一起横向滚动、坐标永远对齐。
   (function drawPlyAxis() {
     if (maxPly <= 0 || x1 <= x0) return;
     var pxPerPly = (x1 - x0) / maxPly;
@@ -2238,6 +3817,7 @@ function drawCurve() {
     }
     var lastP = 0;
     for (var pp = 1; pp <= maxPly; pp += plyStep) { plyTick(pp); lastP = pp; }
+    // 末手若不是刻度点、且离上一个标签够远，就补一条 —— 让总手数一眼可见
     if (maxPly !== lastP && (maxPly - lastP) * pxPerPly >= 12) plyTick(maxPly);
   })();
 
@@ -2323,6 +3903,83 @@ function drawCurve() {
   plot('w', '#a4d7f5');
   
   if (w > availW) scroll.scrollLeft = w;
+  drawCurveInfo();
+}
+
+/* ★ 2026-10-23（用户：「鼠标悬停到曲线的某一个位置……显示黑和白的分数和胜率；
+   不悬停时展示最新一手的分数和胜率」）：
+   悬停 → 取最近的曲线数据点、在滚动画布内画一条细的纵轴虚线、两个信息框显示该手；
+   移出 → 去掉虚线、信息框回到最新一手。 */
+var CURVE_GEO = null, CURVE_HOVER = null;
+
+function curveLastPoint() {
+  var out = null;
+  G.curve.forEach(function (p) {
+    if (typeof p.b !== 'number' || !isFinite(p.b)) return;
+    if (!out || (p.i || 0) >= (out.i || 0)) out = p;
+  });
+  return out;
+}
+function curvePointAt(ply) {
+  var out = null, best = Infinity;
+  G.curve.forEach(function (p) {
+    if (typeof p.b !== 'number' || !isFinite(p.b)) return;
+    var d = Math.abs((p.i || 0) - ply);
+    if (d < best) { best = d; out = p; }
+  });
+  return out;
+}
+function curvePlyX(ply) {
+  if (!CURVE_GEO) return 0;
+  var g = CURVE_GEO, n = g.maxPly || 0;
+  return g.x0 + ((n <= 1) ? 0 : (g.x1 - g.x0) * (ply / n));
+}
+function curveHoverLine(p) {
+  var ln = els.curveHover;
+  if (!ln) return;
+  if (!p || !CURVE_GEO) { ln.style.display = 'none'; return; }
+  ln.style.left = curvePlyX(p.i || 0) + 'px';
+  ln.style.height = CURVE_GEO.H + 'px';
+  ln.style.display = 'block';
+}
+function drawCurveInfo() {
+  var hover = (CURVE_HOVER != null);
+  var p = hover ? curvePointAt(CURVE_HOVER) : curveLastPoint();
+  var b = p ? p.b : null;
+  curveHoverLine(hover ? p : null);   // 虚线只在悬停时出现
+  if (b == null) {
+    if (els.ci_b_score) els.ci_b_score.textContent = '-';
+    if (els.ci_b_win) els.ci_b_win.textContent = '-';
+    if (els.ci_w_score) els.ci_w_score.textContent = '-';
+    if (els.ci_w_win) els.ci_w_win.textContent = '-';
+    return;
+  }
+  var wb = scoreWin(b);
+  if (els.ci_b_score) els.ci_b_score.textContent = scoreTxt(b);
+  if (els.ci_b_win) els.ci_b_win.textContent = Math.round(wb * 100) + '%';
+  if (els.ci_w_score) els.ci_w_score.textContent = scoreTxt(-b);
+  if (els.ci_w_win) els.ci_w_win.textContent = Math.round((1 - wb) * 100) + '%';
+}
+function wireCurveHover() {
+  var cv = els.curve;
+  if (!cv || cv.__gbHover) return;
+  cv.__gbHover = true;
+  cv.addEventListener('mousemove', function (e) {
+    if (!CURVE_GEO || !G.curve.length) return;
+    var r = cv.getBoundingClientRect();
+    var g = CURVE_GEO, n = g.maxPly || 0;
+    if (n <= 0) return;
+    var mx = Math.max(g.x0, Math.min(g.x1, e.clientX - r.left));
+    var ply = Math.round((mx - g.x0) / (g.x1 - g.x0) * n);
+    var p = curvePointAt(ply);
+    if (!p) return;
+    CURVE_HOVER = p.i || 0;
+    drawCurveInfo();
+  });
+  cv.addEventListener('mouseleave', function () {
+    CURVE_HOVER = null;
+    drawCurveInfo();
+  });
 }
 
 var HIST_KEY = 'gbcalc.history.v1';
@@ -2726,7 +4383,7 @@ function toast(msg) {
   setStat(null, msg);
 }
 
-var APP_VERSION = '4.42';
+var APP_VERSION = '4.43';
 
 var UPDATE_URL = 'https://wwbbj.lanzout.com/b016l49aqj';
 var UPDATE_PWD = '15';
@@ -2752,6 +4409,8 @@ function openUpdatePage() {
 function escHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+// ★ 2026-10-19：关于面板的文案里有历史遗留的 **加粗** 标记（escHtml 之后会原样显示星号）。
+//   这里统一把成对的 ** 去掉再转义 —— 面板本来就用颜色/字号分层，不需要行内加粗标记。
 function abEsc(t) { return escHtml(String(t == null ? '' : t).replace(/\*\*/g, '')); }
 function renderAbout() {
   if (!els.about || !els.ab_body) return;
@@ -2964,10 +4623,12 @@ var VIS = { list: [], idx: 0, busy: false, result: null, seq: 0, queued: false, 
             sel: null, anchor: -1, edit: false, pick: null, delPts: [], swapSel: null,
             ghosts: [], saveTmr: 0, addOpen: false, undoStack: [], kb: -1,
             vc: false, gateBad: false,
-            wd: 0, retry: 0 };
+            wd: 0, retry: 0 };   // ★ 2026-10-19：wd=识别看门狗，retry=本张图已自动重试次数
 
 function visSelSet() { if (!VIS.sel) VIS.sel = new Set(); return VIS.sel; }
 
+// ★ 2026-10-19：提示文字进「固定高度的虚线文本框」（calc.css 里 .vis-msg 已定高），
+//   这里不再因为文案换行而改变整列高度 —— 拖动识别参数时界面不抖。
 function visMsg(t) {
   if (els.visMsg) els.visMsg.textContent = t || '';
   visLayout();
@@ -3003,9 +4664,11 @@ function visShowMoves(mv) {
 function visUpdateCode() {
   if (!els.visCodeBar || !els.visCode) return;
   var has = !!(G.moves && G.moves.length);
+  // ★ 2026-10-19（用户：「打开『识别参数』的时候，自动隐藏棋盘代码框」）：
+  //   参数面板展开 ⇒ 代码框让位（它只占高度、对调参没用）；收起/确定/取消后自动回来。
   els.visCodeBar.hidden = !has || visRc.on;
   if (has) els.visCode.value = movesToCode(G.moves);
-  visLayout();
+  visLayout();                                  // 代码框出现/消失都会改变可用高度
 }
 
 function visShowResult(r) {
@@ -3014,7 +4677,7 @@ function visShowResult(r) {
 
 function visRefreshView() {
   var has = VIS.list.length > 0;
-  VIS.retry = 0;
+  VIS.retry = 0;                               // 换图 ⇒ 自动重试额度重新计数
   var it = VIS.list[VIS.idx];
   var isImg = !!it && it.t === 'img';
   els.visImg.hidden = !isImg;
@@ -3057,6 +4720,21 @@ function visAutoRecognize() {
   }, 200);
 }
 
+// ★★ 2026-10-19（用户：「识图这个界面上也添加一个识别参数，放到重新识别右面，把保存到历史这个
+//   功能键给取代掉……」→ 随后补充：「点击识别参数后该键自己也消失、下面的棋盘代码框也消失」、
+//   「拖动和改变这 5 个识别参数的参数值，并没有任何变化」、「识别效果要随着滑动条的滑动动态改变」、
+//   「下面添加『取消，确定』功能键（与『通用』是一行的）」）：
+//   识图「识别参数」面板 —— 与连线窗同一套同步识别阈值里的 **5 项（不含 interval/时间）**：
+//   灰度偏差 / 黑色偏差 / 黑色占比 / 白色偏差 / 白色占比。每项一个小虚线框：上行「名称 + 数字框」、
+//   下行细滑动条；底部一行「通用 / 取消 / 确定」三个键。
+//   · 打开面板**不再隐藏任何功能键**（识别参数键自己保留作开关，其余键照常可见）——原先那套
+//     `hidden = (btns[i] !== els.btn_vis_rc)` 一旦 btn_vis_rc 取不到就会把整行（含本键）全藏掉，
+//     正是「点击识别参数，这个按键也消失」的成因；
+//   · 拖动滑动条 → 180ms 合并后 ① 落盘（单一权威，关软件再打开不回退默认）
+//     ② 立即按新阈值重识别当前图片 = 实时预览；
+//   · 「通用」回默认（50 / 96 / 96 / 33 / 33）；「取消」回到打开面板时那一组并重识别；
+//     「确定」收下当前值并收起面板；
+//   · 5 项随每次识别请求下发（见 visRecognize 的 recog 字段），宿主 → 视觉服务 algo=sync/forceSync。
 var VIS_RC_DEF = { gray_offset: 50, black_offset: 96, white_offset: 96,
                    black_percent: 33, white_percent: 33 };
 var VIS_RC_FIELDS = [
@@ -3085,6 +4763,7 @@ function visRcNum(k) {
   return v;
 }
 
+// 面板只在首次用到时构建（识图窗语言跟随启动时的设置，不做二次翻译 —— 与连线窗同口径）
 function visRcBuild() {
   if (!els.visRcBox || els.visRcBox.childElementCount) return;
   for (var k in VIS_RC_DEF) if (visRc.val[k] === undefined) visRc.val[k] = VIS_RC_DEF[k];
@@ -3125,6 +4804,7 @@ function visRcBuild() {
         if (inp) inp.value = String(v);
         visRcLive();
       });
+      // 数字框：只认数字；越界/非法则回退到当前值（与连线窗、颜色窗同一口径）
       inp.addEventListener('input', function () {
         var raw = String(inp.value).replace(/[^0-9]/g, '');
         var v = parseInt(raw, 10);
@@ -3146,6 +4826,7 @@ function visRcBuild() {
   }
 }
 
+// 回填（宿主在页面 ready 时把磁盘上正在生效的那份发下来）
 function visRcFill(o) {
   if (!o) return;
   for (var i = 0; i < VIS_RC_FIELDS.length; i++) {
@@ -3174,12 +4855,15 @@ function visRcSnapshot() {
   return o;
 }
 
+// ★★ 2026-10-19：拖动滑动条 = 实时预览。以前这里只把值写盘、不重识别，所以「拖动和改变这 5 个识别
+//   参数的参数值，并没有任何变化」。现在值一动（合并 180ms）就 ① 写盘（单一权威，关软件不回退）
+//   ② 按新阈值把当前图片重新识别一遍 —— 识别效果随滑动条动态改变。
 function visRcLive() {
   if (visRc.tmr) clearTimeout(visRc.tmr);
   visRc.tmr = setTimeout(function () {
     visRc.tmr = 0;
     visRcPersist();
-    if (visRc.on) visAutoRecognize();
+    if (visRc.on) visAutoRecognize();      // 实时预览
   }, 180);
 }
 
@@ -3198,12 +4882,14 @@ function visRcGeneral() {
   visMsg(T('visRcGeneralMsg'));
 }
 
+// 「确定」：把当前这组值收下来（拖动时已实时落盘 + 实时预览过）并收起面板
 function visRcOk() {
   visRcPersist();
   visRcClose(false);
   visMsg(T('visRcOkMsg'));
 }
 
+// 「取消」：整组回到打开面板时的那一份 —— 写盘 + 重识别，识别效果也一起回退
 function visRcCancel() {
   for (var i = 0; i < VIS_RC_FIELDS.length; i++) {
     var k = VIS_RC_FIELDS[i].k;
@@ -3214,39 +4900,52 @@ function visRcCancel() {
   visMsg(T('visRcCancelMsg'));
 }
 
+// 收起面板；revert=true 时按回退后的值重识别一次
 function visRcClose(revert) {
   visRc.on = false;
   if (visRc.tmr) { clearTimeout(visRc.tmr); visRc.tmr = 0; }
   visRcPersist();
   if (els.visRcBox) els.visRcBox.hidden = true;
-  visUpdateCode();
+  visUpdateCode();                 // 参数面板收起 ⇒ 棋盘代码框回到原位
   visLayout();
   if (revert) visAutoRecognize();
 }
 
 function visRcToggle() {
-  if (!els.visRcBox) return;
+  if (!els.visRcBox) return;                 // 兜底：面板容器缺失就什么都不做（绝不误隐藏功能键）
   if (visRc.on) { visRcClose(false); visMsg(T('visRcOff')); return; }
   visRc.on = true;
   visRcBuild();
+  // 记住打开面板时的那一组值 —— 「取消」要回到它
   for (var i = 0; i < VIS_RC_FIELDS.length; i++) {
     var k = VIS_RC_FIELDS[i].k;
     visRc.base[k] = visRcNum(k);
   }
   els.visRcBox.hidden = false;
   visRcPaint();
-  visUpdateCode();
+  visUpdateCode();                 // 参数面板展开 ⇒ 棋盘代码框自动隐藏
   visLayout();
   visMsg(T('visRcOn'));
 }
 
+// ★★ 2026-10-19：「点击识别参数后……下面的棋盘代码那一块框也消失掉」→ 之后追加「点击识别参数，
+//   不出现代码框和相关按键，要完整显示参数调整条」：
+//   照片框高度按「识图列可视高度 − 其余子项实测高度 − 间距」动态算，参数面板不再自带 max-height
+//   内部滚动（必须 5 项完整可见），因此「功能键行 / 参数面板 / 棋盘代码框 / 提示行」始终留在可视区。
 function visLayout() {
   if (!els.visBox || !els.visView) return;
+  // ★★ 2026-10-19（用户：「点击识别参数，不出现代码框和相关按键，要完整显示参数调整条」）：
+  //   照片框高度 = 识图列「可视高度 − 其余子项各自实测高度 − 各子项间距」。
+  //   以前是硬编码预留 330px，参数面板 + 棋盘代码框 + 提示行真实高度一旦超过这个数，整列就
+  //   顶出识图窗 —— 「棋盘代码」框与下方功能键就是这么消失的，而参数面板还自带内部滚动，
+  //   于是 5 项参数条又只露一半。现在改成逐项 offsetHeight 实测：参数条全高（无 max-height）
+  //   永远完整可见，照片框按剩余空间收窄，代码框 / 提示行永远留在可视区内。
+  //   `.vis-view` 本身还有 overflow-y:auto 兜底：窗口极矮时整列可滚动，不会有够不着的东西。
   var gapPx = 8;                                  // .vis-view gap:.5rem ≈ 8px
   var used = 0, n = 0, kids = els.visView.children;
   for (var i = 0; i < kids.length; i++) {
     var c = kids[i];
-    if (c === els.visBox) continue;
+    if (c === els.visBox) continue;               // 照片框自己由本函数定高，不参与求和
     if (c.hidden || c.offsetParent === null || !c.offsetHeight) continue;
     used += c.offsetHeight; n++;
   }
@@ -3254,7 +4953,7 @@ function visLayout() {
   var h;
   if (avail) h = avail - used - gapPx * (n + 1);
   else h = Math.round(((els.board ? els.board.clientHeight : 480) || 480) * 0.56);
-  if (visRc.on) { if (h < 88) h = 88; }
+  if (visRc.on) { if (h < 88) h = 88; }           // 参数面板展开：照片框可以更矮，保证其余项完整
   else { if (h < 170) h = 170; }
   if (h > 460) h = 460;
   els.visBox.style.height = h + 'px';
@@ -3709,6 +5408,12 @@ function visAddFiles(files) {
   });
 }
 
+// ★★ 2026-10-19（用户：「经常不会自动调用视觉引擎去识别，导致只识别了棋盘，而常常不会自动
+//   识别棋子」）：页面侧的**识别看门狗**。
+//   以前 VIS.busy = true 之后只等宿主回 visResult —— 一旦这条回包丢了（视觉进程没起、管道断了、
+//   WebView 重载、宿主正在切窗口……），busy 就永久卡住：此后换图、拖参数触发的一切「自动识别」
+//   都只把 VIS.queued 置真然后 return，**再也不发请求**。用户看到的正是「不会自动调用引擎」。
+//   现在每次请求都挂一条 12s 看门狗：超时就解除占用 + 自动重试一次（重试也走同一条通路）。
 var VIS_REC_TO = 12000;
 function visClearWatchdog() { if (VIS.wd) { clearTimeout(VIS.wd); VIS.wd = 0; } }
 function visArmWatchdog() {
@@ -3744,10 +5449,12 @@ function visRecognize() {
   VIS.busy = true;
   VIS.seq++;
   VIS.reqSeq = VIS.seq;
-  visArmWatchdog();
+  visArmWatchdog();                       // ★ 回包丢了也要能自愈（见 visArmWatchdog 注释）
   if (els.btn_vis_rec) els.btn_vis_rec.disabled = true;
   visMsg(T('visWorking'));
 
+  // ★ 2026-10-19：把「识别参数」那 5 项随识别请求一起下发 —— 服务端按 algo=sync 走同步读子，
+  //   所以拖动阈值能真正改变识别结果（实时预览就是靠这条通路）。
   tellHost({ type: 'visRecognize', mode: 'image', data: it.d, seq: VIS.reqSeq,
              recog: visRcSnapshot() });
 }
@@ -3755,7 +5462,7 @@ function visRecognize() {
 function visRecognizeDone() {
   var was = VIS.busy;
   VIS.busy = false;
-  VIS.retry = 0;
+  VIS.retry = 0;                          // 有回包了 ⇒ 自动重试额度复位
   visClearWatchdog();
   if (els.btn_vis_rec) els.btn_vis_rec.disabled = false;
   if (was && VIS.queued) { VIS.queued = false; visAutoRecognize(); }
@@ -3768,6 +5475,8 @@ function visHandleResult(m) {
   if (!r.ok) { visMsg(T('visBad') + (r.err ? ' (' + r.err + ')' : '')); return; }
   var bl = r.black || [], wh = r.white || [];
   if (!bl.length && !wh.length) {
+    // ★ 2026-10-19：识别回「有盘无子」时，把上一张图**残留**的局面/棋盘代码清掉 ——
+    //   否则代码框还挂着上一次的着法，看上去像「棋盘识别到了、棋子没识别」，很难判断真相。
     if (VIS.result) { VIS.result = null; visShowMoves([]); }
     visMsg(T('visNoStones'));
     return;
@@ -4311,7 +6020,7 @@ function bootVis() {
     else if (m.type === 'visShotFail') visMsg(T('visShotFail'));
     else if (m.type === 'visShotCancel') visMsg('');
     else if (m.type === 'visResult') visHandleResult(m);
-    else if (m.type === 'visRecog') visRcFill(m.recog);
+    else if (m.type === 'visRecog') visRcFill(m.recog);   // 宿主回填磁盘上正在生效的识别参数
     else if (m.type === 'uiTheme') {
       S.theme = (m.theme === 'light') ? 'light' : 'dark';
       document.body.setAttribute('data-theme', S.theme);
@@ -4795,6 +6504,8 @@ function undoOne() {
   G.curve = G.curve.filter(function (p) { return p.i < G.moves.length; });
   G.heat = []; G.nums = [];
   recomputeOver(); persistGame();
+  anaReset();                      // ★ 盘面变了：停掉常驻评估并清标记
+  liveAnaBoardChanged();
   paint(); refreshUI();
   refreshCoach();
 }
@@ -4820,6 +6531,8 @@ function stepBack() {
   G.curve = G.curve.filter(function (p) { return p.i < G.moves.length; });
   G.heat = []; G.nums = [];
   recomputeOver(); persistGame();
+  anaReset();                      // ★ 盘面变了：停掉常驻评估并清标记
+  liveAnaBoardChanged();
   paint(); refreshUI();
   refreshCoach();
 }
@@ -4888,11 +6601,14 @@ function ingestExternal(text) {
 }
 
 var LAY_KEY = 'gbcalc.layout.v7';   
+// ★★ 2026-10-17（用户：「还有很多持久化做的不合理」）：布局也收口到**单键**。
+//   原来按 linkSessionOn() 分叉成 gbcalc.layout.v7 / .link.v1 —— 在连线窗拖好的卡片顺序，
+//   回主窗（或下次启动）读的是另一套，表现就是「布局没保存」。
 function layKey() { return 'gbcalc.layout.v8'; }   
 function loadLayout() {
   try {
     var raw = localStorage.getItem(layKey());
-    if (!raw) {
+    if (!raw) {   // 一次性迁移：v7（主窗）优先，其次 link 键
       var cands = ['gbcalc.layout.v7', 'gbcalc.layout.link.v1'];
       for (var i = 0; i < cands.length; i++) {
         var sv = localStorage.getItem(cands[i]);
@@ -5083,7 +6799,7 @@ function onCardUp() {
 function applyLang() {
   var d = I18N[S.lang];
   ['title','setup','mode','side','turn','rule','cores','hash','heat','heatHint',
-   'showNum','showNumHint','preview','previewHint','engine','depth','speed','nodes','time','eval','best','curve',
+   'showNum','showNumHint','bgThink','bgThinkHint','preview','previewHint','engine','depth','speed','nodes','time','eval','best','curve',
    'blackCurve','whiteCurve','curveHint','reciteHint','code','drTip',
    'heatBest','heatGood','heatFair','heatPoor','coach','coachHint',
    'swapTtl','swapFirst','swapSecond',
@@ -5091,6 +6807,12 @@ function applyLang() {
     var el = els['t_' + k];
     if (el) el.textContent = d[k];
   });
+  // ★ 2026-10-23：上面会把 t_eval 重置成纯「评估」，把执子方后缀（·黑 / ·白）冲掉 —— 立刻补回。
+  try { dashEvalRefresh(); } catch (eEV) {}
+  // 同理：bgThinkHint 被重置回原文，把「已自动暂停」的状态标记补回去。
+  // （先清掉 data-base —— 切语言后原文已换，缓存的那份是旧语言的。）
+  try { if (els.t_bgThinkHint) els.t_bgThinkHint.removeAttribute('data-base'); } catch (eBH1) {}
+  try { bgThinkHintSync(); } catch (eBH2) {}
   els.btn_reset.textContent = d.reset;
   els.btn_pause.textContent = S.paused ? '▶' : '❚❚';
   els.btn_pause.title = S.paused ? (aiVsAi() ? d.spResume : d.resume)
@@ -5155,8 +6877,11 @@ function applyLang() {
     if (els.btn_live) liveAnaUI();          
     els.t_analysis.textContent = d.analysis;
     if (els.t_curveTtl) els.t_curveTtl.textContent = d.curve;   
+    [].forEach.call(document.querySelectorAll('.ci-score'), function (el) { el.textContent = d.score; });
+    [].forEach.call(document.querySelectorAll('.ci-win'), function (el) { el.textContent = d.winRate; });
+    drawCurveInfo();
     els.btn_an_nbest.textContent = (G.ana.busy && G.ana.kind === 'nbest') ? d.anStop : d.anNbest;   
-    els.btn_an_defend.textContent = d.anDefend;
+    els.btn_an_defend.textContent = (G.ana.busy && G.ana.kind === 'defend') ? d.anStopScan : d.anDefend;
     els.btn_an_bal.textContent = d.anBal;
     if (els.btn_an_baln) { els.btn_an_baln.value = String(balPN()); els.btn_an_baln.title = d.anBalnHint; }
     
@@ -5176,7 +6901,7 @@ function applyLang() {
     els.t_nbestHint.textContent = d.nbestHint;
     cpSyncSegs();
     applyCardVis();                                   
-    if (!G.ana.busy && !G.ana.rows.length) renderAna(d.anIdle);
+    if (!G.ana.busy && !G.ana.rows.length) renderAna(d.anIdle, true);
     
     renderSysInfo();
     renderHashInfo();
@@ -5317,6 +7042,10 @@ function applyTheme() {
   
   if (HOST) tellHost({ type: 'uiTheme', theme: themeKey(), bg: pageBgHex(), lang: S.lang, cssVars: S.cssVars });
 }
+// ★★ 2026-10-18（用户：「线程多于核心…要齐心协力，而不是相互打架」）：
+//   宿主 host 消息到达时的线程拓扑校正。接线窗不走 boot()（不调 buildSelects），
+//   主界面 boot() 又需要同一套判定 ⇒ 收敏到一个入口，两边都调（幂等，标记只写一次）。
+//   触发条件收窄到 10~12（旧上限 12 与常见中间值 10）：用户自选的 2~9 / 13+ 一律不动。
 window.GB_onHost = function (m) {
   if (!m) return;
   try {
@@ -5332,7 +7061,7 @@ window.GB_onHost = function (m) {
   if (!(maxT >= 1)) return;
   if (m.userThreads >= MIN_THREADS) S.cores = m.userThreads;
   if (!(S.cores >= 10 && S.cores <= 12 && maxT > S.cores)) return;
-  if (migFlag('threadsTopo2')) return;
+  if (migFlag('threadsTopo3')) return;
   var _old = S.cores;
   S.cores = maxT;
   try { enginePrefSet(S.cores, S.hashMB); } catch (e1) {}
@@ -5666,12 +7395,24 @@ function wireColors() {
 var CARD_IDS = ['setup', 'analysis', 'engine'];   
 var DEFAULT_CARDS = { setup: 0, analysis: 0, engine: 1 };   
 
+// ★★ 2026-10-17（用户：「线程数选择 1 就保存不了」「固定变 × 后再开又显示固定」）：
+//   用户偏好统一收口到一个**全局键**，不再依赖会被整体覆盖的 S 快照。
+//   病根：S 在 gbcalc.settings.v1 与 gbcalc.settings.link.v1 两套存档之间来回覆盖；
+//   且 save() 里「另一个键不存在就 return」—— 只在连线窗里改过的偏好永远落不到主键，
+//   下次启动读到的还是旧值（线程选 1 被写回 12 就是这条链路）。
+// ★★ 2026-10-17（用户：「把可选线程数最小改成 2」）：线程 1 会让引擎 + worker 反复重启、
+//   与各处的「最小 2」夹取互相打架（表现就是一串莫名其妙的 bug）。下拉从 2 起，
+//   旧存档里的 1 在启动时自动抬到 2 —— 只此一处定义，宿主 C++ 同口径。
 var MIN_THREADS = 2;
 var PREFS_KEY = 'gbcalc.prefs.v1';
 // cores / hashMB were removed from this generic pref table: the main / link / replay / vision
 // windows each have their own S, and any window's save() re-wrote them to the shared key, so a
 // stale window overwrote the value the user had just changed. They now live in ENGINE_PREF_KEY
 // and are only written on an explicit change.
+// ★★ 2026-10-18（回归修复）：「cores / hashMB 必须在这个表里」。它们是全局偏好里**最要紧**的两个
+//   字段，一旦漏掉，`gbcalc.prefs.v1` 里的线程/哈希就永远不会被 prefsApplyToS() 应用到 S ——
+//   兜底整条失效，settings.v1 一被写坏就只能回落到下拉上限（用户「线程数改了又恢复」的复发路径）。
+//   由 `.workbuddy/tmp/test-prefs.js` 的「cores 在偏好字段里」断言守住。
 var PREF_FIELDS = ['cores', 'hashMB', 'turnMs', 'rule', 'lang', 'theme',
                    'cards', 'customBase', 'aiB', 'aiW', 'linkAuto', 'linkClicks'];
 function prefsAll() {
@@ -5695,6 +7436,7 @@ function prefsSyncFromS() {
     var o = prefsAll(), ch = false;
     PREF_FIELDS.forEach(function (k) {
       if (S[k] === undefined) return;
+      // ★ 线程/哈希的 0 不是用户选择，是「还没初始化」——写进偏好会把用户值永久抹掉
       if (k === 'cores' && !(S[k] >= MIN_THREADS)) return;
       if (k === 'hashMB' && !(S[k] >= 1)) return;
       var a = S[k], b = o[k];
@@ -5704,6 +7446,9 @@ function prefsSyncFromS() {
     if (ch) localStorage.setItem(PREFS_KEY, JSON.stringify(o));
   } catch (e) {}
 }
+// ★★ 2026-10-17 修正：prefs **只兜底、不覆盖**。
+//   第一版写成「prefs 优先」，结果 prefs 里的旧值（3）会把用户刚选的 10 盖掉 ——
+//   又一次变成「改了又恢复」。settings 才是最后写入者，prefs 只在字段缺失/非法时补。
 function prefsApplyToS() {
   try {
     var o = prefsAll();
@@ -5770,11 +7515,13 @@ function enginePrefApplyToS() {
 
 function savePins() { prefSet('pins', CARD_PIN); }
 
+// ★★ 2026-10-17：固定状态（引擎卡为 ✕）必须跨启动保留 —— 原来 CARD_PIN 是纯内存
+//   对象，关掉软件就回到默认 {engine:true}，用户看到的就是「显示固定了」。
 var CARD_PIN = (function () {
   var p = prefGet('pins', null);
   if (p && typeof p === 'object') {
     var o = {};
-    for (var k in p) o[k] = !!p[k];
+    for (var k in p) o[k] = !!p[k];   // 保留 false：取消固定也要跨重启
     return o;
   }
   return { engine: true };
@@ -5906,6 +7653,10 @@ function anaCalcUI() {
   if (els.btn_an_nbest) {   
     els.btn_an_nbest.textContent = (busy && G.ana.kind === 'nbest') ? T('anStop') : T('anNbest');
   }
+  // ★ 2026-10-22（用户：「点击「扫描防守」按键文字变为「停止扫描」」）
+  if (els.btn_an_defend) {
+    els.btn_an_defend.textContent = (busy && G.ana.kind === 'defend') ? T('anStopScan') : T('anDefend');
+  }
 }
 
 var ANA_DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
@@ -5941,9 +7692,16 @@ function cellScore(board, x, y, c) {
   cellLines(board, x, y, c).forEach(function (l) { total += anaLineScore(l.cnt, l.open); });
   return total;
 }
-function renderAna(msg) {
+// quietLog=true：只更新分析卡片的状态栏，不往引擎仪表盘的滚动日志里再写一条。
+// ★ 2026-10-23（用户：「不要频繁出现这个文案：选一个功能键开始计算…」）：
+//   anaReset / liveAnaWipeMarks 每落一手都会调到空闲文案；若照常写日志，
+//   它会夹在「计算中」等消息之间反复出现（engMsgAdd 只去重相邻重复）。
+//   空闲提示属于「状态栏」而不是「日志」，所以这些调用一律静默。
+function renderAna(msg, quietLog) {
   if (els.anStatus) {
     els.anStatus.textContent = msg || '';
+    // ★ 2026-10-13：文案栏支持**多行**（开局提示是多条短句、用 \n 分行）。
+    //   只在真的含换行时才切 pre-line，其它单行提示的排版一字不变。
     els.anStatus.style.whiteSpace = (typeof msg === 'string' && msg.indexOf('\n') >= 0) ? 'pre-line' : '';
   }
   if (!els.anList) return;
@@ -5955,17 +7713,108 @@ function renderAna(msg) {
            '<span class="ev">' + escHtml(r.eval) + '</span>' +
            (r.pv ? '<span class="pv">' + escHtml(r.pv) + '</span>' : '') + '</div>';
   }).join('');
+  // ★ 2026-10-22（用户：「各种文字讯息……同样也展现同步到这个框中」）：
+  //   分析卡片的状态文案（计算评估 / 多点分析 / 分析计算…）同步到引擎仪表盘消息框。
+  if (!quietLog) engMsgAdd(msg);
 }
 
 function anaReset() {
   G.ana.gen++;
+  anaLiveStop();
+  // ★ 2026-10-22（用户：「只有用户再次在棋盘上落子……清除这些标记」）：
+  //   落子 / 清除计算 / 重开 → 停掉常驻扫描并丢掉最后一帧（defCells 置空后 paint 自然不画）。
+  defLiveStop();
+  G.ana.defCells = null;
+  PV_HOVER = null;
+  PV_PREVIEW = null;
+  setPvLine([]);
   if (G.ana.defTimer) { clearTimeout(G.ana.defTimer); G.ana.defTimer = null; }  
   G.ana.defWinUntil = 0; G.ana.defRefining = false;                             
   if (G.ana.deferTmr) { clearTimeout(G.ana.deferTmr); G.ana.deferTmr = null; }  
   G.ana.busy = false; G.ana.kind = '';
   G.ana.marks = []; G.ana.rows = [];
+  G.ana.autoDefend = false;
   anaMark(null);
-  renderAna(T('anIdle'));
+  renderAna(T('anIdle'), true);
+}
+
+/* ★ 2026-10-22（用户：「这种长live同样适应计算评估的几个功能」）：
+   「计算评估 / 多点分析」不再按轮次 analyze(350·rd) 推倒重来 —— 改用与分析计算同一套
+   LocalAI.live：一次 YXNBEST 连续加深，宿主 tick 流式回传；落子（anaReset）/ 停止 / 被
+   其它引擎请求抢占时才结束。停止时**不清**已算出的标记与列表（保留最后一帧快照）。 */
+var ANA_LIVE = { handle: null };
+function anaLiveStop() {
+  if (ANA_LIVE.handle) { try { ANA_LIVE.handle.stop(); } catch (e) {} ANA_LIVE.handle = null; }
+}
+function anaLiveRun(kind, topN, tagKey) {
+  var gen = G.ana.gen, mvN = G.moves.length;
+  var side = curColor(), t0 = Date.now(), lastUi = 0, lastPaint = 0;
+  var ended = false;
+  var h = LocalAI.live({
+    board: G.board, moveList: [], matchMs: 600000, turnMs: 3600000, timeUsedMs: 0,
+    topN: topN, rule: engineRule(), cid: 'calc-' + kind + '-' + mvN, lane: 'main', side: side,
+    liveId: LocalAI.nextLiveId(), tag: T(tagKey),
+  }, function (res) {
+    if (gen !== G.ana.gen || G.moves.length !== mvN) return;
+    var cs = ((res && res.candidates) || []).filter(function (c) {
+      return c && c.x >= 0 && c.y >= 0 && !(G.board[c.y] && G.board[c.y][c.x]);
+    });
+    if (!cs.length) return;
+    var depth = (res && res.depth) || cs[0].depth || 0;
+    if (kind === 'calc') {
+      var c0 = cs[0];
+      G.lastStat = { x: c0.x, y: c0.y, depth: depth, eval: c0.eval, speed: res.speed || 0,
+                     nodes: res.nodes || 0, timeMs: null, line: c0.line || [], side: side };
+      G.ana.marks = [{ live: true, x: c0.x, y: c0.y, wr: c0.winrate, ev: fmtEval(c0.eval),
+                       rank: 0, depth: depth }];
+      G.ana.rows = [{ i: 0, badge: '1', coord: coordName(c0.x, c0.y),
+                      eval: fmtEval(c0.eval), pv: pvText(c0.line) }];
+      setPvLine(c0.line || [], side);
+    } else {
+      G.ana.marks = []; G.ana.rows = [];
+      cs.slice(0, topN).forEach(function (c, i) {
+        G.ana.marks.push({ x: c.x, y: c.y, badge: String(i + 1), label: fmtEval(c.eval),
+                           tier: anaTierOf(i), inline: true });
+        G.ana.rows.push({ i: i, badge: String(i + 1), coord: coordName(c.x, c.y),
+                          eval: fmtEval(c.eval), pv: pvText(c.line) });
+      });
+      setPvLine((cs[0] && cs[0].line) || [], side);
+    }
+    var now = Date.now();
+    if (now - lastUi >= 280) {
+      lastUi = now;
+      if (depth) els.st_depth.textContent = String(depth);
+      // 与「评估曲线」同一口径：统一折成黑方视角（正值 = 黑优），再按 AI 执子方翻成 AI 视角。
+      // ★ 2026-10-23：`if (cs[0].eval)` 会把字符串 "0" / 空串一起判掉 ⇒ 计算分析有时不刷新，
+      //   用户看到「评估」一直停在上一轮的百分比。改为「有非空值就刷」。
+      if (cs[0].eval != null && String(cs[0].eval) !== '') dashEvalSet(cs[0].eval, side);
+      els.st_speed.textContent = fmtSpeed(res.speed || 0);
+      els.st_nodes.textContent = fmtNodes(res.nodes || 0);
+      els.st_time.textContent = ((now - t0) / 1000).toFixed(1) + ' s';
+      renderAna(T(kind === 'calc' ? 'anCalcRun' : 'anNbestRun').replace('{d}', String(depth || 0)));
+    }
+    // ★ 引擎流式 INFO 可达每秒数百次：画布最多 ~8fps 重绘，别让「展示路线」抢 CPU。
+    // ★ 2026-10-23（用户：「提升并行计算能力，当前速度和深度都很浅很慢」）：
+    //   整盘重绘（15×15 网格 + 225 格 + 标记）实测单次 10~25ms，8fps 就要吃掉 10~20% 的
+    //   一个核 —— 和引擎抢 CPU 会直接反映成「nps 掉、深度上不去」。分析期压到 5fps。
+    if (now - lastPaint >= 200) { lastPaint = now; paint(); }
+  }, function (ev) {
+    ended = true;
+    if (gen !== G.ana.gen) return;
+    ANA_LIVE.handle = null;
+    // 引擎正被 AI 落子 / 提示等请求占用：保持「评估中」，稍后自动重试，不打断别人。
+    if (ev && ev.busy) {
+      setTimeout(function () {
+        if (gen === G.ana.gen && G.ana.busy) anaLiveRun(kind, topN, tagKey);
+      }, 420);
+      return;
+    }
+    G.ana.busy = false;
+    anaMark(null);
+    if (ev && ev.error) renderAna(T('offline'));
+    paint();
+  });
+  if (!ended && gen === G.ana.gen) ANA_LIVE.handle = h;
 }
 
 function anaDeferClear() {
@@ -5976,12 +7825,15 @@ function anaDeferClear() {
     if (G.ana.busy || gen !== G.ana.gen) return;     
     G.ana.marks = []; G.ana.rows = [];
     if (!G.ana.kind) anaMark(null);
-    if (!G.ana.busy) renderAna(T('anIdle'));
+    if (!G.ana.busy) renderAna(T('anIdle'), true);
     paint();
   }, 1000);
 }
 function anaGuard(minStones) {
   if (RV_MODE || G.review) return false;
+  // ★ 2026-10-23（用户：「开启任何一项计算分析功能就直接自动关掉后台思考」）：
+  //   计算评估卡的所有入口都从这里进 —— 在这里让路，后台思考立刻收工，别和它抢引擎。
+  bgThinkYield();
   if (LIVE_AN.on) liveAnaToggle();          
   if (G.ana.deferTmr) { clearTimeout(G.ana.deferTmr); G.ana.deferTmr = null; }  
   if (G.ana.busy) { toast(T('anRunning')); return false; }
@@ -5993,193 +7845,254 @@ function anaIp() { return Math.max(2, Math.min(8, Math.round(+S.nbest || 4))); }
 async function anaCalc() {
   if (!anaGuard(0)) return;
   aiStandDown();                              
-  var gen = ++G.ana.gen;
+  ++G.ana.gen;
   G.ana.busy = true; G.ana.kind = 'calc';
   G.ana.marks = []; G.ana.rows = [];
+  setPvLine([]);
   anaMark(els.btn_an_stop);
-  var calcMs = Math.min(60000, Math.round((S.turnMs || 2000) * 1.6));
-  renderAna(T('anEta').replace('{s}', String(Math.ceil(calcMs / 1000))));
-  var last = null, used = 0;
-  try {
-    for (var rd = 1; ; rd++) {
-      if (gen !== G.ana.gen) return;
-      
-      var budget = Math.min(calcMs - used, Math.min(2500, 350 * rd));
-      if (budget < 200) break;
-      renderAna(T('anDraft').replace('{r}', String(rd)));
-      var r = await analyze(budget, 1, null, curColor(), T('tagCalc'));
-      if (gen !== G.ana.gen) return;
-      var cs = (r && r.candidates) || [];
-      if (!cs.length) { if (!last) { renderAna(T('anEmpty')); return; } break; }
-      used += (r.elapsed != null) ? r.elapsed : budget;
-      var c0 = cs[0];
-      c0.timeMs = (r.elapsed != null) ? r.elapsed : null;
-      last = cs;
-      G.ana.marks = [{ x: c0.x, y: c0.y, badge: '1', label: fmtEval(c0.eval), tier: 0 }];
-      G.ana.rows = [{ i: 0, badge: '1', coord: coordName(c0.x, c0.y), eval: fmtEval(c0.eval), pv: pvText(c0.line) }];
-      if (c0.depth != null) { els.st_depth.textContent = c0.depth; els.st_eval.textContent = c0.eval; }
-      paint();
-      if (used >= calcMs) break;
-    }
-    if (!last) { renderAna(T('anEmpty')); return; }
-    G.lastStat = last[0];
-    setStat(last[0], null);
-    renderAna(T('anDone').replace('{n}', String(G.moves.length + 1))
-             .replace('{ev}', fmtEval(last[0].eval))
-             .replace('{d}', String(last[0].depth != null ? last[0].depth : '-')));
-    paint();
-  } catch (e) {
-    if (gen === G.ana.gen) renderAna(T('offline'));
-  } finally {
-    if (gen === G.ana.gen) { G.ana.busy = false; anaMark(null); }   
-  }
+  renderAna(T('anCalcRun').replace('{d}', '0'));
+  anaLiveRun('calc', 1, 'tagCalc');            // ★ 常驻深算：不再按轮次重启
 }
 
-function defendLWR(board, x, y, c) {
-  var SZ = board.length, out = [];
-  for (var d = 0; d < 4; d++) {
-    var dx = ANA_DIRS[d][0], dy = ANA_DIRS[d][1], segL, segR;
-    for (var s = 0; s < 2; s++) {              
-      var e = 0, w = 0, e2 = 0, i = 1, gap = false;
-      for (;;) {
-        var px = x + dx * i * (s ? 1 : -1), py = y + dy * i * (s ? 1 : -1);
-        if (px < 0 || py < 0 || px >= SZ || py >= SZ) break;
-        var v = board[py][px];
-        if (v === 0) { if (w > 0) { gap = true; e2++; } else e++; }  
-        else if (v === c) { if (gap) break; w++; }                   
-        else break;                                                  
-        i++;
-      }
-      if (s === 0) segL = [e, w, e2]; else segR = [e, w, e2];
-    }
-    var wl = segL[1], wr = segR[1];
-    
-    var wlAdj = (segL[0] === 0 && wl > 0), wrAdj = (segR[0] === 0 && wr > 0);
-    var W, L, Rr;
-    if (wlAdj && wrAdj) { W = 1 + wl + wr; L = segL[2]; Rr = segR[2]; }   
-    else if (wlAdj)     { W = 1 + wl;      L = segL[2]; Rr = segR[0]; }
-    else if (wrAdj)     { W = 1 + wr;      L = segL[0]; Rr = segR[2]; }
-    else                { W = 1;           L = segL[0]; Rr = segR[0]; }
-    var dd;
-    if (W >= 5) dd = 100;
-    else if (W === 4) dd = (L > 0 && Rr > 0) ? 100 : 92;
-    else if (W === 3) dd = (L > 0 && Rr > 0) ? 80 + Math.min(8, (L + Rr) * 2)
-                        : ((L + Rr > 0) ? 45 : 0);
-    else if (W === 2) dd = (L > 0 && Rr > 0) ? 26 + Math.min(8, (L + Rr) * 2)
-                        : ((L + Rr > 0) ? 10 : 0);
-    else dd = (L > 0 && Rr > 0) ? 6 : 0;
-    out.push({ d: dd, lwr: 'L' + L + 'W' + W + 'R' + Rr });
-  }
-  return out;
+/* ★★ 2026-10-22（用户：「扫描防守功能完全按照这个整合包里面的算法」）：
+   不再用本地启发式 defendLWR / defendMateAt 逐点估威胁，改走引擎原生
+   `YXSEARCHDEFEND`（Rapfi command/gomocup.cpp: searchDefend ⇒ multiPV = 全盘合法点）。
+   宿主先补一手 PASS 把行棋方让给对手，于是每个候选的 WINRATE 就是
+   「对手下在这里」的胜率 = 该点危险度（与整合包扫描同一口径）。
+   页面用一条常驻 live 搜索持续加深（越算越准），停止时保留最后一帧。 */
+var DEF_LIVE = { handle: null, gen: 0 };
+function defLiveStop() {
+  DEF_LIVE.gen++;
+  if (DEF_LIVE.handle) { try { DEF_LIVE.handle.stop(); } catch (e) {} DEF_LIVE.handle = null; }
 }
-
-function defendMateAt(board, x, y, me, opp, basePly) {
-  var INF = 99, ourBest = INF, oppBest = INF;
-  var ourFours = 0, ourThrees = 0;   
-  cellLines(board, x, y, me).forEach(function (l) {
-    if (l.cnt >= 5) ourBest = Math.min(ourBest, 1);
-    else if (l.cnt === 4 && l.open >= 2) ourBest = Math.min(ourBest, 3);
-    else if (l.cnt === 4 && l.open === 1) ourFours++;
-    else if (l.cnt === 3 && l.open >= 2) ourThrees++;
-  });
-  if (ourFours > 0 && ourThrees > 0) ourBest = Math.min(ourBest, 5);   
-  if (ourThrees >= 2) ourBest = Math.min(ourBest, 7);                  
-  cellLines(board, x, y, opp).forEach(function (l) {
-    if (l.cnt >= 5) oppBest = Math.min(oppBest, 2);
-    else if (l.cnt === 4 && l.open >= 2) oppBest = Math.min(oppBest, 4);
-    else if (l.cnt === 3 && l.open >= 2) oppBest = Math.min(oppBest, 6);
-  });
-  if (ourBest < oppBest) return 'W' + (basePly + ourBest);   
-  if (oppBest < INF) return 'L' + (basePly + oppBest);
-  return '';
+// 五档优先级样式（用户：第 1 档大圆环，2/3/4 依次缩小、透明度升高，
+// 最小圆环半径 = 最大的一半；文字缩小幅度更低；第 5 档 = 数字 + 更细的小环）。
+var DEF_TIERS = [
+  { rf: 1.00, ff: 1.00, ring: 0.98, fill: 0.30, lw: 1.00 },  // 1 档
+  { rf: 0.84, ff: 0.93, ring: 0.82, fill: 0.23, lw: 0.82 },  // 2 档
+  { rf: 0.68, ff: 0.86, ring: 0.64, fill: 0.17, lw: 0.68 },  // 3 档
+  { rf: 0.50, ff: 0.78, ring: 0.46, fill: 0.11, lw: 0.56 }   // 4 档（半径 = 1 档的一半）
+];
+// ★ 2026-10-23（用户：「有时，2，3，4 等级也不止 2-3 个点，详细参考 Rapfi 整合包的方法」）：
+//   档位按**胜率绝对值**分档（高低危由实时胜率决定，不按名次切固定份数）。
+// ★ 2026-10-23 二次调整（用户：「有时候胜率都挺高的，导致几乎都是大圆环；前三档集中
+//   在 85% 左右，第五档范围更大一点，第四档范围也不小」）：
+//   1~3 档收紧到 85~100（5 个百分点一档），4 档 70~85，5 档 <70 铺纯数字 ——
+//   普通局面下 80% 左右的点不再画成最大圆环；只有真正的必防点（≥95%）才用最大环。
+function defendTierOf(pct) {
+  if (pct >= 95) return 1;
+  if (pct >= 90) return 2;
+  if (pct >= 85) return 3;
+  if (pct >= 70) return 4;
+  return 5;                                                   // <70%：低位 / 弱危点，纯数字铺开
+}
+function anaDefendStop() {
+  if (G.ana.kind !== 'defend') return;
+  defLiveStop();
+  G.ana.busy = false; G.ana.kind = '';
+  G.ana.autoDefend = false;
+  anaMark(null);
+  var n = (G.ana.defCells || []).length;
+  renderAna(n ? T('anScanFrozen').replace('{c}', String(n)) : T('anIdle'));
+  paint();
 }
 function anaDefend(renew) {
   if (!anaGuard(1)) return;
-  aiStandDown();                              
+  aiStandDown();
+  defLiveStop();
   var gen = ++G.ana.gen;
-  
+  var mvN = G.moves.length, t0 = Date.now(), lastUi = 0, lastPaint = 0, lastAna = 0;
+
   G.ana.busy = true; G.ana.kind = 'defend';
+  G.ana.autoDefend = true;
+  G.ana.marks = []; G.ana.rows = []; G.ana.defCells = null;
+  setPvLine([]);
   anaMark(els.btn_an_defend);
-  var SZ = G.board.length;
-  var me = curColor(), opp = (me === 1) ? 2 : 1;
-  
-  var stones = [];
-  for (var sy = 0; sy < SZ; sy++) for (var sx = 0; sx < SZ; sx++)
-    if (G.board[sy][sx]) stones.push([sx, sy]);
-  var R = stones.length <= 6 ? 3 : (stones.length <= 14 ? 4 : 5);
-  var inR = {};                                     
-  stones.forEach(function (st) {
-    for (var dy = -R; dy <= R; dy++) for (var dx = -R; dx <= R; dx++) {
-      var qx = st[0] + dx, qy = st[1] + dy;
-      if (qx < 0 || qy < 0 || qx >= SZ || qy >= SZ || G.board[qy][qx]) continue;
-      inR[qy * SZ + qx] = 1;
-    }
-  });
-  
-  var cells = [];
-  var basePly = G.moves.length;                     
-  for (var key in inR) {
-    var x = key % SZ, y = (key - x) / SZ;
-    var lws = defendLWR(G.board, x, y, opp);
-    lws.sort(function (a, b) { return b.d - a.d; });
-    var d1 = lws[0].d, d2 = lws.length > 1 ? lws[1].d : 0;
-    var pct = Math.min(100, Math.round(d1 + d2 * 0.3));
-    if (pct <= 0) continue;                         
-    cells.push({ x: x, y: y, pct: pct, lwr: lws[0].lwr,
-                 mate: defendMateAt(G.board, x, y, me, opp, basePly) });
-  }
-  if (!cells.length) { G.ana.busy = false; anaMark(null); renderAna(T('anEmpty')); return; }
-  cells.sort(function (a, b) { return b.pct - a.pct; });
-  
-  renderDefendMarks(cells);
-  renderAna(T('anDefendDone').replace('{c}', String(cells.length)));
-  G.ana.busy = false;
-  anaMark(null);                        
+  renderAna(T('anScanRun').replace('{d}', '0').replace('{c}', '0'));
   paint();
-  G.ana.autoDefend = true;              
-  
-  G.ana.defRefining = true;
-  anaDefendRefine(gen).catch(function () {}).then(function (res) {
-    G.ana.defRefining = false;
-    if (gen !== G.ana.gen) return;                    
-    if (res === 'stable' || res === 'stop') return;   
-    defendScheduleNext();
+
+  var ended = false;
+  var h = LocalAI.live({
+    board: G.board, moveList: [], matchMs: 600000, turnMs: 3600000, timeUsedMs: 0,
+    topN: 1, rule: engineRule(), cid: 'scan-' + mvN, lane: 'main', side: curColor(),
+    liveId: LocalAI.nextLiveId(), tag: T('tagDefend'), scan: true
+  }, function (res) {
+    if (gen !== G.ana.gen || G.moves.length !== mvN) return;
+    var cs = ((res && res.candidates) || []).filter(function (c) {
+      return c && c.x >= 0 && c.y >= 0 && !(G.board[c.y] && G.board[c.y][c.x]);
+    });
+    if (!cs.length) return;
+    // ★ 2026-10-23（用户：「有的点都重叠了」）：同一坐标只保留一条（取胜率更高的）。
+    //   引擎每轮重发全点 PV，宿主在 NUMPV 变少时会残留旧尾巴 —— 两条同坐标叠画，
+    //   看起来就是一个点被画了两遍、数字互相压。
+    var seen = {}, cells = [];
+    cs.forEach(function (c) {
+      var pct = Math.round((typeof c.winrate === 'number' ? c.winrate : 0.5) * 100);
+      pct = Math.max(0, Math.min(100, pct));
+      var k = c.x + ',' + c.y;
+      if (seen[k] != null) {
+        var old = cells[seen[k]];
+        if (pct > old.pct) { old.pct = pct; old.evalTxt = c.eval || old.evalTxt; }
+        return;
+      }
+      seen[k] = cells.length;
+      cells.push({ x: c.x, y: c.y, pct: pct, evalTxt: c.eval || '', depth: c.depth || 0 });
+    });
+    cells.sort(function (a, b) { return b.pct - a.pct; });
+    cells.forEach(function (c, i) { c.rank = i + 1; c.tier = defendTierOf(c.pct); });
+    renderDefendMarks(cells);
+
+    var depth = (res && res.depth) || (cells[0] && cells[0].depth) || 0;
+    var now = Date.now();
+    if (now - lastUi >= 280) {
+      lastUi = now;
+      if (depth) els.st_depth.textContent = String(depth);
+      els.st_speed.textContent = fmtSpeed(res.speed || 0);
+      els.st_nodes.textContent = fmtNodes(res.nodes || 0);
+      els.st_time.textContent = ((now - t0) / 1000).toFixed(1) + ' s';
+      // ★ 2026-10-23（用户：「『评估』点扫描防守也要动态显示」）：以前这里写的是最高危点的
+      //   防守百分比（截图里那个 100%），跟「评估」这个字段名不符。现在给真实的引擎评估分：
+      //   扫描防守先补了一手 PASS 把行棋方让给对手，所以引擎 EVAL 是「对手视角」，
+      //   折算用的行棋方必须是 PASS 之后的 `3 - curColor()`（原来的写法漏了这一翻转）。
+      var scSide = 3 - curColor();
+      if (cells[0] && cells[0].evalTxt) dashEvalSet(cells[0].evalTxt, scSide);
+      els.st_best.textContent = cells[0] ? coordName(cells[0].x, cells[0].y) : '-';
+    }
+    // 列表 / 消息框 ~1s 刷一次（engMsgAdd 只在上一条不同时才追加，深度不变就不刷屏）
+    if (now - lastAna >= 1000) {
+      lastAna = now;
+      renderAna(T('anScanRun').replace('{d}', String(depth || 0)).replace('{c}', String(cells.length)));
+    }
+    // ★ 2026-10-23（用户：「速度和深度都很浅很慢」）：扫描防守一帧要画 90+ 个圆环 + 描边数字，
+    //   单次重绘 20~35ms；120ms 一次等于常年占掉 1/4 个核，和引擎抢 CPU。压到 3fps 足够看。
+    if (now - lastPaint >= 320) { lastPaint = now; paint(); }
+  }, function (ev) {
+    ended = true;
+    if (gen !== G.ana.gen) return;                 // 落子 / 停止 / 重开：由 anaReset 收尾
+    DEF_LIVE.handle = null;
+    if (ev && ev.busy) {                           // 引擎被 AI 落子等占用：稍后自动续扫
+      setTimeout(function () {
+        // ★ 注意：anaGuard 见到 busy 会直接拒绝，所以续扫前先把本轮状态收回；
+        //   否则扫描会永远停在「停止扫描」状态却再也没跑起来。
+        if (gen === G.ana.gen && G.ana.busy && G.ana.kind === 'defend') {
+          G.ana.busy = false; G.ana.kind = '';
+          anaDefend();
+        }
+      }, 500);
+      return;
+    }
+    if (!G.ana.busy || G.ana.kind !== 'defend') return;
+    // 引擎侧异常结束：保留最后一帧（不擦标记），按钮复位。
+    G.ana.busy = false; G.ana.kind = ''; G.ana.autoDefend = false;
+    anaMark(null);
+    renderAna(ev && ev.error ? T('offline')
+      : T('anScanFrozen').replace('{c}', String((G.ana.defCells || []).length)));
+    paint();
   });
+  if (!ended && gen === G.ana.gen) DEF_LIVE.handle = h;
 }
 
+// ★ 2026-10-23（用户：「扫描防守由原来的红色系列渐变变成稍偏白天蓝色系列渐变」）：
+//   统一到天蓝色系：高危 = 更深的晴蓝，低危 = 偏白的浅天蓝（不再出现红 / 橙 / 黄）。
 function defendColor(pct) {
-  var B = [[90, 'hsl(2,82%,50%)'], [80, 'hsl(20,82%,52%)'], [70, 'hsl(33,84%,52%)'],
-           [60, 'hsl(43,86%,50%)'], [50, 'hsl(52,80%,48%)'], [40, 'hsl(85,62%,42%)'],
-           [30, 'hsl(130,55%,42%)'], [20, 'hsl(162,55%,40%)'], [10, 'hsl(178,60%,44%)'],
-           [5, 'hsl(192,75%,56%)'], [0, 'hsl(200,85%,60%)']];
+  var B = [[90, 'hsl(214,72%,52%)'], [80, 'hsl(211,72%,54%)'], [70, 'hsl(208,71%,56%)'],
+           [60, 'hsl(205,70%,58%)'], [50, 'hsl(202,68%,60%)'], [40, 'hsl(199,66%,62%)'],
+           [30, 'hsl(196,64%,64%)'], [20, 'hsl(198,70%,68%)'], [10, 'hsl(201,76%,72%)'],
+           [5, 'hsl(203,82%,76%)'], [0, 'hsl(205,88%,80%)']];
   for (var i = 0; i < B.length; i++) if (pct >= B[i][0]) return B[i][1];
   return B[B.length - 1][1];
 }
 
 function renderDefendMarks(cells) {
-  G.ana.defCells = cells;               
-  var top = Math.min(3, cells.length);
-  G.ana.marks = cells.map(function (c, i) {
-    var col = defendColor(c.pct || 0);
-    
-    if (i < top || c.mate) return { x: c.x, y: c.y, badge: c.mate || String(i + 1),
-                          label: c.pct + '%', tier: i, inline: true, col: col };
-    return {                            
-      x: c.x, y: c.y, badge: '', label: c.pct + '%', plain: true,
-      tier: 0, col: col,
-    };
-  });
+  G.ana.defCells = cells;
+  // 盘面标记由 drawDefendMarks() 统一绘制；G.ana.marks 留空避免叠旧徽标。
+  G.ana.marks = [];
   G.ana.rows = cells.slice(0, 8).map(function (c, i) {
-    return { i: i, badge: c.mate || String(i + 1),
-             coord: coordName(c.x, c.y), eval: c.pct + '%', pv: c.lwr || '',
+    return { i: i, badge: String(i + 1),
+             coord: coordName(c.x, c.y), eval: c.pct + '%',
+             pv: c.evalTxt ? ('评分 ' + c.evalTxt) : '',
              col: defendColor(c.pct || 0) };
   });
 }
 
-var LIVE_AN = { on: false, gen: 0, busy: false, items: [], timer: 0, key: '', t0: 0, rounds: 0 };
+// 扫描防守的棋盘标记（五级）：
+//   1~4 档 = 由大到小的圆环 + 半透明填充，透明度随档次升高；
+//   5 档 = 边角/低危点，数字外只套一圈更细的小环（扫盘式，几乎全覆盖）。
+function defendAlpha(col, a) {
+  return String(col).replace(/^hsl\((.*)\)$/, 'hsla($1,' + a.toFixed(2) + ')');
+}
+function drawDefendMarks(ctx, cells, pad, gap) {
+  // ★ 2026-10-23（用户：「最大的圆圈要小一点，应该和大小棋子相等」）：
+  //   棋子半径是 gap*0.47；圆环外沿 = r + 线宽/2，所以 r0 收到 gap*0.43，
+  //   外沿约 0.45*gap —— 视觉上与棋子等大（不再比棋子大一整圈）。
+  var r0 = Math.max(8, gap * 0.43);
+  // ★ 2026-10-23（用户：「第4、5档的数字大小应该和第三档是一样的，当前字号有点大」）：
+  //   4/5 档字号不再单独按 gap*0.225 放大，而是**直接复用第 3 档的算法**
+  //   （r3 = r0*rf[3档]、fs = r3*0.56*ff/rf，与 drawRingLabels 内完全同一公式），
+  //   这样同一盘面下 4/5 档与 3 档的数字严格同高，且随盘面尺寸同比缩放。
+  var r3 = Math.max(8, r0 * DEF_TIERS[2].rf);
+  var fs5 = Math.max(9, r3 * 0.56 * (DEF_TIERS[2].ff / DEF_TIERS[2].rf));
+  var by = [[], [], [], [], []];
+  cells.forEach(function (c) { by[Math.max(0, Math.min(4, (c.tier || 5) - 1))].push(c); });
+  for (var t = 4; t >= 0; t--) {
+    by[t].forEach(function (c) {
+      var px = pad + c.x * gap, py = pad + c.y * gap;
+      var pct = Math.max(0, Math.min(100, Math.round(c.pct || 0)));
+      var col = defendColor(pct);
+      if (t >= 3) {
+        // ★ 2026-10-23（用户：「第四档和第五档的数字大小是一样的，并且都不是透明的」）：
+        //   4 / 5 档共用同一套绘制：**同字号、同字重、完全不透明**的纯数字，外围一圈
+        //   同尺寸细环（4 档略粗、5 档更细）。4 档不再画半透明填充，避免低危点也像大圆环。
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(px, py, r0 * DEF_TIERS[3].rf, 0, Math.PI * 2);
+        ctx.lineWidth = (t === 3 ? Math.max(1.0, gap * 0.030) : Math.max(0.9, gap * 0.020));
+        ctx.strokeStyle = defendAlpha(col, t === 3 ? 0.88 : 0.72);
+        ctx.stroke();
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+        ctx.font = '700 ' + fs5 + 'px "Segoe UI",system-ui,sans-serif';
+        ctx.lineWidth = Math.max(1.4, fs5 * 0.28);
+        ctx.strokeStyle = 'rgba(0,0,0,.58)';
+        ctx.strokeText(String(pct), px, py);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(String(pct), px, py);
+        ctx.restore();
+        return;
+      }
+      var ti = DEF_TIERS[t];
+      var r = Math.max(8, r0 * ti.rf);
+      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fillStyle = defendAlpha(col, ti.fill); ctx.fill();
+      // ★ 2026-10-23（用户：「圆环再稍细一点，仅次于比第二个等级粗一点点」）：
+      //   1 档线宽 gap*0.044（原 gap*0.072），2 档 gap*0.031 —— 只粗约四成。
+      ctx.lineWidth = (t === 0 ? Math.max(1.6, gap * 0.044) : Math.max(1, gap * 0.038 * ti.lw));
+      ctx.strokeStyle = defendAlpha(col, ti.ring); ctx.stroke();
+      // 字号缩小幅度低于圆环（ff/rf > 1），小环里也看得清；
+      // ★ 2026-10-23：1~3 档只占总盘面 15 个百分点的窄带，保留百分比 + 由大到小的圆环；
+      //   4/5 档才用纯数字（见上）。
+      drawRingLabels(ctx, px, py, r, pct + '%', '', ti.ff / ti.rf, 2.0 + t * 0.1);
+    });
+  }
+}
+
+// ★★ 2026-10-22（用户：「开启计算分析这个按键的时候，引擎总是会思考打断，导致一遍遍再重新计算，
+//   错失了很多真正的优势点……要持续计算，不能打断」）：
+//   旧实现的 LIVE_AN 是「按轮次」的：每轮 analyze(roundMs) 到点收官 → 再重发 YXBOARD 重开，
+//   预算还会 ×1.3 逐轮放大。每一轮都把上一轮的迭代加深成果丢掉，深搜优势点根本来不及长出来。
+//   现在改成**一条常驻搜索**：宿主 op=live 把 TIMEOUT_TURN 放到 1 小时、不设截止时间，
+//   引擎在同一个盘面上一直加深，tick 以 ~120ms 的节奏把 INFO 流回页面。
+//   只有三种情况会结束这条搜索：
+//     ① 用户在棋盘上点击（立刻 STOP、标记立刻消失，随后按新盘面重开）；
+//     ② 点「停止分析」（冻结此刻的标记 / 胜率 / 分数 / 深度，不再改）；
+//     ③ AI 落子抢占（盘面必然变化，等同 ①）。
+var LIVE_AN = {
+  on: false, gen: 0, handle: null, items: [], picked: [], depth: 0,
+  timer: 0, key: '', t0: 0, frozen: false, lastUi: 0,
+};
 
 function liveAnaWanted() {
-  if (linkSessionOn()) return false;      
+  if (linkSessionOn()) return false;
+  if (S.mode === 'pve' && isAiColor(curColor())) return false;   // 轮 AI 走：等它落子后再说
   return LIVE_AN.on && !RV_MODE && !G.review && !G.over && aiDecorOn() && !aiVsAi();
 }
 
@@ -6187,18 +8100,31 @@ function liveAnaSide() {
   if (S.aiB !== S.aiW) return S.aiB ? 2 : 1;
   return sideByCount();
 }
+function liveAnaKeyNow() { return G.moves.length + ':' + liveAnaSide() + ':' + boardFp(); }
+
+function liveAnaStopJob() {
+  if (LIVE_AN.handle) { try { LIVE_AN.handle.stop(); } catch (e) {} LIVE_AN.handle = null; }
+  if (LIVE_AN.timer) { clearTimeout(LIVE_AN.timer); LIVE_AN.timer = 0; }
+  G.ana.busy = false;
+}
+function liveAnaWipeMarks() {
+  G.ana.gen++;
+  G.ana.kind = ''; G.ana.busy = false;
+  G.ana.marks = []; G.ana.rows = [];
+  renderAna(T('anIdle'), true);
+  paint();
+}
 function liveAnaClear() {
   LIVE_AN.gen++;
-  LIVE_AN.items = [];
-  LIVE_AN.key = ''; LIVE_AN.t0 = 0; LIVE_AN.rounds = 0;
-  if (LIVE_AN.timer) { clearTimeout(LIVE_AN.timer); LIVE_AN.timer = 0; }
-  delete LIVE_LANES.main;                     
+  liveAnaStopJob();
+  LIVE_AN.items = []; LIVE_AN.picked = [];
+  LIVE_AN.key = ''; LIVE_AN.t0 = 0; LIVE_AN.depth = 0; LIVE_AN.frozen = false; LIVE_AN.lastUi = 0;
+  delete LIVE_LANES.main;
   paintLiveDash();
   paint();
 }
 function liveAnaUI() {
   if (!els.btn_live) return;
-  
   if (aiVsAi() && LIVE_AN.on) { LIVE_AN.on = false; liveAnaClear(); }
   els.btn_live.disabled = aiVsAi();
   els.btn_live.title = aiVsAi() ? T('liveAnaBan') : '';
@@ -6206,8 +8132,7 @@ function liveAnaUI() {
   els.btn_live.textContent = LIVE_AN.on ? T('liveAnaStop') : T('liveAna');
 }
 function liveAnaToggle() {
-  if (aiVsAi()) { liveAnaUI(); return; }    
-  
+  if (aiVsAi()) { liveAnaUI(); return; }
   if (linkSessionOn()) {
     setStat(null, '连线会话中不使用「分析计算」—— 评估只针对 AI 执色方进行');
     return;
@@ -6215,116 +8140,237 @@ function liveAnaToggle() {
   LIVE_AN.on = !LIVE_AN.on;
   liveAnaUI();
   if (LIVE_AN.on) {
-    aiStandDown();                          
-    
-    if (!G.ana.busy) { G.ana.marks = []; G.ana.rows = []; renderAna(T('anIdle')); }
-    liveAnaTick();
+    aiStandDown();
+    bgThinkStop();               // ★ 后台思考让位给「分析计算」（同一局面，live 直接接管）
+    anaLiveStop();               // ★ 若「计算评估 / 多点分析」的常驻搜索还在跑，先停它
+    liveAnaWipeMarks();          // 重新开始：清掉上一次（含冻结快照）的标记
+    LIVE_AN.frozen = false;
+    LIVE_AN.t0 = 0; LIVE_AN.depth = 0;
+    liveAnaStart();
+  } else {
+    liveAnaFreeze();             // 停止：保留此刻的标记 / 胜率 / 分数 / 深度
   }
-  else liveAnaFreeze();
 }
 
+// —— 最多 4 个点，通常 1~3 个：只收「跟最佳点足够接近」的候选 ——
+function liveAnaPick(cs) {
+  if (!cs || !cs.length) return [];
+  var out = [cs[0]], bw = cs[0].wr;
+  var lim = [0.08, 0.05, 0.03];                 // 第2/3/4名的最大落后（胜率绝对值）
+  for (var i = 1; i < cs.length && out.length < 4; i++) {
+    if (bw - cs[i].wr > lim[out.length - 1]) break;
+    out.push(cs[i]);
+  }
+  return out;
+}
+function liveAnaApply(res) {
+  var cs = ((res && res.candidates) || []).filter(function (c) {
+    return c && c.x >= 0 && c.y >= 0 && !(G.board[c.y] && G.board[c.y][c.x]);
+  }).map(function (c, i) {
+    return { x: c.x, y: c.y, ev: fmtEval(c.eval), wr: (typeof c.winrate === 'number') ? c.winrate : 0.5,
+             depth: c.depth || 0, rank: i, line: c.line || [] };
+  });
+  LIVE_AN.items = cs;
+  LIVE_AN.picked = liveAnaPick(cs);
+  // 仪表盘「路线」小框跟随实时最佳路线（此前 map 时把 line 丢了 → 路线框一直是空的）
+  setPvLine((cs[0] && cs[0].line) || [], liveAnaSide());
+  if (LIVE_AN.picked.some(function (c) { return /^[+-]?M\d+$/i.test(String(c.ev)); }))
+    LIVE_AN.mate = true;               // 已算出必杀/必败：不再重开，保留这条终局结果
+  var d = (res && res.depth) || 0;
+  if (d > LIVE_AN.depth) LIVE_AN.depth = d;
+  G.ana.marks = LIVE_AN.picked.map(function (c, i) {
+    return { live: true, x: c.x, y: c.y, wr: c.wr, ev: c.ev, rank: i, depth: LIVE_AN.depth };
+  });
+  var now = Date.now();
+  if (now - LIVE_AN.lastUi >= 300) {
+    LIVE_AN.lastUi = now;
+    liveAnaRows();
+    renderAna(T('liveAnaRun').replace('{d}', String(LIVE_AN.depth || 0)));
+  }
+  // ★ 引擎流式 INFO 可达每秒数百次：画布最多 ~8fps 重绘，别让「展示路线」抢 CPU。
+  if (now - (LIVE_AN.lastPaint || 0) >= 120) { LIVE_AN.lastPaint = now; paint(); }
+}
+function liveAnaRows() {
+  G.ana.rows = (LIVE_AN.picked || []).map(function (c, i) {
+    return { i: i, badge: String(i + 1), coord: coordName(c.x, c.y),
+             eval: Math.round((c.wr || 0) * 100) + '%  ' + c.ev, pv: '' };
+  });
+  renderAna(T('liveAnaRun').replace('{d}', String(LIVE_AN.depth || 0)));
+}
+
+function liveAnaStart() {
+  if (!LIVE_AN.on) return;
+  if (!liveAnaWanted()) return;              // 轮 AI / 已结束 / 复盘 / 连线：不重开，等盘面变化再拉
+  var gen = ++LIVE_AN.gen;
+  liveAnaStopJob();
+  var mvN = G.moves.length;
+  var side = liveAnaSide();
+  LIVE_AN.key = liveAnaKeyNow();
+  LIVE_AN.mate = false;
+  if (!LIVE_AN.t0) LIVE_AN.t0 = Date.now();
+  G.ana.busy = true; G.ana.kind = 'live';
+  renderAna(T('liveAnaRun').replace('{d}', String(LIVE_AN.depth || 0)));
+  // ★ 引擎忙时 LocalAI 会**同步**回调 onEnd（busy）——用 ended 兜住，别把已结束的 handle 存回去。
+  var ended = false;
+  var h = LocalAI.live({
+    board: G.board, moveList: [], matchMs: 600000, turnMs: 3600000, timeUsedMs: 0,
+    topN: 4, rule: engineRule(), cid: 'calc-live-' + mvN, lane: 'main', side: side,
+    liveId: LocalAI.nextLiveId(), tag: T('tagLiveAna'),
+  }, function (res) {
+    if (gen !== LIVE_AN.gen) return;
+    if (G.moves.length !== mvN || LIVE_AN.key !== liveAnaKeyNow()) { liveAnaBoardChanged(); return; }
+    liveAnaApply(res);
+  }, function () {
+    ended = true;
+    if (gen !== LIVE_AN.gen) return;
+    G.ana.busy = false;
+    LIVE_AN.handle = null;
+    if (LIVE_AN.on && !LIVE_AN.mate && liveAnaWanted()) liveAnaScheduleRetry(350);
+  });
+  if (!ended && gen === LIVE_AN.gen) LIVE_AN.handle = h;
+}
+function liveAnaScheduleRetry(ms) {
+  if (!LIVE_AN.on || !liveAnaWanted()) return;
+  if (LIVE_AN.timer) clearTimeout(LIVE_AN.timer);
+  LIVE_AN.timer = setTimeout(function () { LIVE_AN.timer = 0; liveAnaStart(); }, ms || 350);
+}
+
+// 停止分析：**不做排名筛选、不重排**，原样保留停止那一刻计算出来的标记 / 胜率 / 分数 / 深度。
 function liveAnaFreeze() {
-  
-  var all = (LIVE_AN.items || []).map(function (it) {
-    return { x: it.x, y: it.y, ev: it.ev, wr: (typeof it.wr === 'number') ? it.wr : 0.5 };
-  });
-  var n = all.length;
-  var idxs = [];
-  if (n <= 5) { for (var i = 0; i < n; i++) idxs.push(i); }
-  else {
-    var TIE = 0.02;
-    var best = [0];
-    for (var b = 1; b < n && best.length < 2 && all[b].wr >= all[0].wr - TIE; b++) best.push(b);
-    var worst = [n - 1];
-    for (var w = n - 2; w >= 0 && worst.length < 2 && all[w].wr <= all[n - 1].wr + TIE; w--) worst.unshift(w);
-    var mid = -1, md = 2;                                    
-    for (var m = 0; m < n; m++) {
-      if (best.indexOf(m) >= 0 || worst.indexOf(m) >= 0) continue;
-      var d = Math.abs(all[m].wr - 0.5);
-      if (d < md) { md = d; mid = m; }
-    }
-    idxs = best.slice();
-    if (mid >= 0) idxs.push(mid);
-    idxs = idxs.concat(worst);
-  }
-  var k = idxs.length;
-  G.ana.gen++;                                              
-  if (G.ana.defTimer) { clearTimeout(G.ana.defTimer); G.ana.defTimer = null; }
-  if (G.ana.deferTmr) { clearTimeout(G.ana.deferTmr); G.ana.deferTmr = null; }
+  LIVE_AN.on = false;
+  LIVE_AN.gen++;
+  liveAnaStopJob();
+  LIVE_AN.frozen = true;
+  liveAnaUI();
   G.ana.busy = false; G.ana.kind = '';
-  G.ana.marks = idxs.map(function (ix, i) {
-    var it = all[ix];
-    var pi = (k > 1) ? Math.round(i * 3 / (k - 1)) : 0;      
-    var pal = LIVE_PAL[Math.max(0, Math.min(LIVE_PAL.length - 1, pi))] || LIVE_PAL[0];
-    return { x: it.x, y: it.y, badge: String(i + 1), label: it.ev, tier: 0, col: pal.fill };
+  G.ana.marks = (LIVE_AN.picked || []).map(function (c, i) {
+    return { live: true, x: c.x, y: c.y, wr: c.wr, ev: c.ev, rank: i, depth: LIVE_AN.depth };
   });
-  G.ana.rows = idxs.map(function (ix, i) {
-    var it = all[ix];
-    var pi = (k > 1) ? Math.round(i * 3 / (k - 1)) : 0;
-    var pal = LIVE_PAL[Math.max(0, Math.min(LIVE_PAL.length - 1, pi))] || LIVE_PAL[0];
-    return { i: i, badge: String(i + 1), coord: coordName(it.x, it.y), eval: it.ev, pv: '', col: pal.fill };
+  G.ana.rows = (LIVE_AN.picked || []).map(function (c, i) {
+    return { i: i, badge: String(i + 1), coord: coordName(c.x, c.y),
+             eval: Math.round((c.wr || 0) * 100) + '%  ' + c.ev, pv: '' };
   });
-  renderAna(T('anStopped'));
-  liveAnaClear();                                           
+  renderAna(T('liveAnaStopped').replace('{d}', String(LIVE_AN.depth || 0)));
+  paint();
+  bgThinkSchedule(300);          // ★ 后台思考接着跑（冻结的标记不受影响）
 }
 
-function liveAnaAiPending() { return S.mode === 'pve' && (isAiColor(1) || isAiColor(2)); }
-function liveAnaRoundMs() {
-  
-  if (LIVE_AN.rounds === 0) return 350;
-  if (liveAnaAiPending()) return Math.max(1500, Math.min(4000, Math.round((S.turnMs || 2000) * 0.8)));
-  var ms = Math.max(2500, Math.round((S.turnMs || 2000) * 1.2)) * Math.pow(1.3, LIVE_AN.rounds - 1);
-  return Math.round(Math.min(20000, ms));
+// 用户点了棋盘：立刻停算 + 立刻清标记，然后按当前盘面重新计算（点空位没落子也要重开）。
+function liveAnaTouch(restartMs) {
+  if (!LIVE_AN.on && !LIVE_AN.frozen) return false;
+  LIVE_AN.gen++;
+  liveAnaStopJob();
+  LIVE_AN.items = []; LIVE_AN.picked = []; LIVE_AN.depth = 0;
+  LIVE_AN.lastUi = 0; LIVE_AN.frozen = false; LIVE_AN.mate = false;
+  PV_HOVER = null; PV_PREVIEW = null; setPvLine([]);
+  liveAnaWipeMarks();
+  if (LIVE_AN.on) {
+    LIVE_AN.timer = setTimeout(function () { LIVE_AN.timer = 0; liveAnaStart(); },
+                               restartMs == null ? 160 : restartMs);
+  }
+  return true;
 }
 
-async function liveAnaTick() {
-  if (!liveAnaWanted()) { LIVE_AN.on = false; liveAnaUI(); liveAnaClear(); return; }
-  
-  if (G.busy || G.ana.busy) {
-    if (LIVE_AN.timer) clearTimeout(LIVE_AN.timer);
-    LIVE_AN.timer = setTimeout(liveAnaTick, 500);
+// 盘面变化（落子 / 悔棋 / 重做 / AI 落子）：停算清标记后按新盘面重开。
+function liveAnaBoardChanged() {
+  liveAnaTouch(120);
+}
+
+/* ★ 2026-10-22（用户：「在对局设置中的对局，添加一个后台思考的选择键，参考这个网站，
+   五子棋计算器的预热算法」）：
+   gomocalc 的「后台思考」= 空闲时引擎也不停（速度/节点持续上涨），关掉就只在轮到引擎时算。
+   这里用**最低优先级**的常驻 live 搜索（topN 1、无截止）养热置换表；不画任何棋盘标记、
+   不写「路线」框，只把速度/节点/深度实时喂给仪表盘。任何真正的 ask（AI 落子 / 计算评估 /
+   多点分析 / 平衡 / 防守 / 教练 / 前瞻）都会把它抢占，结束后自动续上 —— 不与主功能抢车道。
+   轮 AI 时它让路：AI 自己按「思考时间」算，算完再由这里接管。 */
+var BG_AN = { gen: 0, handle: null, key: '', timer: 0 };
+
+// 后台思考「为什么必须让路」的原因码（空串 = 没被占用，可以跑）
+// ★★ 2026-10-23（用户：「如果检测用户开启任何一项计算分析功能，以及 AI 黑白同时开（AI 对打），
+//   直接自动关掉后台思考；后台思考算法对齐 gomocalc」）：
+//   后台思考与所有分析功能共用同一个引擎实例（LocalAI 单实例 + exclusive 抢占），
+//   同时跑只会互相打断 —— 严格成「任何计算一开，后台思考立刻收工」。
+function bgThinkBusyBy() {
+  if (aiVsAi()) return 'ai';                 // AI 对打：两个 AI 轮流占引擎，后台思考无处可用
+  if (LIVE_AN.on) return 'an';               // 分析计算（常驻深算）
+  if (G.ana && G.ana.busy) return 'an';      // 计算评估卡：计算 / 多点 / 平衡 / 扫描防守
+  if (G.fwd && G.fwd.busy) return 'fwd';     // 前瞻 · VCF · VCT
+  return '';
+}
+// 「让路」：立刻停掉正在跑的后台思考（连排队中的定时器一起清），并把状态写到开关下面那行提示。
+function bgThinkYield() {
+  if (bgThinkBusyBy() || !bgThinkWanted()) {
+    if (BG_AN.handle || BG_AN.timer) bgThinkStop();
+  }
+  bgThinkHintSync();
+}
+// 开关下方的动态状态：有计算在跑 / AI 对打时，明确写出「已自动暂停」，避免用户以为算法卡住了。
+function bgThinkHintSync() {
+  var h = els.t_bgThinkHint;
+  if (!h) return;
+  if (!h.getAttribute('data-base')) h.setAttribute('data-base', h.textContent || '');
+  var base = h.getAttribute('data-base') || '';
+  var why = bgThinkBusyBy();
+  var tag = '';
+  if (why === 'ai') tag = T('bgThinkOffAi');
+  else if (why) tag = T('bgThinkOffBusy');
+  var want = tag ? (base + ' · ' + tag) : base;
+  if (h.textContent !== want) h.textContent = want;   // 只在真的变了才写，避免 refreshUI 高频触发重排
+  h.classList.toggle('bg-off', !!tag);
+}
+
+function bgThinkWanted() {
+  if (!S.bgThink || G.engineOffline || bgThinkBusyBy()) return false;   // 任何分析在跑 ⇒ 让路
+  if (S.mode !== 'pve' || S.paused) return false;
+  if (linkSessionOn() || LINK_MODE || VIS_MODE || RV_MODE || G.review || G.over || G.busy) return false;
+  if (openActive()) return false;
+  if (isAiColor(curColor())) return false;           // 轮 AI：让它自己算
+  return true;
+}
+function bgThinkKeyNow() { return G.moves.length + ':' + curColor() + ':' + boardFp(); }
+function bgThinkStop() {
+  BG_AN.gen++;
+  BG_AN.key = '';
+  if (BG_AN.timer) { clearTimeout(BG_AN.timer); BG_AN.timer = 0; }
+  if (BG_AN.handle) { try { BG_AN.handle.stop(); } catch (e) {} BG_AN.handle = null; }
+}
+function bgThinkSchedule(ms) {
+  if (BG_AN.timer || !bgThinkWanted()) return;
+  BG_AN.timer = setTimeout(function () { BG_AN.timer = 0; bgThinkStart(); }, ms == null ? 400 : ms);
+}
+function bgThinkKick(ms) {
+  if (!bgThinkWanted()) {
+    if (BG_AN.handle || BG_AN.timer) bgThinkStop();
     return;
   }
-  var gen = ++LIVE_AN.gen;
-  var mvN = G.moves.length;
-  var side = liveAnaSide();                   
-  var hk = mvN + ':' + side;
-  if (LIVE_AN.key !== hk) {                   
-    LIVE_AN.key = hk; LIVE_AN.t0 = Date.now(); LIVE_AN.rounds = 0;
-  }
-  LIVE_AN.busy = true;
-  try {
-    var r = await analyze(liveAnaRoundMs(), 8, null, side, T('tagLiveAna'));
-    if (gen !== LIVE_AN.gen || G.moves.length !== mvN) return;
-    LIVE_AN.rounds++;
-    var cs = ((r && r.candidates) || []).slice(0, 8).filter(function (c) {
-      return c && c.x >= 0 && c.y >= 0 && !(G.board[c.y] && G.board[c.y][c.x]);
-    });
-    
-    LIVE_AN.items = cs.map(function (c, i) {
-      return { x: c.x, y: c.y, ev: fmtEval(c.eval), wr: (typeof c.winrate === 'number') ? c.winrate : 0.5, rank: i };
-    });
-    paint();
-  } catch (e) { gen = -1; }                   
-  finally {
-    LIVE_AN.busy = false;
-    if (LIVE_AN.on && liveAnaWanted()) {
-      if (LIVE_AN.timer) clearTimeout(LIVE_AN.timer);
-      LIVE_AN.timer = setTimeout(liveAnaTick, (gen === -1) ? 1200 : streamGapMs());
-    }
-  }
+  var key = bgThinkKeyNow();
+  if ((BG_AN.handle && BG_AN.key === key) || (BG_AN.timer && BG_AN.key === key)) return;
+  bgThinkStop();
+  BG_AN.key = key;
+  bgThinkSchedule(ms == null ? 200 : ms);
 }
-
-var LIVE_PAL = [
-  { fill: 'rgba(0,194,201,.92)',   ring: 'rgba(150,205,255,.98)' },    
-  { fill: 'rgba(96,200,120,.82)',  ring: 'rgba(255,255,255,.92)' },    
-  { fill: 'rgba(255,176,102,.68)', ring: 'rgba(255,255,255,.9)' },     
-  { fill: 'rgba(255,102,102,.42)', ring: 'rgba(255,255,255,.85)' },    
-];
-function liveTier(i, n) {
-  if (i <= 0) return 0;
-  if (n <= 2) return Math.min(3, i);
-  return Math.max(1, Math.min(3, Math.ceil(i * 3 / (n - 1))));
+function bgThinkStart() {
+  if (!bgThinkWanted()) return;
+  var key = bgThinkKeyNow();
+  if (BG_AN.handle && BG_AN.key === key) return;
+  var gen = ++BG_AN.gen;
+  if (BG_AN.handle) { try { BG_AN.handle.stop(); } catch (e) {} BG_AN.handle = null; }
+  BG_AN.key = key;
+  var mvN = G.moves.length;
+  var ended = false;
+  // 引擎忙时 LocalAI 会**同步**回调 onEnd（busy）—— 用 ended 兜住，别把已结束的 handle 存回去。
+  var h = LocalAI.live({
+    board: G.board, moveList: [], matchMs: 600000, turnMs: 3600000, timeUsedMs: 0,
+    topN: 1, rule: engineRule(), cid: 'bg-' + mvN, lane: 'main', side: curColor(),
+    liveId: LocalAI.nextLiveId(), tag: T('tagBg'),
+  }, function () {}, function () {
+    ended = true;
+    if (gen !== BG_AN.gen) return;
+    BG_AN.handle = null;
+    if (G.moves.length !== mvN) return;
+    bgThinkSchedule(400);
+  });
+  if (!ended && gen === BG_AN.gen) BG_AN.handle = h;
 }
 
 function boardDecided() {
@@ -6359,90 +8405,6 @@ function sideByCount() {
 
 function streamWindowMs() { return Math.round(Math.max(4000, (S.turnMs || 2000) * 4.5)); }
 function streamGapMs() { return 120; }
-
-async function anaDefendRefine(gen) {
-  
-  var ms = 600, MAX_MS = 12000, STABLE_MS = 2600;
-  var prevSig = null;
-  for (var r = 0; ; r++) {
-    if (gen !== G.ana.gen || boardDecided()) return;   
-    var me = curColor();
-    var anchor = null;
-    try {
-      var ra = await LocalAI.analyze({ board: G.board, moveList: [], matchMs: 600000,
-        turnMs: ms, timeUsedMs: 0, topN: 1, rule: engineRule(),
-        cid: 'defA-' + gen + '-' + r, lane: 'main', side: me,
-        liveId: LocalAI.nextLiveId(), tag: T('tagDefend'),
-        exclusive: true, noPonder: true }, ms + 9000);
-      anchor = ra && ra.candidates && ra.candidates[0];
-    } catch (e) { return 'stop'; }       
-    if (gen !== G.ana.gen || !anchor || G.board[anchor.y][anchor.x]) return;
-    
-    var b2 = G.board.map(function (row) { return row.slice(); });
-    b2[anchor.y][anchor.x] = me;         
-    var cands = null;
-    try {
-      var rr = await LocalAI.analyze({ board: b2, moveList: [], matchMs: 600000,
-        turnMs: ms, timeUsedMs: 0, topN: 8, rule: engineRule(),
-        cid: 'defB-' + gen + '-' + r, lane: 'main', side: 3 - me,   
-        liveId: LocalAI.nextLiveId(), tag: T('tagDefend'),
-        exclusive: true, noPonder: true }, ms + 9000);
-      cands = (rr && rr.candidates) || null;
-    } catch (e) { cands = null; }
-    if (gen !== G.ana.gen) return;
-    if (!cands || !cands.length) return;
-    
-    var mx = 0;
-    cands.forEach(function (c) {
-      var v = evalNum(c.eval);
-      c.danger = (isNaN(v) || v < 0) ? 0 : v;      
-      var mn = /^M(\d+)$/i.exec(String(c.eval == null ? '' : c.eval).replace('+', ''));
-      c.Ln = (mn && v > 0) ? (+mn[1] + 1) : 0;     
-      if (c.danger > mx) mx = c.danger;
-    });
-    cands.forEach(function (c) { c.pct = mx > 0 ? Math.round(c.danger / mx * 100) : 0; });
-    
-    var map = {};
-    cands.forEach(function (c) { map[c.x + ',' + c.y] = c; });
-    var merged = (G.ana.defCells || []).map(function (c) {
-      var f = map[c.x + ',' + c.y];
-      if (!f) return c;
-      var pct = Math.max(c.pct || 0, f.Ln ? 100 : (f.pct || 0));
-      return { x: c.x, y: c.y, pct: pct, lwr: c.lwr || '',
-               mate: f.Ln ? ('L' + (G.moves.length + f.Ln)) : (c.mate || ''), prio: pct };
-    });
-    merged.sort(function (a, b) { return (b.prio || b.pct) - (a.prio || a.pct); });
-    var sig = merged.slice(0, 3).map(function (c) {
-      return c.x + ',' + c.y + ':' + (c.badge || '') + '/' + c.pct;
-    }).join('|');
-    
-    var stable = (prevSig !== null && sig === prevSig && ms >= STABLE_MS);
-    prevSig = sig;
-    if (gen !== G.ana.gen) return;
-    renderDefendMarks(merged);
-    renderAna(stable ? T('anDefendStable')
-                     : T('anDefendRefine').replace('{r}', String(r + 1))
-                         .replace('{t}', (ms / 1000).toFixed(ms % 1000 ? 1 : 0)));
-    paint();
-    if (stable) return 'stable';         
-    ms = Math.min(ms * 2, MAX_MS);       
-  }
-}
-
-function defendScheduleNext(ms) {
-  if (G.ana.defTimer) clearTimeout(G.ana.defTimer);
-  G.ana.defTimer = setTimeout(defendTick, ms == null ? streamGapMs() : ms);
-}
-function defendTick() {
-  G.ana.defTimer = null;
-  
-  if (linkSessionOn()) return;
-  if (!G.ana.autoDefend || RV_MODE || G.review || S.paused) return;
-  if (G.over || boardDecided()) return;                    
-  if (G.ana.busy || G.ana.defRefining) { defendScheduleNext(); return; }   
-  
-  try { anaDefend(); } catch (e) { defendScheduleNext(); }
-}
 
 var VCX_BUDGET = 600000;              
 
@@ -7278,6 +9240,9 @@ function evalQuietAi() {
   if (G.busy) gAiGen++;                       
 }
 
+// ★★ 2026-10-17（用户口径）：「AI 落子（人机/自我对弈）占满车道；用户点计算分析、扫描防守
+//   这类功能时，那个功能也占满车道 —— 但 AI 落子这条先停掉，AI 不用再落子，自动关闭黑白 AI 执子。」
+//   所以这里做两件事：① 关执子 + 作废当前这一手；② 让 worker 对三条车道发 STOP，把引擎整条让出来。
 function aiStandDown() {
   evalQuietAi();
   try { LocalAI.stopLane('main'); } catch (e) {}
@@ -7639,6 +9604,7 @@ function fwdCommit() {
 
 function anaStop() {
   G.ana.gen++;
+  anaLiveStop();                 // ★ 停引擎，但**不清**最后一帧标记 / 列表 / 路线
   if (G.ana.defTimer) { clearTimeout(G.ana.defTimer); G.ana.defTimer = null; }
   G.ana.defWinUntil = 0; G.ana.defRefining = false;
   G.ana.busy = false; G.ana.kind = '';
@@ -7652,49 +9618,27 @@ function anaStop() {
 async function anaNbest() {
   if (!anaGuard(0)) return;
   aiStandDown();                              
-  var gen = ++G.ana.gen, N = anaIp();
+  var N = anaIp();
+  ++G.ana.gen;
   G.ana.busy = true; G.ana.kind = 'nbest';
+  G.ana.marks = []; G.ana.rows = [];
+  setPvLine([]);
   anaMark(els.btn_an_nbest);
-  var winUntil = Date.now() + streamWindowMs();
-  var last = null;
-  try {
-    for (var rd = 1; ; rd++) {
-      if (gen !== G.ana.gen) return;
-      var budget = Math.min(S.turnMs || 2000, winUntil - Date.now());
-      if (budget < 250) break;                        
-      renderAna(T('anDraft').replace('{r}', String(rd)));
-      
-      var r = await analyze(budget, N, null, curColor(), T('tagNbest'));
-      if (gen !== G.ana.gen) return;
-      var cs = ((r && r.candidates) || []).slice(0, N);
-      if (!cs.length) { if (!last) { renderAna(T('anEmpty')); return; } break; }
-      last = cs;
-      
-      G.ana.marks = []; G.ana.rows = [];
-      cs.forEach(function (c, i) {
-        
-        G.ana.marks.push({ x: c.x, y: c.y, badge: String(i + 1), label: fmtEval(c.eval), tier: anaTierOf(i), inline: true });
-        G.ana.rows.push({ i: i, badge: String(i + 1), coord: coordName(c.x, c.y), eval: fmtEval(c.eval), pv: pvText(c.line) });
-      });
-      if (cs[0].depth != null) {
-        els.st_depth.textContent = cs[0].depth;
-        els.st_eval.textContent = cs[0].eval;
-      }
-      paint();
-      if (Date.now() >= winUntil) break;              
-    }
-    if (!last) { renderAna(T('anEmpty')); return; }
-    renderAna(T('anDone').replace('{n}', String(G.moves.length + 1))
-             .replace('{ev}', fmtEval(last[0].eval))
-             .replace('{d}', String(last[0].depth != null ? last[0].depth : '-')));
-    paint();
-  } catch (e) {
-    if (gen === G.ana.gen) renderAna(T('offline'));
-  } finally {
-    if (gen === G.ana.gen) { G.ana.busy = false; anaMark(null); }
-  }
+  renderAna(T('anNbestRun').replace('{d}', '0'));
+  anaLiveRun('nbest', N, 'tagNbest');          // ★ 常驻深算：一次 YXNBEST 连续加深
 }
 
+// 平衡定式表（**黑 1 固定天元型**）—— 同时充当「无禁手公式」与「有禁手公式」：
+//   两张公式在「黑 1 天元」这个走法下收敛到同一批三手（白 2 走斜 I9(8,8) 或直 H9(7,8)，
+//   黑 3 按官方表取点）。逐条引擎实测（RapfiEngine-avx512vnni，YXBALANCETWO 取
+//   「白这一手＋黑应手」这一对最接近 0 的分，≤ 50 = 官方 balanceWindow 内的「平」）：
+//     · 无禁手（rule 0）：|评估| 1~44 → 26/26 平衡
+//     · 有禁手（rule 2）：|评估| 1~17 → 26/26 平衡
+//   ⇒ 只保留平衡定式，**必胜定式一条都不加**（用户：「无禁手公式+有禁手公式，
+//     只利用里面的平衡定式，必胜定式不可添加」）。
+//   注：连线版（bridge.js）那边不走「黑 1 天元」固定式，而是整组三手直接用，所以它
+//   用的是**分开的两张表**：无禁手 = 官方 Swap2 三手 9 组（实测 9/9 平衡）、
+//   禁手 = 下面这张 RIF 26。两条线路各按各的走法取表，不混用。
 var BAL_OPEN_TJ = [
   [[7, 7], [8, 8], [9, 9]],
   [[7, 7], [8, 8], [9, 8]],
@@ -7723,6 +9667,11 @@ var BAL_OPEN_TJ = [
   [[7, 7], [7, 8], [8, 6]],
   [[7, 7], [7, 8], [9, 5]],
 ];
+// ★ 2026-10-13 已**停用**（保留仅为对照，勿再调用）：这是「从对弈引擎的候选里挑
+//   |评估| 最小的一个」的老口径。它的问题是把**对弈引擎的分**当平衡点的分用 ——
+//   实测禁手盘面 YXNBEST 8 给 +546（无禁手同盘才 +12），挂到「平衡点」名下就是
+//   用户报的「接近 1000 分的误差」。现在的口径：平衡点只认平衡引擎（YXBALANCETWO），
+//   拿不到就如实报 anBalNoEngine，绝不用对弈引擎顶替。
 function balClosestToZero(cands, nearC, nearR) {
   if (!cands || !cands.length) return null;
   var scope = cands;
@@ -7741,6 +9690,20 @@ function balClosestToZero(cands, nearC, nearR) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 开局三平衡点 = 黑 1 固定天元 + 引擎原生平衡搜索**成对**给出的（白 2, 黑 3）。
+//   「哪一点最平」**完全交给引擎**：Rapfi 的 balance 模式内部按
+//   balancedValue(v,bias) = -|v-bias|+bias 排序（bias = 0 ⇒ 取 |评估| 最小，即最接近
+//   和棋的那一手），并用 balanceWindow(50) 判定够不够平。页面只做「合法性复核 +
+//   把引擎给的评估分如实报出来」，不自造打分、不碰平衡算法本身。
+// ★★ 2026-10-13 **撤掉中心区间锁**（上一轮锁 3×3 / 5×5 是错的）。用户：
+//   「一定要分清有禁手和无禁手，有时候这三个平衡点不仅仅只在中心那几个位置，光靠中心
+//     那几个位置很难做出真正的平衡点，一直使用的是有禁手模式的平衡点」。
+//   实测（黑 1 天元后一次 YXBALANCETWO，1.5s/手）：
+//     不锁（本轮）        无禁手 |评估| 14~44 / 禁手 25~43   ← 平衡对的第 2 点常在 d=3
+//     锁中心 3×3 / 5×5    禁手 |评估| = M4（锁完直接算出杀棋！）← 锁死 = 把平衡点挤没了
+//     逐手单点 ONE（更早） 无禁手 486 / 禁手 297               ← 那才是「一眼看出谁占优」
+//   禁手 / 无禁手的区别不再靠「锁区间」体现，而是靠**传给引擎的 rule**：禁手规则下
+//   引擎的着法生成会自动剔掉黑方禁手点，无禁手不会 —— 那才是规则真正该管的事。
 function balLegalAt(board, x, y, side) {
   if (!board[y] || board[y][x]) return false;
   if (side === 1 && renjuRule() && vcxForbidden(board, x, y)) return false;
@@ -7748,6 +9711,16 @@ function balLegalAt(board, x, y, side) {
 }
 
 var _balCidSeq = 0;
+// 开局平衡点的**退化通道**：一次 YXBALANCETWO 拿不到成对答案时才走这里。
+//   (1) 原生 **YXBALANCETWO**（成对）—— 只取这一对的第 1 手（联合平衡的那一手）。
+//       不再用单点 YXBALANCEONE：实测它在近乎空盘上评估 −350~−470，报出来就是
+//       「评估差距过大」；成对搜索才把分差压回 0 附近。
+//   (2) 再来一轮 n=2（引擎内部逐轮 YXBLOCK 掉上一手 ⇒ 依次给出次优平衡点），
+//       只为兜住偶发超时 / 禁手点 / 已被占用的点。
+//   ★ 绝不退回 analyze()（= 对弈引擎 YXNBEST）：那样开局点就变成「对弈引擎算出来的
+//     最好一手」而不是「平衡搜索给出的最平一手」，正是用户报的
+//     「开局还是调用的原对弈引擎而不是平衡引擎」。拿不到就交回 null，
+//     由 openBalChain → anaBalPoints 走**官方定式**兜底（仍是黑 1 天元开局）。
 async function balBalancedPick(board, side, rule, turnMs, gen, lane) {
   var qMs = Math.max(600, Math.min(1500, Math.round((turnMs || 2000) * 0.6)));
   var cid = 'calc-openbal-' + side + '-' + (++_balCidSeq);
@@ -7775,15 +9748,28 @@ async function balBalancedPick(board, side, rule, turnMs, gen, lane) {
   return null;
 }
 
+// 开局三手：黑 1 = 天元（固定），白 2 / 黑 3 用**一次 YXBALANCETWO 成对取出**。
+//   Rapfi 的 BALANCE_TWO 会在根节点枚举「白 2 + 黑 3」这两手的所有组合，按
+//   balancedValue(v,bias) = -|v-bias|+bias（bias=0 ⇒ |评估| 最小）取最接近和棋的一对。
+//   ★★ **成对才平**：单点 YXBALANCEONE 是按「白 2 自己最小 |分|」挑的，抵消不了
+//     「黑 2 子 vs 白 1 子」的先天优势。实测（黑 1 天元后，1.5s/手）：
+//       ONE → -486（无禁手）/ -297（禁手）       ← 就是用户看到的「一眼看出谁占优」
+//       TWO →  +14（无禁手）/ +25~43（禁手）     ← 官方 balanceWindow(50) 内才算「平」
+//     （ScalingFactor = 200 ⇒ 胜率 = sigmoid(V/200)：50 ⇒ 56%，120 ⇒ 65%）
+//   ★★ **不加中心区间锁**：实测把白 2 锁进天元 3×3 之后，禁手侧直接算出杀棋
+//     （|评估| = M4）—— 锁死等于把平衡点挤没了。禁手 / 无禁手的区别靠 rule 参数
+//     （引擎的着法生成会自己剔掉黑方禁手点），不靠锁区间。
+// 返回 [{x,y,color,seq}]，长度 1~3（引擎不可用时会短于 3，上层退官方定式）。
 async function openBalChain(rule, turnMs, gen) {
   var c = (N - 1) >> 1;
   var board = G.board.map(function (r) { return r.slice(); });
   var out = [], stones = 0;
   for (var y = 0; y < N; y++) for (var x = 0; x < N; x++) if (board[y][x]) stones++;
   if (!stones) { board[c][c] = 1; stones = 1; out.push({ x: c, y: c, color: 'b', seq: '1' }); }
-  if (out.length !== 1) return out;
+  if (out.length !== 1) return out;                 // 盘上已有子 ⇒ 不属于「开局三手」
   var qMs = Math.max(600, Math.min(2000, Math.round((turnMs || 2000) * 0.8)));
   G.ana.balEval = null; G.ana.balMode = null;
+  // (1) 首选：一次 YXBALANCETWO ——（白 2, 黑 3）成对平衡
   var j2 = null;
   try {
     j2 = await apiBalance({
@@ -7805,6 +9791,7 @@ async function openBalChain(rule, turnMs, gen) {
     }
     board[pair[0][1]][pair[0][0]] = 0;
   }
+  // (2) 退化：成对拿不到 / 落点非法 ⇒ 单点 ONE 逐手取（同样不锁中心区）
   var sides = [2, 1], lanes = ['sub', 'sub'];
   for (var i = 0; i < sides.length && out.length < 3; i++) {
     var p = null;
@@ -7819,18 +9806,28 @@ async function openBalChain(rule, turnMs, gen) {
   return out;
 }
 
+// 平衡点完成提示：把引擎给的**评估分**一并报出来 —— 用户要的判据就是
+// 「分差应该在 0 附近才可以」，光给坐标看不出平不平。|ev| ≤ 50（官方 balanceWindow）
+// 是「平」，越大越不平（ScalingFactor=200 ⇒ 50→56% 胜率，486→91%）。
 function balDoneMsg(n, names, ev) {
   var base = T('anBalDone').replace('{n}', String(n)).replace('{list}', names.join(', '));
   if (ev == null || isNaN(+ev)) return base;
   return base + T('anBalEval').replace('{v}', String(Math.abs(Math.round(+ev))));
 }
 
+// ★ 2026-10-13（用户）：「如果用户想在开局的时候定平衡点的话，应该要评估几个才合理」。
+//   开局 = 官方指定开局那三手之内（黑1 天元 / 白2 / 黑3，即盘上 ≤ 3 子）。此时补一句
+//   「开局评估几个才合理」的提示；出了开局阶段就不显示（那时点数由用户按中盘需要自选）。
+//   依据：中国五子棋竞赛规则(2025) 第 11 条「指定开局」/ RIF —— 官方开局只有三手。
+//   ★ 2026-10-13（用户）：「这个提示文案是多条的，是灵活多变的，不应该只是一个大段话」：
+//     改为从 anBalOpenHints 短句池里**随机抽 1~2 条**（不重复），每条单独一行（用 \n 分行，
+//     renderAna 见到 \n 会切 white-space:pre-line）—— 同一个局面多点几次看到的角度不同。
 function balOpenHintTxt() {
   if (G.moves.length > 3) return '';
   var pool = T('anBalOpenHints');
   if (!pool || !pool.length || typeof pool === 'string') return '';
   var left = pool.slice();
-  var n = Math.min(left.length, 1 + Math.floor(Math.random() * 2));
+  var n = Math.min(left.length, 1 + Math.floor(Math.random() * 2));   // 每次 1~2 条
   var out = [];
   for (var i = 0; i < n && left.length; i++) {
     out.push(left.splice(Math.floor(Math.random() * left.length), 1)[0]);
@@ -7850,11 +9847,25 @@ async function anaBalPoints() {
   var need = empty ? 3 : Math.max(1, Math.min(6, balPN()));
   try {
     if (!empty) {
+      // (1) 官方平衡搜索（原生硬链接）：**成对**取点 —— 每次 YXBALANCETWO 给出 2 手，
+      //     这两手是引擎按 balancedValue(v,bias) = -|v-bias|+bias 联合挑出来的
+      //     「连着下都不吃亏」的组合。逐手单点（ONE）是各取自己最小的 |分|，实测会漂：
+      //     同一个中盘（无禁手）ONE 收在 |评估| 132，成对只有 9。
+      //     非空局面没有官方开局区间，不传 zoneR（中心锁只属于禁手开局前 3 手）。
       var bmB = G.board.map(function (r) { return r.slice(); });
       var plyB = G.moves.length;
       var marksArr = [], namesB = [], evB = null;
       var qMs = Math.max(600, Math.min(1800, turnMs));
       while (marksArr.length < need) {
+        // ★ 2026-10-13 二次修正（用户：「当前有禁手模式，平衡点评估经常差距过大」
+        //   「分数差应该在 0 附近才可以」）：**收尾那手也一律走成对 YXBALANCETWO**。
+        //   原来剩 1 手时用单点 YXBALANCEONE，引擎实测（白方待走）：
+        //     空盘+黑1天元  ONE 无禁手 −468 / 标准 −463 / 禁手 −352   ← 差得离谱
+        //     同一局面 TWO 无禁手 +12 / 标准 +21 / 禁手 +17            ← 都在 balanceWindow(50) 内
+        //   原因：ONE 是「单点取最接近 0」，白只下一手时根本抵消不掉黑天元那一子的固有优势；
+        //   TWO 搜的是「白这一手 + 黑应手」的**对**，两手联合才能把分差压回 0。
+        //   成对里只取第 1 手即可（它就是「下完仍保持平衡」的那一手，第 2 手是对方的最优应手），
+        //   报出的评估分也用这一对的分 —— 不再出现单点那种 −350 的假「不平衡」。
         var modeB = 'two';
         var qi = marksArr.length;
         var curB = ((plyB + qi) % 2 === 0);
@@ -7881,12 +9892,13 @@ async function anaBalPoints() {
           namesB.push(coordName(ptsQ[pk][0], ptsQ[pk][1]));
           addedQ++;
         }
-        if (!addedQ) break;
+        if (!addedQ) break;                 // 防「全是已占点」时空转
       }
       if (marksArr.length) {
         renderBalMarks(marksArr, balDoneMsg(marksArr.length, namesB, evB) + balOpenHintTxt());
         return;
       }
+      // (2) 连线版页内面板桥（bridge.js 打开时）：同一条原生平衡通道
       if (typeof window.GB_BAL_POINTS === 'function') {
         marksArr = []; namesB = [];
         try {
@@ -7903,6 +9915,16 @@ async function anaBalPoints() {
           return;
         }
       }
+      // (3) ★★ 2026-10-13 **删掉「用对弈引擎顶替平衡点」的兜底**。
+      //   用户：「当前有禁手的模式，连线器以及主界面的平衡点评估仍然有巨大误差，
+      //   接近 1000 分的误差」。实测（用户实际盘面 b(9,10)(7,7)/w(6,7)，1.5s/手）：
+      //     · 对弈引擎 YXNBEST 8（analyze） rule 2 → **+546**（同盘 rule 0 只 +12）
+      //     · 平衡引擎 YXBALANCETWO          rule 2 → **+21**  ← 这才是平衡口径
+      //     · 平衡引擎 YXBALANCEONE（单点）  rule 2 → +165
+      //   原来这里退到 `analyze()` + balClosestToZero：「离 0 最近的对弈引擎候选」在禁手
+      //   局面里仍然是几百上千分。那既不是平衡点、又把 ~1000 分的对弈评估挂在「平衡点」
+      //   名下 → 正是用户报的「巨大误差」。现在改为：**再给平衡引擎一次机会**（换 sub 车道、
+      //   加时间），拿不到就如实报「平衡子不可用」，绝不拿对弈引擎的数冒充平衡分。
       var retry = null;
       try {
         retry = await apiBalance({
@@ -7934,9 +9956,21 @@ async function anaBalPoints() {
       return;
     }
     if (empty) {
+      // ★ 开局三平衡点 —— 2026-10-13 二次重写。用户：「评定得仍不好，一定要分清有禁手和
+      //   无禁手，有时候这三个平衡点不仅仅只在中心那几个位置，光靠中心那几个位置很难
+      //   做出真正的平衡点，一直使用的是有禁手模式的平衡点，到后面两手评判得不太好，
+      //   分数相差得非常巨大了」「分数差应该在 0 附近才可以」：
+      //   · 黑 1 = 天元（固定）
+      //   · 白 2 / 黑 3 由 **一次 YXBALANCETWO** 成对取出（理由见 openBalChain 注释）
+      //   · **不加中心区间锁** —— 上一轮锁 3×3 / 5×5 之后禁手侧直接算出杀棋（|评估| = M4），
+      //     无禁手真正的平衡手也常在中心区之外。禁手 / 无禁手的区别靠 rule 传给引擎。
+      //   实测（黑 1 天元后，引擎 1.5s/手，|评估| ≤ 50 为官方 balanceWindow 内的「平」）：
+      //     无禁手：ONE 486 ✗ → TWO 14~44 ✓（平衡对第 2 点常在 d=3）
+      //     禁手  ：ONE 297 ✗ → TWO 25~43 ✓
       var ruleE = engineRule();
       var marksE = await openBalChain(ruleE, Math.max(2000, S.turnMs || 2000), gen);
       if (gen !== G.ana.gen) return;
+      // 引擎完全不可用（三点没凑齐）：退到官方平衡定式（全部以天元作黑 1、无必胜线）
       if (marksE.length < 3) {
         var cyB = (N - 1) >> 1;
         marksE = [{ x: cyB, y: cyB, color: 'b', seq: '1' }];
@@ -7949,6 +9983,10 @@ async function anaBalPoints() {
       renderBalMarks(marksE, balDoneMsg(marksE.length, namesE, G.ana.balEval) + balOpenHintTxt());
       return;
     }
+    // ★ 2026-10-13：这里原本还有一段 `analyze()` + 「取 |评估| 最小的候选」的死兜底
+    //   （对弈引擎 YXNBEST）。它在禁手局面里报出来的就是 +546 那种「对弈分」，
+    //   挂在「平衡点」名下正是用户说的「接近 1000 分的误差」。已整体删除：
+    //   平衡点的评估**只能**来自平衡引擎，拿不到就如实说拿不到（见上面的 anBalNoEngine）。
     renderAna(T('anBalNoEngine'));
   } catch (e) {
     if (gen === G.ana.gen) renderAna(T('offline'));
@@ -7991,6 +10029,7 @@ function balPN() {
 }
 
 function wireAnalysis() {
+  wireCurveHover();
   if (!els.btn_an_nbest) return;
   
   els.btn_an_stop.onclick = function () { if (G.ana.busy) anaStop(); else anaCalc(); };
@@ -8017,7 +10056,12 @@ function wireAnalysis() {
     fwdStep(e.key === 'ArrowLeft' ? -1 : 1);
     e.preventDefault();
   });
-  els.btn_an_defend.onclick = function () { aiStandDown(); anaDefend(true); };   
+  // ★ 2026-10-22（用户：「点击「扫描防守」按键文字变为「停止扫描」，然后又点击「停止扫描」后，
+  //   最后一帧的扫描状态保留到棋盘上」）：同一个键二态 —— 扫 / 停。
+  els.btn_an_defend.onclick = function () {
+    if (G.ana.busy && G.ana.kind === 'defend') { anaDefendStop(); return; }
+    aiStandDown(); anaDefend(true);
+  };
   els.btn_an_bal.onclick = function () { anaBalPoints(); };
   if (els.btn_an_baln) els.btn_an_baln.onchange = function () {
     var n = parseInt(els.btn_an_baln.value, 10);
@@ -8032,7 +10076,7 @@ function wireAnalysis() {
     save();
   };
   els.num_nbest.value = String(anaIp());
-  renderAna(T('anIdle'));
+  renderAna(T('anIdle'), true);
 }
 
 function gbOf(mb) { mb = mb | 0; return mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : mb + ' MB'; }
@@ -8108,6 +10152,8 @@ var HASH_FLOOR_MB = 64;
 function renderHashInfo() {
   var el = els.hashInfo;
   if (!el) return;
+  // ★ 2026-10-15：展示**生效值**（本机装得下的档位）——偏好被本机上限折衷时，
+  //   这里如实显示折衷后的数字；偏好本身仍持久化，换大机器自动恢复。
   var fullMB = (G.hashEffMB || S.hashMB) | 0;
   var h = '<div class="si-r"><span class="si-k">' + escHtml(T('hmExcl')) +
           '</span><span class="si-v">' + escHtml(T('hmExclVal').replace('{m}', fullMB)) +
@@ -8142,23 +10188,68 @@ function buildSelects() {
   if (host.userThreads >= MIN_THREADS) S.cores = host.userThreads;
   if (host.userHashMB >= 1) S.hashMB = host.userHashMB;
   if (host.userThreads >= MIN_THREADS || host.userHashMB >= 1) enginePrefSet(S.cores, S.hashMB);
+  // ★★ 2026-10-17：宿主 sysinfo 未到达时 threadsMax 缺失 ⇒ maxT 会退化成 1，
+  //   后面的「超上限就重置」逻辑会把用户选好的 12 线程**永久写成 1**
+  //   （= 「线程数改了、重启又变回去」的根因之一）。host 未就绪一律不动偏好。
   if (!(host.threadsMax >= 1)) return;
   renderSysInfo();
   var maxT = Math.max(1, host.threadsMax || 1);
+  // ★★ 2026-10-18（用户：「线程多于核心…要齐心协力，而不是相互打架」）：线程拓扑迁移（一次性）。
+  //   旧上限 = 逻辑核-4（本机 12），存档多停在 10~12。实测这段区间是最差组合：
+  //   比物理核多、又没多到占满 SMT ⇒ Windows 把两个线程塞进同一个物理核的
+  //   两个兄弟（本机兄弟相邻编号），抢同一组执行单元。同盘面 2000ms：
   //     t=10 2879K nps / d22  ·  t=12 3567K / d29  ·  t=14~16 4.0M+ / d30
-  if (S.cores >= 10 && S.cores <= 12 && maxT > S.cores && !migFlag('threadsTopo2')) {
+  //   这里把 10~12 抬到新上限；用户之后自己改的值不会被再动（标记已写）。
+  // ★★ 2026-10-23（用户：「提升并行计算能力，当前速度和深度都很浅很慢」）：
+  //   本机存档里一直停着 **6 线程**（远低于物理核 8），是历史上一次测试留下的旧默认值。
+  //   同盘面同预算实测（均势开局，RapfiEngine-avx512vnni）：
+  //     6s：T6 depth 21 / 1.54M nps   vs   T14 depth 24 / 3.14M nps   （差 3 层）
+  //     10s：T4 depth 23 / 0.73M      vs   T14 depth 22 / 2.36M
+  //   加上 2026-10-18 那组 2s 实测（t10 d22 / t14 d30），趋势一致：线程数越接近上限，
+  //   同样时间里迭代加深越快。**低于物理核**的存档值几乎必然是旧版本的默认档，
+  //   一次性抬到上限（用户之后自己改的值不会再被动 —— 标记已写）。
+  var physC = Math.max(0, host.physCores | 0);
+  var lowCores = (physC > 1) ? (S.cores < physC) : (S.cores >= 10 && S.cores <= 12);
+  if (lowCores && maxT > S.cores && !migFlag('threadsTopo4')) {
     var _oldCores = S.cores;
     S.cores = maxT;
+    // ★★ 2026-10-22（用户：「引擎调用上还有提升智力的空间吗」）：
+    //   threadsTopo2 那次迁移**从未真正生效** —— 这里只写了 save()，而 save() 第一行
+    //   enginePrefApplyToS()、本函数末尾的 applyEngineConfig() 都会把 S.cores 从专用键
+    //   gbcalc.engine.v1 读回旧值（本机一直停在 12）。先写专用键再 save，才是真迁移。
+    //   同盘面等时实测（1.2s、4 次取吞吐）：T12 4.3~4.5M nps、T14 4.6~4.8M、T16 4.7~5.3M，
+    //   深度同为 34~35 层 ⇒ 抬到宿主上限 14 是纯增益（16 核留给识图 2 核，不抢视图）。
+    try { enginePrefSet(S.cores, S.hashMB); } catch (eTT0) {}
     try { save(); } catch (eTT) {}
     try { console.log('[threads] topo migrate ' + _oldCores + ' -> ' + maxT); } catch (eTT2) {}
   }
   
+  // ★ 2026-10-15（用户：「有的用户反映保存线程数为 1 的时候……保存不了更改。增强适应
+  //   能力和持久化的适应能力」）：S.cores / S.hashMB 是**用户偏好**，永不因本机能力被
+  //   改写（老逻辑会把超上限的哈希降档后 save()、把换机后的线程数重置为最大值——偏好
+  //   就这样被永久抹掉了）。本机装不下的部分只在「生效值」里折衷：下拉按生效值选中、
+  //   engineConfig 下发生效值；换到大内存/多核机器后，用户偏好自动完整恢复。
+  //   线程数=1 现在全程生效（宿主 C++ CalcFullThreads / 本下拉都原样尊重 1）。
+  // ★★ 2026-10-16（用户：「速度和深度远不如 4.39」/「智力不算高」）——根因就在这里。
+  //   v4.39 的口径是**首启默认 = 下拉上限**（buildSelects 里 `S.cores = maxT`），本机 16 逻辑核
+  //   ⇒ maxT = 12 ⇒ 主车道满 12 线程搜索。后来一段版本把工厂默认写成 half(maxT)=6，且被
+  //   save() 固化进 localStorage ⇒ **所有老用户**都只跑一半线程：引擎明明加载成功（用户看到
+  //   的「引擎加载成功了」），nps / 深度 / 出分速度却只有 4.39 的一半，「迟迟没有评估」正是它。
+  //   现在：默认 = host.threadsDefault（宿主 ThreadsMax 同口径），并做一次性迁移 —— marker
+  //   缺失时把「恰好等于 halfT 的偏好」抬回上限（= 那一版自动写进去的值）。用户手选的其他值
+  //   一律不动（2026-10-15 用户反馈过「线程数=1 保存不了更改」，绝不能因为本机能力改写偏好）。
+  //   maxT<4 的机器上 halfT 会是 1 或 2，可能撞上用户的真实选择 ⇒ 那种小机器不迁移。
   var factoryT = (host.threadsDefault >= 1 && host.threadsDefault <= maxT) ? host.threadsDefault : maxT;
   if (factoryT < MIN_THREADS) factoryT = Math.min(maxT, MIN_THREADS);
+  // ★★ 2026-10-17：**删除**「恰好一半就抬回上限」的迁移 —— 它按 maxT 推算，
+  //   在 maxT 偏小的机器上会把用户真实的选择抬走（用户报过两次「改了又恢复」）。
+  //   现在只有一种自动行为：小于最小可选值时抬到 factoryT（= 下拉上限）。
   if (!(S.cores >= MIN_THREADS)) { S.cores = factoryT; enginePrefSet(S.cores, S.hashMB); save(); }
+  // ★ 偏好永不因本机能力被改写：换到小机器只夹「生效值」，S.cores 保留用户原值，
+  //   换回大机器自动恢复（与 2026-10-15 的约定一致；老代码这里 save() 过，等于抹掉偏好）。
   var effT = Math.max(Math.min(MIN_THREADS, maxT), Math.min(S.cores, maxT));
   var html = '';
-  for (var t = Math.min(MIN_THREADS, maxT); t <= maxT; t++) {
+  for (var t = Math.min(MIN_THREADS, maxT); t <= maxT; t++) {   // 最小 2
     html += '<option value="' + t + '"' + (t === effT ? ' selected' : '') + '>' + t + '</option>';
   }
   els.sel_cores.innerHTML = html;
@@ -8181,10 +10272,14 @@ function buildSelects() {
     var byRes = Math.max(0, memMB - 2048);
     capMB = Math.min(maxH, byPct, byRes);
   }
+  // ★ 2026-10-15：哈希偏好**永不改写**（去掉「超上限 → 降档 → save()」的破坏性回写）。
+  //   生效值 effH = 本机装得下的最大档：下拉按生效值选中、超上限档 disabled 照旧；
+  //   engineConfig 照发用户偏好，宿主 C++ CalcHashFullKB 按 min(80% RAM, RAM-2GB, 6GB)
+  //   自适应 —— 小内存机器不炸、换大机器后用户偏好自动完整恢复。
   var effH = (S.hashMB && hs.indexOf(S.hashMB) >= 0 && S.hashMB <= capMB)
     ? S.hashMB
     : (hs.filter(function (h) { return h <= capMB; }).pop() || 512);
-  if (!migFlag('hash1024')) {
+  if (!migFlag('hash1024')) {                        // 一次性历史默认迁移（1024 → 512）
     if (S.hashMB === 1024) { S.hashMB = 512; enginePrefSet(S.cores, S.hashMB); save(); effH = 512; }
   }
   if (!S.hashMB) { S.hashMB = 512; enginePrefSet(S.cores, S.hashMB); save(); effH = 512; } // factory default: 512MB
@@ -8193,7 +10288,7 @@ function buildSelects() {
     return '<option value="' + h + '"' + (h === effH ? ' selected' : '') +
            (off ? ' disabled' : '') + '>' + h + ' MB</option>';
   }).join('');
-  G.hashEffMB = effH;
+  G.hashEffMB = effH;                                // 生效值给 renderHashInfo / 引擎口径展示
 
   if (S.hashMul !== undefined) { delete S.hashMul; save(); }
   renderHashInfo();
@@ -8210,6 +10305,8 @@ function boot() {
   try {
     var st = JSON.parse(localStorage.getItem(settingsKey()) || '{}');
     for (var k in st) if (S.hasOwnProperty(k)) S[k] = st[k];
+    // ★ 2026-10-13（用户：「在用户选择规则的时候，一定要正确链接」）：规则以专属键为准 ——
+    //   这样「上次在连线窗里选的规则」在下次开主界面时同样生效，反之亦然。
     var rgBoot = loadRuleGlobal();
     if (rgBoot != null) S.rule = rgBoot;
     
@@ -8230,7 +10327,7 @@ function boot() {
   prefsApplyToS();       // remaining global prefs as fallback
   initPanels();
   applyLayout();
-  try { syncPinKeys(); } catch (e) {}
+  try { syncPinKeys(); } catch (e) {}   // ★ 固定状态按存档重画（✕ / 固定）
   
   wireColors();
   wireCards();
@@ -8426,6 +10523,9 @@ function boot() {
     var wOn = (key === 'w') ? !S.aiW : S.aiW;
     setAiSides(bOn, wOn);
     
+    // ★ 2026-10-17：执子状态必须落盘。原来只在 mode 变化时 save()，而 mode 早就是
+    //   'pve' 时（绝大多数情况）S.aiB/aiW 的改动根本没写进 localStorage ⇒ 重启后
+    //   AI 执子又回到旧状态。这是「其他持久化做得不好」里最直观的一条。
     if (S.mode !== 'pve') S.mode = 'pve';
     save();
     S.paused = false;
@@ -8501,6 +10601,12 @@ function boot() {
   els.sel_rule.onchange = function () {
     var prev = +S.rule;
     S.rule = +els.sel_rule.value; save(); applyRuleHint();
+    // ★ 2026-10-13（用户：「有禁手和无禁手的平衡点它都是不一样的，在用户选择规则的时候，
+    //   一定要正确链接」）：**写全局规则键 + 每次改规则都推给连线窗**。
+    //   原来这行 tellHost 写在本 handler 的**外面**（只在本页启动时执行一次），
+    //   所以主界面把规则从「无禁手」改成「有禁手」时，连线窗完全不知道 ——
+    //   连线器的「交换平衡点 / 交换评估 / 自动落子」照旧按旧规则（无禁手）算，
+    //   于是禁手局面拿到的是无禁手的平衡点。放在 onchange 里之后，两边永远同步。
     saveRuleGlobal(S.rule);
     if (linkSessionOn()) tellHost({ type: 'linkCfgSync', rule: +S.rule });
     if (+S.rule === prev) { refreshUI(); return; }
@@ -8520,6 +10626,8 @@ function boot() {
     resetGame(false); openStart(); refreshUI();   
   };
   
+  // 启动时若连线会话已开（比如本页是重开的），先把当前规则推一次；之后每次改规则由
+  // sel_rule.onchange 里的同名语句负责（见上）。
   if (linkSessionOn()) tellHost({ type: 'linkCfgSync', rule: +S.rule });
   els.sel_cores.onchange = function () {
     S.cores = Math.max(MIN_THREADS, +els.sel_cores.value | 0);
@@ -8541,6 +10649,11 @@ function boot() {
   };
   els.chk_num.onchange = function () { S.showNum = !!els.chk_num.checked; save(); paint(); };
   
+  els.chk_bgThink.onchange = function () {
+    S.bgThink = !!els.chk_bgThink.checked; save();
+    if (S.bgThink) bgThinkKick(0); else bgThinkStop();
+  };
+  
   els.chk_preview.onchange = function () { S.previewOn = !!els.chk_preview.checked; save(); paint(); };
   
   if (els.btn_live) els.btn_live.onclick = liveAnaToggle;
@@ -8551,6 +10664,7 @@ function boot() {
   els.sel_rule.value = String(S.rule);
   els.chk_coach.checked = !!S.coach;
   els.chk_num.checked = !!S.showNum;
+  els.chk_bgThink.checked = !!S.bgThink;
   els.chk_preview.checked = S.previewOn !== false;   
   [].forEach.call(els.seg_mode.querySelectorAll('button'), function (b) { b.classList.toggle('on', b.getAttribute('data-mode') === S.mode); });
   syncSideUI();                              
@@ -8853,7 +10967,7 @@ async function linkEvalSide(bd, side, canDrop) {
     return;
   }
   var c0 = cs[0];
-  var best = r.best || [c0.x, c0.y];
+  var best = r.best || [c0.x, c0.y];          // 引擎首选，零 JS 改写
   if (!(best && best.length === 2 && best[0] >= 0 && best[1] >= 0 &&
         best[0] < N && best[1] < N && !bd[best[1]][best[0]])) {
     best = null;
@@ -8878,78 +10992,9 @@ async function linkEvalSide(bd, side, canDrop) {
   }
 }
 
-async function maybeAiForSide(side) {
-  return;   
-  var bd0 = G.board;
-  if (!bd0) return;
-  var fp0 = linkBoardFp(bd0);
-  if (LINK_EVAL_BUSY) { LINK_EVAL_PENDING = fp0; return; }
-  LINK_EVAL_BUSY = true;
-  var okRun = true;
-  try { await maybeAiForSideRun(side); }
-  catch (e) { okRun = false; }
-  finally {
-    LINK_EVAL_BUSY = false;
-    var fpNow = linkBoardFp(G.board || bd0);
-    
-    if (okRun) LINK_EVAL_LASTFP = fpNow;
-    if (LINK_EVAL_PENDING && LINK_EVAL_PENDING !== fpNow && linkSessionOn()) {
-      LINK_EVAL_PENDING = '';
-      setTimeout(function () { if (linkSessionOn()) maybeAiForSide(); }, 80);
-    } else LINK_EVAL_PENDING = '';
-  }
-}
-async function maybeAiForSideRun(side) {
-  if (linkSessionOn()) return;   
-  if (RV_MODE || G.paused || G.review) return;
-  if (G.sideSettle) return;
-  if (G.busy) return;                     
-  var bd = G.board;
-  if (!bd) return;
-  var aiSide = (S.aiB || S.aiW) ? (S.aiB ? 1 : 2) : 0;   
-  var stm = linkSideToMove(bd);
-  var nStones = 0;
-  for (var y3 = 0; y3 < N; y3++) for (var x3 = 0; x3 < N; x3++) if (bd[y3][x3]) nStones++;
-  
-  var fiveNow = findWinLine(bd, engineRule());
-  if (fiveNow) {
-    linkSay('本局已定局（五子连珠）—— 已停止评估', 'Game over (five in a row) - evaluation stopped', '');
-    return;
-  }
-  if (G.over) return;
-  
-  if (!aiSide) {
-    if (nStones === 0) {
-      linkSay('已定位棋盘（空盘）· 落子后自动分析', 'Board located (empty) - analysis starts after the first move', '');
-      return;
-    }
-    await linkEvalSide(bd, stm, false);
-    return;
-  }
-  
-  if (stm === aiSide) {
-    var wc = winPoints(bd, aiSide, engineRule());
-    if (wc.length) {
-      linkDropCell(bd, wc[0].x, wc[0].y, true);
-      linkSay('已落制胜子 ' + coordName(wc[0].x, wc[0].y).toUpperCase() + ' —— 五子连珠，本局收官',
-              'Winning move ' + coordName(wc[0].x, wc[0].y).toUpperCase() + ' - five in a row, game over', '');
-      return;                                        
-    }
-  }
-  
-  if (stm !== aiSide) {
-    linkSay('等待对方落子…', 'Waiting for opponent...', '');
-    return;
-  }
-  
-  if (nStones === 0 && aiSide === 1) {
-    linkDropCell(bd, 7, 7, true);
-    linkSay('执黑首手 —— 直落天元', 'First move as Black - center (H8)', '');
-    return;
-  }
-  
-  await linkEvalSide(bd, aiSide, true);
-}
+// ★ 2026-10-23 清理：maybeAiForSide / maybeAiForSideRun 早已整体 `return;` 停用
+//   （主窗与连线窗已由 linkEvalSide / aiMove 两条独立链路接管），无任何外部调用点，
+//   删除以免日后误接。
 
 function noteEngineDown() {
   G.engineOffline = true;
@@ -8979,8 +11024,19 @@ function fitFont() {
 }
 
 function linkSessionOn() { return !!(G && G.linkOn); }
+// ★★ 2026-10-17（用户：「线程数改了又恢复」的真正根因）：设置**单键化**。
+//   原来按 linkSessionOn() 在 gbcalc.settings.v1 / .link.v1 之间来回切：在连线窗改的
+//   线程数写进 link 键，主窗读 v1 —— 两套快照互相覆盖，任何一次读错就把偏好改回旧值。
+//   两版（主窗/连线窗）本来就是同一份偏好，没有理由分开存。
 function settingsKey() { return 'gbcalc.settings.v1'; }
 
+// ★ 2026-10-13（用户：「有禁手和无禁手的平衡点它都是不一样的，在用户选择规则的时候，
+//   一定要正确链接」）：规则改用**一个专属键**做全局单一来源。
+//   主界面与连线窗来自同一个源（calc.html，只是连线窗多带 ?link=1），同源 ⇒ localStorage 共用，
+//   所以任意一方改了规则、写进这个键，另一方下次启动必然读到新值。
+//   为什么不用 gbcalc.settings.v1 / .link.v1：那两个键随「连线中 / 非连线」交替写入
+//   （见 save() 的 settingsKey()），没有先后信息、没法判断谁更新 —— 读错的那一次就会
+//   把「有禁手」的局面按「无禁手」算平衡点，正是用户说的「一定要正确链接」要避免的。
 function saveRuleGlobal(r) {
   try { localStorage.setItem('gbcalc.rule.v1', String(+r)); } catch (e) {}
 }
@@ -8995,6 +11051,10 @@ function loadRuleGlobal() {
 // engine key, and copying them between the two S objects was the propagation path.
 function GLOBAL_LOOK_KEYS() { return ['lang', 'theme', 'cssVars', 'customBase', 'rule']; }
 
+// ★★ 2026-10-17（用户：「线程数的更改，还有一些其他持久化做的不好」）：
+//   一次性迁移标记统一存**全局键**。原来放在 S 里，而 S 会在
+//   gbcalc.settings.v1 / gbcalc.settings.link.v1 两套存档之间来回覆盖 ——
+//   marker 跟着丢、迁移就重跑，每进一次连线窗都把用户手选的线程数/哈希再改一遍。
 var MIG_KEY = 'gbcalc.mig.v1';
 function migFlag(name) {
   var o = null;
@@ -9010,6 +11070,7 @@ function save() {
   // Align the engine fields with the dedicated key before any window writes a save, so a stale
   // window can never write an old cores/hashMB again.
   enginePrefApplyToS();
+  // ★ 偏好先进全局键：本函数后面有 `if (!ost) return;`，放在末尾会被跳过
   prefsSyncFromS();
   try {
     var k = settingsKey();
@@ -9033,14 +11094,14 @@ function setLinkMode(on) {
   var keepTheme = S.theme, keepCssVars = S.cssVars, keepCustomBase = S.customBase;
   var keepLang = (S.lang === 'en') ? 'en' : 'zh';
   
-  try { localStorage.setItem('gbcalc.settings.v1', JSON.stringify(S)); } catch (e) {}
+  try { localStorage.setItem('gbcalc.settings.v1', JSON.stringify(S)); } catch (e) {}   // 单键：切换模式不再换存档
   G.linkOn = !!on;
   document.body.classList.toggle('linkOn', !!on);
   try { localStorage.setItem('gbcalc.link.active', on ? '1' : '0'); } catch (e) {}
   
   LINK_EVAL_BUSY = false; LINK_EVAL_PENDING = ''; LINK_EVAL_LASTFP = ''; LINK_HAS_FRAME = false;
   
-  var nk = 'gbcalc.settings.v1';
+  var nk = 'gbcalc.settings.v1';   // ★ 单键：进/出连线窗读同一份，旧 link 快照不再覆盖用户偏好
   var st = null;
   try { st = JSON.parse(localStorage.getItem(nk) || 'null'); } catch (e) {}
   if (!st) {
@@ -9067,6 +11128,9 @@ function setLinkMode(on) {
     S.mode = 'pve';
     G.heat = []; G.nums = [];
     ++gAiGen; G.busy = false; G.think = [];
+    // ★ 2026-10-13：连线会话一开，就把主界面的规则推给连线窗（用户：「在用户选择规则的时候，
+    //   一定要正确链接」）。上面那段只处理「连线窗先发过 cfg」的情况；连线窗还没发过 cfg 时
+    //   LINK_CFG_LAST 为空、S.rule 保持主界面的值，这里补推一次，保证两边开局就一致。
     tellHost({ type: 'linkCfgSync', rule: +S.rule });
   } else {
     ++gAiGen; G.busy = false; G.think = [];     
@@ -9078,6 +11142,12 @@ function setLinkMode(on) {
   if (els.seg_mode) [].forEach.call(els.seg_mode.querySelectorAll('button'), function (x) {
     x.classList.toggle('on', x.getAttribute('data-mode') === S.mode);
   });
+  // ★ 2026-10-13 修（HEAD 既有缺陷）：这里原来调 turnSecs()，但它只是 **boot() 内部的
+  //   局部函数** —— setLinkMode() 在另一个作用域，于是每次一进连线就抛
+  //   `ReferenceError: turnSecs is not defined`，把这行**之后**的
+  //   「规则下拉回填 els.sel_rule.value / applyLayout / applyLang / buildSelects / refreshUI / paint」
+  //   整段都跳过了 —— 正好卡在用户关心的「规则」那一步上（进连线后主界面规则下拉不刷新）。
+  //   （连线的真机测试就是靠这条红出来的。）改成等价的就地计算，不再依赖 boot() 的局部函数。
   if (els.num_turn) els.num_turn.value = ((+S.turnMs || 2000) / 1000).toFixed(3);
   if (els.sel_rule) els.sel_rule.value = String(S.rule);
   applyLayout();                       
@@ -9125,6 +11195,8 @@ window.addEventListener('keydown', function (e) {
 
 fitFont();
 
+// ★ 2026-10-18 诊断钩子（真机验证「一手到底发了几次搜索」用）。
+//   加密后外部读不到；不挂 UI、不写盘、无副作用，只在被显式调用时才动作。
 try {
   window.__gbProbe = {
     ver: function () { try { return APP_VERSION; } catch (e) { return "?"; } },
@@ -9422,6 +11494,10 @@ function bootLink() {
     else if (st1 && st1.lang) S.lang = (st1.lang === 'en') ? 'en' : 'zh';
     if (st && st.cssVars) { S.cssVars = st.cssVars; applyColorVars(st.cssVars); }
     else if (st1 && st1.cssVars) { S.cssVars = st1.cssVars; applyColorVars(st1.cssVars); }
+    // ★ 2026-10-13（用户：「有禁手和无禁手的平衡点它都是不一样的，在用户选择规则的时候，
+    //   一定要正确链接」）：连线窗启动时先认**全局规则键**（主界面选的那份），
+    //   让下面 `c.rule` 初始化时以它为准 —— 否则连线窗会拿自己上次那份 gbcalc.link.cfg
+    //   覆盖掉主界面刚选的规则，开局第一个平衡点就按错规则算。
     var rgLk = loadRuleGlobal();
     if (rgLk != null) S.rule = rgLk;
   } catch (e) {}
@@ -9487,6 +11563,8 @@ function bootLink() {
           '<span class="dashed-group" id="lkSwGrp">' +
           '<button id="lk_bal" class="btn">' + lkL('交换平衡点', 'Swap Balance') + '</button>' +
           '<button id="lk_eval" class="btn">' + lkL('交换评估', 'Swap Eval') + '</button>' +
+          // ★★ 2026-10-19（用户：「在交换平衡点、交换评估后面，再添加一个取消按键，点击取消后，
+          //   可以停止交换平衡的计算，以及清除上面的平衡标记，恢复正常的初始连线状态」）。
           '<button id="lk_swxcancel" class="btn">' + lkL('取消', 'Cancel') + '</button>' +
           '</span>' +
         '</div>' +
@@ -9505,9 +11583,21 @@ function bootLink() {
         '<canvas id="lkBoard" width="640" height="640"></canvas>' +
       '</div>' +
     '</div>' +
+    // ★★ 2026-10-19（用户：「点击读档会展开一个由连线窗这个小界面由上到下的一个抽屉，里面就是之前
+    //   用户保存的参数名称，最多只能保存 50 个，抽屉里同样有：选择、全选、删除、撤销 4 个功能键，
+    //   两列的风格」）：抽屉 + 点击空白即关的遮罩 + 命名小弹窗，都是 #linkPane 的绝对定位浮层。
     '<div class="lk-drmask" id="lkSlotMask" hidden></div>' +
+    // ★★ 2026-10-19 二次修订（用户：「这个抽屉需要再高 1.2 倍左右（固定高度）；保存的存档条用
+    //   一个小虚线框框起来，虚线框里同时展示 5 个存档，超过 5 个加一个滑动条；四个控制键并排放
+    //   到一行；点存档名字可改名；把『选择』改成『加载』，双击某个存档也能加载」）：
+    //   · `.lk-dr-frame` 就是那个小虚线框（固定高度 = 5 条存档），内部 `.lk-dr-list` 超出即滚动；
+    //   · `.lk-dr-keys` 由 2×2 网格改为一行 4 键并排。
     '<div class="lk-drawer" id="lkSlotDrawer" hidden>' +
-      '<div class="lk-dr-hd"><span class="lk-dr-ttl" id="lk_slotInfo"></span></div>' +
+      // ★ 2026-10-23（用户：「读档右上角需要关闭键；存档窗不需要」）：读档抽屉标题行右端加 ✕。
+      '<div class="lk-dr-hd">' +
+        '<span class="lk-dr-ttl" id="lk_slotInfo"></span>' +
+        '<button id="lk_slotX" class="lk-dr-x" aria-label="close" title="' + lkL('关闭', 'Close') + '">&#215;</button>' +
+      '</div>' +
       '<div class="lk-dr-frame">' +
         '<div class="lk-dr-list" id="lkSlotList"></div>' +
       '</div>' +
@@ -9526,6 +11616,8 @@ function bootLink() {
             '<button id="lk_nameOk" class="btn"></button>' +
             '<button id="lk_nameNo" class="btn"></button>' +
           '</span>' +
+          // ★ 2026-10-23（用户：「存档窗不需要关闭键」）：这里原来的 ✕ 已移除，
+          //   只留「确定 / 取消」两个键（取消 = 关闭）。
         '</div>' +
         '<input id="lk_nameInp" type="text" maxlength="45" autocomplete="off">' +
       '</div>' +
@@ -9547,9 +11639,12 @@ function bootLink() {
       b.classList.toggle('on', +b.getAttribute('data-rule') === (c.rule >= 0 && c.rule <= 2 ? c.rule : 0));
     });
   }
+  // ★ 2026-10-13（用户：「在用户选择规则的时候，一定要正确链接」）：**全局规则键优先**。
+  //   S.rule 上面刚从全局键载入过 ⇒ 主界面选了什么规则，连线窗开局就用什么规则；
+  //   全局键还没有（首次运行）才退到连线面板自己那份 gbcalc.link.cfg。
   c.rule = (+S.rule === 0 || +S.rule === 1 || +S.rule === 2) ? +S.rule
          : ((c.rule >= 0 && c.rule <= 2) ? +c.rule : 0);
-  lkSaveCfg(c);
+  lkSaveCfg(c);                        // 让 gbcalc.link.cfg 也跟着一致（只作为兜底来源）
   ruleSync();
   q('lk_auto').classList.toggle('on', !!c.auto);
   
@@ -9584,6 +11679,18 @@ function bootLink() {
   };
   q('lk_select').onclick = function () { tellHost({ type: 'linkSelect' }); };
   
+  // ★ 2026-10-18 四次修订（用户：「真实点击和识别参数放到框选棋盘和自动落子的下面，不要放到 AI 执黑
+  //   和 AI 执白的这个框中了」→「框选棋盘、自动落子、×n、真实点击、识别参数为**同一个虚线板块**」）：
+  //   这 5 个键合成一个 `.lk-btns.lk-twoline` 虚线板块，内含两行 `.lk-btns-row`：
+  //     第 1 行 = 框选棋盘 + 识别参数；第 2 行 = 真实点击 + 自动落子 + ×n（次数跟在自动落子后面）。
+  //   它们仍在 AI 区之外（AI 区保持单行：AI执黑 / AI执白 + 思考时间）。
+  //   隐藏的 #__gb_realclick 仍是 bridge.js 的判定源（checked 或 data-on='1'），按钮只负责改它。
+  // ★★ 2026-10-18 晚修订（用户：「软件默认不开『真实点击』」）：
+  //   默认 **关**。原来这里写 `= true`（首次运行就勾上），而真实点击会整体接管物理鼠标 ——
+  //   与「默认不开」正好相反。
+  //   一次性强制关闭 `realClickOff`：老安装的 gbcalc.link.cfg 里已被自动写成 true，
+  //   只改默认值对他们无效（升级后一开连线照样抢鼠标）⇒ 用 migFlag 强制清一次，
+  //   之后再开/关都完全按用户自己的选择持久化。
   if (!migFlag('realClickOff')) c.realClick = false;
   if (c.realClick !== true && c.realClick !== false) c.realClick = false;
   lkSaveCfg(c);
@@ -9605,11 +11712,33 @@ function bootLink() {
   }
   lkSyncTgl();                                   
 
+  // ★★ 2026-10-18 修订（用户：「点击『识别参数』，棋盘上面的按键，更换为各种参数」「各个参数带
+  //   一个小滑动条，各占两行，滑动条一行（条要细），参数名称以及文字框一行」「那 6 个参数一列
+  //   显示（不要两列了）」「不需要下面的提示文字，这样会省出一些空间」「调节后真正能识别的
+  //   效果实时更新」）：
+  //   旧的浮层小窗**取消**，改为「棋盘上方按键就地替换」：
+  //     · 点「识别参数」→ 按钮区 #lkFnBox 隐藏，参数编辑区 #lkRcBox 就地展开；
+  //     · 6 项参数**单列**，每项**两行**（上行 = 细滑动条，下行 = 名称 + 数字框）；无提示文字；
+  //     · 拖滑动条 / 改数字 → 防抖 120ms 发 linkRecogPreview：宿主改「有效参数」**并同时落盘**
+  //       （★ 2026-10-19 修正：原先预览不落盘，用户拖完就关软件 → 下次启动回到默认值，
+  //        正是「连线调整参数的持久化没有做好」的来源），扫描循环下一拍就用新阈值读子 → 棋盘实时反馈；
+  //     · 「应用」→ linkRecogCfg 落盘（宿主单一权威）并收起编辑区；
+  //     · 「取消」→ 本页值回退到打开时那份，并让宿主把有效参数也还原成上次已应用的值（一并落盘）。
+  //   数值框仍只收数字、越界回退原值（沿用旧口径）。
   var rcState = { interval: 200, gray_offset: 50, black_offset: 96,
                   white_offset: 96, black_percent: 33, white_percent: 33 };
   if (c.linkRecog && typeof c.linkRecog === 'object') {
     for (var rk in rcState) if (typeof c.linkRecog[rk] === 'number') rcState[rk] = c.linkRecog[rk] | 0;
   }
+  // ★ 2026-10-18 三次修订（用户：「稍微压缩文本框，在文本框里面有这些提示语：如果棋盘中识别的黑子
+  //   过多，可以降低黑色什么什么参数之类的」）：新增 `hint` —— 每个参数条内常显一行小灰字提示
+  //   （同时作为数字框的 title 悬停提示），指导用户往哪个方向调参。
+  // ★★ 2026-10-18 最终口径（用户：「这是找棋盘的逻辑，用我们昨天的，然后识别棋子的逻辑，
+  //   用今天新的，识别参数恢复那 6 个参数」）：
+  //   定位（自动吸附/找盘）= 自制 findBoardRects + refineGrid；读子（黑白判定）= 今天接入的
+  //   同步算法（readStonesSync / syncCellInfo）。所以 6 个参数**全部生效**：
+  //     · interval      → 宿主侧非锁定扫描周期（g_syncInterval）
+  //     · 其余 5 个阈值 → sync 读子（经 "recog" 下发给 vision）
   var RC_FIELDS = [
     { key: 'interval',      id: 'lk_rc_interval', lo: 40, hi: 2000, step: 10,
       label: lkL('同步时间间隔(ms)', 'Interval (ms)'),
@@ -9635,6 +11764,12 @@ function bootLink() {
     var rcHTML = '';
     for (var ri = 0; ri < RC_FIELDS.length; ri++) {
       var rf = RC_FIELDS[ri];
+      // ★ 2026-10-18 二次修订（用户：「参数名称和数字框放在上面，然后滑动条放到下面，每一个参数
+      //   用一个小虚线框框起来」）：每一项 = 上方「名称 + 数字框」、下方「细滑动条」，
+      //   整项由 .lk-rcitem 的虚线边框单独框住（框形样式见 calc.css）。
+      // ★ 四次修订（用户：「不要在滑动条上面显示这些文字，还是把这些文字放到下面的文本框中」）：
+      //   参数条内**不再**显示提示行（滑条上方只保留「名称 + 数字框」）；提示文字统一写进下方
+      //   的状态文本框 #lkStatus（可滚动），见 rcPanelExtra()。数字框 title 仍保留同一段提示。
       rcHTML +=
         '<div class="lk-rcitem">' +
           '<div class="lk-rcnameline">' +
@@ -9646,12 +11781,17 @@ function bootLink() {
           '" max="' + rf.hi + '" step="' + rf.step + '" tabindex="-1">' +
         '</div>';
     }
+    // ★ 2026-10-18 三次修订（用户：「这个参数条下面再添加一个按键，为通用」）：参数区下方新增
+    //   「通用」——一键载入自制识别引擎的默认阈值（能识别绝大部分棋盘）；详见下方 onclick。
     rcHTML +=
       '<div class="lk-rcbtns">' +
         '<button id="lk_rcGeneral" class="btn" title="' +
         lkL('通用：载入识别默认值（interval 200 / 灰度 50 / 黑偏差 96 / 黑占比 33 / 白偏差 96 / 白占比 33），可识别绝大部分棋盘',
             'General: load the recognition defaults (interval 200 / gray 50 / blackOff 96 / blackPct 33 / whiteOff 96 / whitePct 33)') +
         '">' + lkL('通用', 'General') + '</button>' +
+        // ★★ 2026-10-19（用户：「在通用的后面添加『存档』……然后在保存的后面添加一个功能键『读档』，
+        //   点击读档，会展开一个由连线窗这个小界面由上到下的一个抽屉，里面就是之前用户保存的参数名称，
+        //   最多只能保存 50 个」「『存档 | 读档』这两个小功能键左右胶囊型，再用一个小虚线框框住」）。
         '<span class="lk-slotbox">' +
           '<button id="lk_rcSlotSave" class="btn" title="' +
           lkL('存档：把当前这 6 项参数按主题名称存起来（最多 50 个）',
@@ -9682,16 +11822,24 @@ function bootLink() {
     }
   }
   var rcTimer = 0, rcOrig = null, rcOrigApplied = null;
-  function rcLive() {
+  function rcLive() {   // 实时联动：拖动/改数字 → 宿主生效**并落盘**（★ 2026-10-19：见上方持久化说明）
     clearTimeout(rcTimer);
     rcTimer = setTimeout(function () {
       tellHost({ type: 'linkRecogPreview', recog: rcSnapshot() });
     }, 120);
   }
+  // ★ 2026-10-18 二次修订（用户：「点击识别参数的时候，整个界面只有下面的棋盘和上面的参数和
+  //   参数条」）：进入参数模式时把面板上**其余**部分（按键区、统计行）收起，
+  //   只留「参数区 + 下方提示文本框 + 棋盘」；退出时原样恢复。
   var rcStats = document.querySelector('#linkPane .lk-stats');
   var rcStatusSaved = null;
-  var rcStatusH = 0;
+  var rcStatusH = 0;                     // ★ 七次修订：进入参数模式前量得的文本框高度 × 0.75
   function rcPanelExtra(hide) {
+    // ★ 四次修订（用户：「点开这个识别参数，深度、速度那一行直接消失掉，直接把它腾空」+
+    //   「还是把这些文字放到下面的文本框中，并且下面的文本框支持滑动展示」）：
+    //   · 只把「深度/速度/节点/评估」统计行( .lk-stats )收起腾空；
+    //   · 下方那个文本消息框 #lkStatus **保留**，并写满 6 条识别参数提示（各种文本消息都进这里面）；
+    //   · 参数模式下给 #linkPane 加 rcmode，文本框限高 + overflow-y:auto ⇒ 内容过界可滑动查看。
     if (rcStats) rcStats.hidden = !!hide;
     var paneEl = document.getElementById('linkPane');
     if (paneEl) paneEl.classList.toggle('rcmode', !!hide);
@@ -9700,6 +11848,7 @@ function bootLink() {
     if (hide) {
       if (rcStatusSaved === null) {
         rcStatusSaved = st.innerHTML;
+        // 行内高度 = rcOpen() 里量到的「打开参数界面之前」那个文本框高度 × 0.75
         if (rcStatusH > 0) { st.style.height = rcStatusH + 'px'; st.style.overflowY = 'auto'; }
       }
       var html = '';
@@ -9725,6 +11874,9 @@ function bootLink() {
           black_offset: c.linkRecog.black_offset, white_offset: c.linkRecog.white_offset,
           black_percent: c.linkRecog.black_percent, white_percent: c.linkRecog.white_percent }
       : rcSnapshot();
+    // ★ 2026-10-18 七次修订（用户：「点击识别参数，打开调整界面的时候，文本框自动变矮，
+    //   高度变为之前的 0.75」）：必须在**改布局之前**量 —— 此时按键区还在、统计行还在、
+    //   文案还是常态那几条，这一版高度才是用户眼里「之前的高度」；量完 ×0.75 固定住。
     var st0 = q('lkStatus');
     rcStatusH = (st0 && st0.offsetHeight) ? Math.round(st0.offsetHeight * 0.75) : 0;
     rcPaint();
@@ -9736,25 +11888,25 @@ function bootLink() {
   function rcClose() {
     if (rcBox) rcBox.hidden = true;
     if (lkFnBox) lkFnBox.hidden = false;
-    lkSlotClose();
+    lkSlotClose();                       // 收起参数区时把「读档」抽屉与命名弹窗一并收起
     lkNameClose();
     rcPanelExtra(false);
   }
   for (var fi = 0; fi < RC_FIELDS.length; fi++) {
     (function (f) {
       var s = q(f.id + '_s'), t = q(f.id);
-      if (s && t) s.addEventListener('input', function () {
+      if (s && t) s.addEventListener('input', function () {   // 滑动条一行：即时联动
         var v = parseInt(s.value, 10);
         if (isNaN(v)) return;
         rcState[f.key] = v; t.value = String(v); t.__rcPrev = v; rcLive();
       });
       if (!t) return;
       t.addEventListener('focus', function () { t.__rcPrev = rcState[f.key]; });
-      t.addEventListener('input', function () {
+      t.addEventListener('input', function () {               // 只收数字
         var v = t.value.replace(/[^0-9]/g, '');
         if (v !== t.value) t.value = v;
       });
-      function rcCommit() {
+      function rcCommit() {                                   // 整数校验；越界/空 → 回退原值
         var v = parseInt(t.value, 10);
         var lo = +t.getAttribute('data-min'), hi = +t.getAttribute('data-max');
         if (isNaN(v) || v < lo || v > hi) {
@@ -9770,6 +11922,10 @@ function bootLink() {
     })(RC_FIELDS[fi]);
   }
   if (q('lk_rcparam')) q('lk_rcparam').onclick = rcOpen;
+  // ★ 2026-10-18 三次修订（用户：「这个参数条下面再添加一个按键，为通用，通用就是我们昨天之前就是
+  //   我们自制的识别引擎相关的一些参数，这个参数可以识别绝大部分棋盘」）：
+  //   「通用」= 自制识别引擎的默认阈值 —— 与宿主 g_sync* / gbvision.h SyncRecogParams 完全一致。
+  //   点击后把 6 项填成通用值并即时预览（rcLive）；仍由「应用」落盘、「取消」还原。
   var RC_GENERAL = { interval: 200, gray_offset: 50, black_offset: 96,
                      white_offset: 96, black_percent: 33, white_percent: 33 };
   if (q('lk_rcGeneral')) q('lk_rcGeneral').onclick = function () {
@@ -9779,9 +11935,9 @@ function bootLink() {
   };
   if (q('lk_rcApply')) q('lk_rcApply').onclick = function () {
     c.linkRecog = rcSnapshot();
-    lkSaveCfg(c);
+    lkSaveCfg(c);                                   // 本页兜底缓存（宿主仍为单一权威）
     tellHost({ type: 'linkRecogCfg', recog: c.linkRecog });
-    rcClose();
+    rcClose();                                      // 先复原文本框（含旧消息），再写「已应用」提示
     var stRc = document.getElementById('lkStatus');
     if (stRc) stRc.textContent = lkL('识别参数已应用', 'Recognition params applied');
   };
@@ -9790,11 +11946,21 @@ function bootLink() {
                 black_offset: rcOrig.black_offset, white_offset: rcOrig.white_offset,
                 black_percent: rcOrig.black_percent, white_percent: rcOrig.white_percent };
     rcPaint();
+    // ★ 2026-10-19：宿主收到 cancel 后既回写有效参数、也把这份（还原后的）值落盘 —— 见 host.cpp
+    //   lkApplyRecog(..., persist=true)：取消 = 回到上次已应用的那份，那份本来就该是磁盘上那一份。
     tellHost({ type: 'linkRecogCancel', recog: rcOrigApplied });
     rcClose();
   };
 
   // ═══════════════════════════════════════════════════════════════════════════════════════
+  // ★★ 2026-10-19（用户：「连线调整参数的持久化没有做好，关闭软件再打开，参数又恢复默认了」
+  //   ＋「在通用的后面添加存档 / 读档」）：
+  //   ① 持久化：本页 localStorage 是**延迟提交**的（宿主在退出时直接杀 WebView2 子进程，
+  //      写入常丢 —— 这正是 host.cpp EnginePrefFile 注释里记过的老坑）。所以「识别参数」的
+  //      单一权威只能是宿主那份 GomokuTrainer.linkrecog；这里让**实时预览也落盘**
+  //      （宿主 lkApplyRecog(persist=true)），这样用户拖完滑条就关软件也不会再回到默认值。
+  //   ② 存档：整包列表交给宿主存（GomokuTrainer.linkrecog.slots），本页 localStorage 只当兜底。
+  //      最多 50 个；抽屉里「选择 / 全选 / 删除 / 撤销」4 个功能键两列 2×2。
   // ═══════════════════════════════════════════════════════════════════════════════════════
   var LK_SLOTS_KEY = 'gbcalc.linkrecog.slots';
   var LK_SLOTS_MAX = 50;
@@ -9820,7 +11986,7 @@ function bootLink() {
   function lkSlotsStore() {
     if (lkSlots.length > LK_SLOTS_MAX) lkSlots = lkSlots.slice(0, LK_SLOTS_MAX);
     try { localStorage.setItem(LK_SLOTS_KEY, JSON.stringify(lkSlots)); } catch (e) {}
-    tellHost({ type: 'linkRecogSlots', json: JSON.stringify(lkSlots) });
+    tellHost({ type: 'linkRecogSlots', json: JSON.stringify(lkSlots) });   // 宿主落盘（单一权威）
   }
   function lkEsc(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -9861,16 +12027,22 @@ function bootLink() {
       }
     }
     list.innerHTML = html;
+    // ★★ 2026-10-19 三次修订（用户：「存档里面的名称不用再改了，取消可改名称的这个功能」＋
+    //   「双击某一个历史，也能加载到相应的调整参数上」）：
+    //   · 单击任意处（含名字）→ 勾选/取消勾选（名字不再可点改名）；
+    //   · 双击整条 → 直接加载该存档的参数。
+    //   单击/双击会互相抢占（浏览器先派发 2 次 click 再派发 dblclick），所以单击用 190ms
+    //   去抖：若期间来了第二次点击，就丢弃单击动作，只让 dblclick 生效。
     [].forEach.call(list.querySelectorAll('.lk-dr-item'), function (it) {
       var nm = it.getAttribute('data-name'), hit = 0;
       it.onclick = function () {
-        if (hit) { clearTimeout(hit); hit = 0; return; }
+        if (hit) { clearTimeout(hit); hit = 0; return; }      // 第二次点击：交给 dblclick
         hit = setTimeout(function () { hit = 0; lkSlotToggle(nm); }, 190);
       };
       it.ondblclick = function (ev) {
         if (ev) ev.preventDefault();
         if (hit) { clearTimeout(hit); hit = 0; }
-        lkSlotApply(nm);
+        lkSlotApply(nm);                                      // 双击 = 加载这个存档
       };
     });
     var ai = q('lk_slotAll');
@@ -9894,6 +12066,9 @@ function bootLink() {
     if (!all) for (var i = 0; i < lkSlots.length; i++) lkSlotSel[lkSlots[i].name] = 1;
     lkSlotPaint();
   }
+  // ★★ 2026-10-19 二次修订（用户：「把选择，改成加载，或者双击某一个历史，也能加载到相应的
+  //   调整参数上」）：`lkSlotApply(name)` 的 name 由双击直接给出（跳过必须是唯一勾选的要求）；
+  //   不传 name 时（点「加载」按钮）仍要求恰好勾选 1 个。
   function lkSlotApply(name) {
     var st = q('lkStatus'), nm = name || '';
     if (!nm) {
@@ -9911,7 +12086,7 @@ function bootLink() {
     rcState = { interval: r.interval, gray_offset: r.gray_offset, black_offset: r.black_offset,
                 white_offset: r.white_offset, black_percent: r.black_percent,
                 white_percent: r.white_percent };
-    rcPaint(); rcLive();
+    rcPaint(); rcLive();                      // 即时生效（rcLive 会把这份参数也交给宿主落盘）
     lkSlotClose();
     if (st) st.textContent = lkL('已加载「' + nm + '」并即时生效', 'Loaded preset "' + nm + '" (live)');
   }
@@ -9926,7 +12101,7 @@ function bootLink() {
       if (lkSlotSel[sl.name]) { batch.push(sl); return false; }
       return true;
     });
-    lkSlotUndo.push(batch);
+    lkSlotUndo.push(batch);                   // 撤销栈：可回退最近一次删除
     lkSlotSel = {};
     lkSlotsStore(); lkSlotPaint();
     if (st) st.textContent = lkL('已删除 ' + batch.length + ' 个存档（点「撤销」可找回）',
@@ -9942,6 +12117,13 @@ function bootLink() {
     lkSlotsStore(); lkSlotPaint();
     if (st) st.textContent = lkL('已撤销删除（恢复 ' + back + ' 个存档）', 'Undo done (' + back + ' restored)');
   }
+  // ★★ 2026-10-19 三次修订（用户：「存档命名这个弹窗标题左对齐」「存档里面的名称不用再改了，取消
+  //   可改名称的这个功能」「存档命名默认是（如果用户不想命名）：Parameter 1（2、3…）」＋「英文
+  //   字符名称不可以超过 45 个字母，汉字不可以超过 20 个字符」）：
+  //   · 标题固定四字「存档命名」，靠左（见 .lk-nm-hd/.lk-nm-ttl 的 space-between + text-align:left）；
+  //   · 改名入口已删除 —— 存档条上的名字不再可点改，单击=勾选、双击=加载；
+  //   · 打开即预填默认名 Parameter N（N = 未被占用的最小序号），不想命名直接点「确定」；
+  //   · 名称长度：含汉字 ≤ 20 字符；纯英文 ≤ 45 字母（输入与确定都做截断）。
   var LK_NAME_CJK = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef\u3000-\u303f]/;
   function lkNameClip(s) {
     s = String(s == null ? '' : s);
@@ -9969,7 +12151,7 @@ function bootLink() {
   function lkNameOk() {
     var st = q('lkStatus'), inp = q('lk_nameInp');
     var nm = lkNameClip(((inp && inp.value) || '').replace(/^\s+|\s+$/g, ''));
-    if (!nm) nm = lkDefaultName();
+    if (!nm) nm = lkDefaultName();                    // 空名即用默认 Parameter N
     var rec = rcSnapshot(), hit = false;
     for (var i = 0; i < lkSlots.length; i++) {
       if (lkSlots[i].name === nm) { lkSlots[i].recog = rec; lkSlots[i].ts = Date.now(); hit = true; break; }
@@ -9986,6 +12168,7 @@ function bootLink() {
     if (st) st.textContent = lkL('已存档「' + nm + '」（共 ' + lkSlots.length + ' 个）',
                                  'Saved preset "' + nm + '" (' + lkSlots.length + ' total)');
   }
+  // 「存档」按钮 → 命名弹窗；「加载」按钮 → 用勾选的那个存档（不传 name）。
   if (q('lk_rcSlotSave')) q('lk_rcSlotSave').onclick = function () { lkNameOpen(); };
   if (q('lk_rcSlotLoad')) q('lk_rcSlotLoad').onclick = function () {
     if (slotDrawer && !slotDrawer.hidden) lkSlotClose();
@@ -9996,10 +12179,14 @@ function bootLink() {
   if (q('lk_slotAll')) q('lk_slotAll').onclick = lkSlotAll;
   if (q('lk_slotDel')) q('lk_slotDel').onclick = lkSlotDel;
   if (q('lk_slotUndo')) q('lk_slotUndo').onclick = lkSlotUndoFn;
+  // ★ 2026-10-23（用户：「读档右上角需要关闭键」）：抽屉标题行右端的 ✕ 就等于「收起抽屉」。
+  if (q('lk_slotX')) q('lk_slotX').onclick = lkSlotClose;
   if (q('lk_nameOk')) q('lk_nameOk').onclick = lkNameOk;
   if (q('lk_nameNo')) q('lk_nameNo').onclick = lkNameClose;
+  // ✕ 已从「存档命名」弹窗移除（用户 2026-10-23：存档窗不需要关闭键，只留确定/取消）。
   if (q('lkNameMask')) q('lkNameMask').onclick = function (ev) { if (ev && ev.target === this) lkNameClose(); };
   if (q('lk_nameInp')) {
+    // 长度上限即时截断：含汉字 ≤20 字符 / 纯英文 ≤45 字母
     q('lk_nameInp').addEventListener('input', function () {
       var v = lkNameClip(this.value);
       if (v !== this.value) this.value = v;
@@ -10009,7 +12196,7 @@ function bootLink() {
       else if (ev.key === 'Escape') { ev.preventDefault(); lkNameClose(); }
     });
   }
-  lkSlots = lkSlotsFromLocal();
+  lkSlots = lkSlotsFromLocal();               // 先用本页缓存顶上；宿主 ready 后会回填权威那份
 
   window.__lkRcOpen = rcOpen;
   window.__lkRcPaint = rcPaint;
@@ -10018,7 +12205,7 @@ function bootLink() {
     b.onclick = function () {
       c.rule = +b.getAttribute('data-rule'); lkSaveCfg(c); ruleSync(); lkSendCfg();
       lkBridgeRule(c.rule);                    
-      saveRuleGlobal(c.rule);
+      saveRuleGlobal(c.rule);                  // ★ 写全局规则键：主界面下次启动也认这个规则
       if (!lkFramedNow()) lkRemindFrame();     
     };
   });
@@ -10047,6 +12234,10 @@ function bootLink() {
     else linkBalanceEval();
   };
 
+  // ★★ 2026-10-19（用户：「在交换平衡点、交换评估后面再添加一个取消按键，点击取消后，可以停止
+  //   交换平衡的计算，以及清除上面的平衡标记，恢复正常的初始连线状态」）：
+  //   真正的停止/清标记在 bridge.js 的 window.GB_LINK_SWAPCANCEL 里（中断引擎 → 作废在途
+  //   runSwapBal → 清 swQueue / balMarks → 复位界面），本页只负责调用与提示。
   if (q('lk_swxcancel')) q('lk_swxcancel').onclick = function () {
     var ok = false;
     if (typeof window.GB_LINK_SWAPCANCEL === 'function') {
@@ -10105,6 +12296,10 @@ function bootLink() {
             if (!BS.hasOwnProperty(k)) continue;
             
             if (k === 'lang' || k === 'dark') continue;
+            // ★ 2026-10-13（用户：「在用户选择规则的时候，一定要正确链接」）：
+            //   **规则不由这份「助手状态」恢复** —— 它是另一个键（gbcalc.assist.s），
+            //   内容可能落后于全局规则键，恢复回来就会把刚同步好的规则又改错。
+            //   规则的唯一来源 = 全局规则键 → c.rule → BS.rule（见 bootLink / lkBridgeRule）。
             if (k === 'rule') continue;
             BS[k] = sv[k];
           }
@@ -10228,6 +12423,10 @@ function bootLink() {
     };
   }
 
+  // ★★ 2026-10-17（用户：「点固定变成 ×，下一次打开又变回固定」「卡片移到棋盘左边，
+  //   重启又回原位」）：连线窗走的是 **bootLink**，而原代码在这里**没有面板初始化** ——
+  //   `.pinkey`（固定）和 `.dash`（折叠）根本没绑事件、`loadLayout` 也从不被读。
+  //   主窗 boot() 里有这一整套，连线窗漏了，所以「保存过的固定/布局」在连线窗永远看不到。
   try {
     prefsApplyToS();
     initPanels();
@@ -10285,13 +12484,19 @@ function bootLink() {
       return;
     }
     if (m.type === 'linkCfgSync') {
+      // ★ 2026-10-13（用户：「有禁手和无禁手的平衡点它都是不一样的，在用户选择规则的时候，
+      //   一定要正确链接」）：主界面改了规则推过来时，**必须同时改 bridge 的 BS.rule**。
+      //   原来这里只更新面板高亮（c.rule + ruleSync），而 bridge.js 的引擎调用读的是
+      //   window.GB_S.rule —— 高亮变了、实际喂给引擎的规则没变，等于没同步。
       if (m.rule >= 0 && m.rule <= 2) {
         c.rule = m.rule; ruleSync(); lkBridgeRule(m.rule);
-        saveRuleGlobal(m.rule);
+        saveRuleGlobal(m.rule);              // 全局规则键也跟上（本次会话内一直有效）
       }
       return;
     }
     if (m.type === 'linkRecog' && m.recog) {
+      // ★ 2026-10-18：宿主是本页「识别参数」的单一权威 —— 页面 ready 时回填一次；
+      //   之后每次「应用」宿主也会回填规范化（夹取后）的结果。
       var rr = m.recog;
       if (typeof rr.interval === 'number')      rcState.interval = rr.interval | 0;
       if (typeof rr.gray_offset === 'number')   rcState.gray_offset = rr.gray_offset | 0;
@@ -10307,6 +12512,9 @@ function bootLink() {
       return;
     }
     if (m.type === 'linkRecogSlots' && typeof m.json === 'string') {
+      // ★★ 2026-10-19（用户：「点击读档会展开抽屉，里面就是之前用户保存的参数名称，最多只能保存 50 个」）：
+      //   存档列表以**宿主那份文件**为权威（localStorage 延迟提交会丢）。宿主文件还是空的时候
+      //   （比如刚从旧版本升上来）才把本页缓存顶上并回推给宿主，避免出现两套数据。
       var arr = [];
       try { arr = JSON.parse(m.json) || []; } catch (eS) { arr = []; }
       if (!(arr && typeof arr.length === 'number')) arr = [];
@@ -10337,6 +12545,11 @@ function bootLink() {
       return;
     }
     if (m.type === 'linkStats') {
+      // ★ 2026-10-17（用户：「评估的分数还是会正负抖动，就是符号上的问题」）：
+      //   连线窗评估栏 lk_s_eval 只能有一个数据源 —— 连线窗自己的 bridge
+      //   （BS.myEval → GBUI.setStatPanel）。主窗经 linkStats 传来的 eval 是**主窗自己
+      //   那盘棋**的分数（而且空闲时是 '-'），写进同一个元素就是第二个来源：两个来源
+      //   交替覆盖同一个数字，表现正是「评估分数正负抖动」。此处去掉 eval 映射。
       var sMap = { depth: 'lk_s_depth', speed: 'lk_s_speed', nodes: 'lk_s_nodes' };
       for (var sk in sMap) {
         var elv = document.getElementById(sMap[sk]);

@@ -1,4 +1,5 @@
-﻿/* Meter Gomoku Trainer - desktop host (Win32 / WebView2). Owns board scanning, recognition, click injection, the native engine process and overlay windows. */
+// Meter Gomoku Link — v4.43
+/* Meter Gomoku Trainer - desktop host (Win32 / WebView2). Owns board scanning, recognition, click injection, the native engine process and overlay windows. */
 
 
 #ifndef UNICODE
@@ -316,12 +317,20 @@ static void PostToLinkPage(const std::string& json);
 
 static std::atomic<bool> g_linkSession(false);
 
-static std::atomic<int> g_syncInterval(200);
-static std::atomic<int> g_syncGray(50);
-static std::atomic<int> g_syncBlackOff(96);
-static std::atomic<int> g_syncWhiteOff(96);
-static std::atomic<int> g_syncBlackPct(33);
-static std::atomic<int> g_syncWhitePct(33);
+// ★ 2026-10-18（用户：「连线功能的识别更换为 synchronization 目录下的同步算法」+「真实点击」
+//   改为「识别参数」并弹出小浮层）：连线同步识别参数。
+//   宿主写盘为单一权威（linkrecog.json，见 SaveLinkRecogPrefs/LoadLinkRecogPrefs），启动读回；
+//   每次 LinkScanTick 把 5 项阈值注入请求 body（"algo":"sync","recog":{...}）；
+//   syncInterval 接管非锁定扫描周期。
+// ★★ 2026-10-18 最终口径（用户：「找棋盘的逻辑用我们昨天的，识别棋子的逻辑用今天新的，
+//   识别参数恢复那 6 个参数」）：**定位自制 + 读子同步** 的混合口径 —— 6 项参数全部生效
+//   （5 项给 sync 的逐格判定，interval 给宿主扫描周期）。
+static std::atomic<int> g_syncInterval(200);   // 同步时间间隔(ms)：非锁定扫描周期
+static std::atomic<int> g_syncGray(50);        // 灰度偏差(0-255)
+static std::atomic<int> g_syncBlackOff(96);    // 黑色偏差(0-255)
+static std::atomic<int> g_syncWhiteOff(96);    // 白色偏差(0-255)
+static std::atomic<int> g_syncBlackPct(33);    // 黑色占比(0-100)
+static std::atomic<int> g_syncWhitePct(33);    // 白色占比(0-100)
 
 static std::vector<std::string> g_outboxPage;
 static std::vector<std::string> g_outboxRv;
@@ -478,6 +487,8 @@ static const UINT_PTR kMainTimerEval = 8;
 static const UINT_PTR kMainTimerTestLink = 10;
 static const UINT_PTR kMainTimerTestLinkScan = 11;
 static const UINT_PTR kMainTimerTestLinkCheck = 12;         
+// ★ 2026-10-16：回归探针（GB_TEST_LINK_PROBE=1）——① 空盘帧（应清置换表）
+//   ② 主窗口 → 连线窗的规则同步（应清置换表并按新规则重算）。
 static const UINT_PTR kMainTimerTestLinkProbe = 13;
 static const UINT_PTR kMainTimerTestLinkProbe2 = 14;
 
@@ -1204,6 +1215,8 @@ static void VselShot(HWND h) {
 static std::wstring FindVisionExe();                       
 
 static bool VisionScanImage(const unsigned char* img, int len, std::string& out);
+// ★ 2026-10-19：识图识别改为「识别参数里那 5 项阈值」下发给视觉服务的同步读子（algo=sync + recog）。
+//   recogJson 为空时自动取宿主当前的 g_visRc* （VisRecogJson）。
 static bool VisionRecognize(const unsigned char* img, int len, int size, bool nosnap,
                             const std::string& recogJson, std::string& out);
 
@@ -1253,11 +1266,20 @@ static bool VselScanRect(const std::string& s, RECT& out, double& stepOut) {
   return true;
 }
 
-static std::atomic<int> g_visRcGray(50);
-static std::atomic<int> g_visRcBlackOff(96);
-static std::atomic<int> g_visRcWhiteOff(96);
-static std::atomic<int> g_visRcBlackPct(33);
-static std::atomic<int> g_visRcWhitePct(33);
+// ★★ 2026-10-19（用户：「在识图这个界面上也添加一个识别参数……5 个调整参数（没有时间这个选项）」＋
+//   「还有自动吸附找盘，也是没有生效，也是没有用连线的自动吸附棋盘的那套算法导致识别速度很低质量
+//   很差」）：
+//   识图窗的「识别参数」= 连线那套同步识别阈值里的 5 项（**不含 interval**：识图是单次调用，
+//   不需要扫描节拍）。宿主写盘为单一权威（%TEMP%\GomokuTrainer.visrecog，与练习器同名共用 ——
+//   两边都是同一个「识图识别参数」，口径一致），启动读回，关软件再打开不回退默认。
+//   每次「自动吸附盘」把这 5 项随 "algo":"sync","recog":{...} 下发给视觉服务 —— **服务端自己
+//   抓屏**（op=SCAN 命名管道，快车道），省掉一次「整屏 PNG → 共享内存 → 服务端解码 + 兜底起
+//   独立进程」的大往返，所以又快又准；拿不到棋盘再回退下面的图像路径。
+static std::atomic<int> g_visRcGray(50);        // 灰度偏差(0-255)
+static std::atomic<int> g_visRcBlackOff(96);    // 黑色偏差(0-255)
+static std::atomic<int> g_visRcWhiteOff(96);    // 白色偏差(0-255)
+static std::atomic<int> g_visRcBlackPct(33);    // 黑色占比(0-100)
+static std::atomic<int> g_visRcWhitePct(33);    // 白色占比(0-100)
 
 static std::wstring VisRecogPrefFile() {
   wchar_t tmp[MAX_PATH] = { 0 };
@@ -1313,8 +1335,15 @@ static void SaveVisRecogPrefs() {
   fclose(f);
 }
 
-static bool VisionScanScreen(const std::string& body, std::string& out);
+static bool VisionScanScreen(const std::string& body, std::string& out);   // 服务端抓屏识别（快车道）
 
+// ★★ 2026-10-19（用户：「还有这个屏幕截图的自动功能，代码仍然是老的，要重新构建」）：
+//   「屏幕截图」浮窗的自动吸附找盘 = **只走**连线同一条「服务端抓屏找盘」快车道：请求交给
+//   视觉服务、由**服务端自己抓屏**找盘（op=SCAN 命名管道），同步阈值（algo=sync）与识别参数
+//   那 5 项一起下发；exclude 把本浮窗那条标题栏挖掉（它压着棋盘上沿，会干扰找盘）。
+//   旧的「宿主抓整屏 PNG → 共享内存（VisionScanImage）→ 服务端解码」以及兜底另起独立进程
+//   （--scan-image）两条老路径**整体移除**（项目硬约束：识图自动吸附不得保留旧的整屏截图转
+//   共享内存实现路径）。服务不可用就是暂时找不到棋盘，手动框选照常可用。
 static bool VselAutoFindRect(HWND h, RECT& br, double& step) {
   int vx = GetSystemMetrics(SM_XVIRTUALSCREEN), vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
   std::string body = std::string("{\"size\":15,\"algo\":\"sync\",\"recog\":") + VisRecogJson();
@@ -1611,6 +1640,11 @@ static int VisionScanPort() {
 
 static bool VisionServiceUp(int idx);
 
+// ★★ 2026-10-17（用户：「识别速度到后期会变得相当慢……挤占视觉线路」）：
+//   优先级现状 = WebView2 渲染 HIGH / 引擎 ABOVE_NORMAL / **视觉 NORMAL**。
+//   引擎 12 线程满核搜索时，NORMAL 的识别进程排在最后 —— 越到中后盘思考越久越明显。
+//   视觉是交互实时任务（一次识别几百 ms），抬到 HIGH 让它插队做完；引擎只在这一瞬
+//   少一个核，整体 nps 影响 < 10%，远小于识别卡顿的体感损失。
 static void BoostVisionPriority(HANDLE h) {
   if (!h) return;
   if (SetPriorityClass(h, HIGH_PRIORITY_CLASS))
@@ -1671,6 +1705,8 @@ static void EnsureVisionServer() {
       envPinned = true;
       SetEnvironmentVariableA("GB_RECOG_PORT", std::to_string(VisionRecogPort()).c_str());
       SetEnvironmentVariableA("GB_SCAN_PORT", std::to_string(VisionScanPort()).c_str());
+      // ★ 2026-10-13：识别进程去 HTTP —— 明确把它钉成 0（即使将来有人给 spawn 加了
+      //   --scan/--recognize 单角色旗标，本应用的识别进程也**永远是纯管道、零 TCP**）。
       SetEnvironmentVariableA("GB_VISION_HTTP", "0");
       SetEnvironmentVariableA("GB_PARENT_PID", std::to_string(GetCurrentProcessId()).c_str());
     }
@@ -1890,6 +1926,9 @@ static bool VisionRecognize(const unsigned char* img, int len, int size, bool no
                             const std::string& recogJson, std::string& out) {
   if (len <= 0) return false;
   EnsureVisionServer();
+  // ★ 2026-10-19：algo=sync ⇒ 服务端走「自制定位(findBoardRects+refineGrid) + 同步读子」，
+  //   并带上识图窗那 5 项阈值（服务端 forceSync 使单帧图片也直接进 sync 分支）。
+  //   这正是「拖动识别参数，识别效果应随之变化」的数据通路。
   std::string recog = recogJson.empty() ? VisRecogJson() : recogJson;
   std::string extra = std::string("{\"size\":") + std::to_string(size) +
                       (nosnap ? ",\"nosnap\":true" : "") +
@@ -1939,7 +1978,15 @@ static bool VisScanCall(const std::string& body, std::string& out) {
   return ok;
 }
 
+// ★★ 2026-10-19（用户：「自动吸附找盘……没有用连线的自动吸附棋盘的那套算法」）：
+//   「服务端抓屏识别」的宿主侧入口 —— 走 op=SCAN 命名管道，把「整屏抓图 + 找盘 + 读子」全部交给
+//   视觉服务进程（与连线窗自动找盘同一条路），宿主这边不再自己抓屏、不再传整屏 PNG。
+//   连不上服务时 VisScanCall 内部会尝试拉起服务并重试一次；真拿不到就返回 false，
+//   调用方按原逻辑回退图像路径。
 static bool VisionScanScreen(const std::string& body, std::string& out) {
+  // ★ 2026-10-19 修复：VisScanCall/VisPipeConnect 自己**不会**拉起服务进程；以前这里没先
+  //   EnsureVisionServer，服务没被预热时快车道必然连不上 ⇒ 静默回退到「宿主抓整屏 PNG +
+  //   兜底起独立进程」的老慢路径（这正是「自动吸附/识别非常缓慢」的直接原因）。
   EnsureVisionServer();
   return VisScanCall(body, out);
 }
@@ -1990,6 +2037,10 @@ static void OpenImageFromPage(const std::string& s) {
          " bytes), hinst=" + std::to_string((long long)(INT_PTR)r));
 }
 
+// ★ 2026-10-19（用户：「只识别了棋盘，常常不会自动识别棋子」）：
+//   把识别结果的关键事实打进日志 —— 光看 "recognize ok (244 bytes)" 根本分不清是
+//   「没找到盘」还是「找到盘但 0 颗子」还是「sync 松阈值/自适应兜底救回来了」。
+//   只做字符串扫，不解析整份 JSON（这里不需要严谨）。
 static int VisCountArrObjs(const std::string& s, const char* key) {
   size_t p = s.find(key);
   if (p == std::string::npos) return -1;
@@ -2042,6 +2093,10 @@ static void RunVisionForVis(std::string req) {
   }
   if (mode != "scan") mode = "image";
 
+  // ★ 2026-10-19（用户：「拖动和改变这 5 个识别参数的参数值，并没有任何变化」）：
+  //   识图识别参数（5 项）原本根本没随识别请求下发 —— 宿主这边 extra 只有 size/nosnap，
+  //   服务端走的就是旧的 recognize()（暗细节投影那套），阈值对它天然无效。
+  //   现在把 5 项随请求下发（缺省回落宿主当前权威值），服务端按 algo=sync + forceSync 走同步读子。
   int rcGray     = JsonIntAfter(req, "\"gray_offset\":");
   int rcBlackOff = JsonIntAfter(req, "\"black_offset\":");
   int rcWhiteOff = JsonIntAfter(req, "\"white_offset\":");
@@ -2084,6 +2139,8 @@ static void RunVisionForVis(std::string req) {
     std::string js;
     bool ok = false;
     if (!visUseTest) {
+      // ★ 2026-10-13：识别进程已**去 HTTP**，这里走的就是纯命名管道 + 共享内存
+      //   （VisPipeCall ⇒ \\.\pipe\GomokuVision.<role>.<port>），没有任何 TCP。
       if (mode == "scan")
         ok = VisionScanImage(bytes.data(), (int)bytes.size(), js);
       else
@@ -2115,6 +2172,8 @@ static void RunVisionForVis(std::string req) {
     fclose(f);
   }
   
+  // ★ 2026-10-19：兜底起独立进程时也要带上 algo=sync + 5 项阈值，否则唯一还能走通道的场景下
+  //   识图又退回旧算法（阈值再次失效）。
   std::wstring syncArgs;
   if (mode != "scan") {
     syncArgs = L" --algo sync --recog " +
@@ -2203,6 +2262,8 @@ static int        g_hashMB = 0;
 
 static int        g_linkCfgSeen = 0;
 
+// ★ 2026-10-17：**启动时缓存**。任何后续的亲和性/Job 限制都不许再影响这个值 ——
+//   否则「钉核 → 核心数变小 → 下拉上限变小 → 用户偏好被夹」这条链会反复出现。
 static int CpuCount() {
   static const int cached = [] {
     SYSTEM_INFO si; GetNativeSystemInfo(&si);
@@ -2210,6 +2271,19 @@ static int CpuCount() {
   }();
   return cached > 0 ? cached : 4;
 }
+// 下拉上限 = 本机逻辑核 - 保留核（留给 WebView2 渲染 / 识图 / sub·fwd 车道）。
+// ★★ 2026-10-18（用户：「线程多于核心…我想要的是多线程齐心协力，而不是相互打架」）：
+//   线程上限从 `n-4` 改成 `n-2`。
+//   实测（AMD 8845H 8 核 16 线程，交错 4 轮、冷启动、同盘面 2000ms）：
+//     t=10 → nps 2879K / 节点 5587K / depth 22      ← 最差（既没占满 SMT，又被乱撒）
+//     t=12 → nps 3567K / 节点 7117K / depth 29      ← 旧上限
+//     t=16 → nps 4678K / 节点 9334K / depth 30      ← 满 SMT 最快
+//   规律是**两端快、中间慢**：8~12 这种「比物理核多、又没多到占满」的组合才会打架
+//   （Windows 会把两个线程放到同一个物理核的两个 SMT 兄弟上，而这台机器兄弟是相邻
+//   编号 (0,1)(2,3)…，于是两个线程抢同一组执行单元）。占满全部逻辑核时每个 LP 一个
+//   线程，天然一一对应，反而最快。
+//   这里留 2 个逻辑核给识别（GomokuVision 钉住 + HIGH，见 CpuSplit），
+//   本机 ⇒ 14 线程；4 核小机器 ⇒ 3 线程 + 1 核识别。
 static int ThreadsMax() {
   int n = CpuCount();
   if (n < 1) n = 1;
@@ -2218,6 +2292,12 @@ static int ThreadsMax() {
   if (t < 1) t = 1;
   return t;
 }
+// ★ 2026-10-16（用户：「速度和深度远不如 4.39」「智力不算高」）：首启默认 = **下拉上限**。
+//   v4.39 的口径就是 `S.cores = maxT`（本机 16 逻辑核 ⇒ 12 线程）；后来一段版本把工厂默认
+//   改成「一半核」并被 save() 固化进 localStorage ⇒ **所有老用户**都只跑一半线程（6 个），
+//   引擎明明加载成功、nps/深度却只有 4.39 的一半。这里与 ThreadsMax() 同口径；界面 host
+//   消息与 CalcFullThreads() 的自动档共用同一个值（默认口径只在宿主，界面不自带默认）。
+//   **勿改回「一半核」**。
 static int ThreadsDefault() {
   int t = ThreadsMax();
   if (t < 1) t = 1;
@@ -2240,6 +2320,11 @@ static int MemAvailMB() {
   return MemTotalMB() / 2;
 }
 
+// ★ 2026-10-18（用户：「在不同电脑上要有不同的适应芯片逻辑…要根据英特尔和 AMD 官方写
+//   一些优化辅助亲和加速补丁」）：厂商与混合架构探测。
+//   · VendorIdentifier = "AuthenticAMD" / "GenuineIntel"（注册表，和 CpuName 同源，零成本）
+//   · 混合架构（Intel 12 代+ P/E 核）= 物理核里存在两种 EfficiencyClass。
+//     AMD 全为 0 ⇒ 永远判成非混合，走的仍是「每核一个 primary」的策略。
 static std::string CpuVendor() {
   HKEY hk = nullptr;
   if (RegOpenKeyExW(HKEY_LOCAL_MACHINE,
@@ -2326,7 +2411,8 @@ struct CpuSplitInfo {
   std::string why;                                  
 };
 
-static std::atomic<int> g_usrThreads{0};
+// ★ 2026-10-17：提前声明（CpuSplit 要按「当前用户线程数」算掩码）
+static std::atomic<int> g_usrThreads{0};             // 用户线程偏好（0=自动=满核）
 
 
 static int PopCountPtr(DWORD_PTR v) {
@@ -2336,6 +2422,12 @@ static int PopCountPtr(DWORD_PTR v) {
 }
 
 static const CpuSplitInfo& CpuSplit() {
+  // ★★ 2026-10-17：掩码按「当前用户线程数」**重算**（不是进程级一次定死）。
+  //   用户把线程从 12 调到 8，视觉就应多拿 4 个逻辑核 —— 这是「空余的才给识别」
+  //   这句话的字面实现：引擎要几个核就给几个，剩下的全归识别。
+  // ★★ 固定按 ThreadsMax() 算（**不随用户当前线程数变**）：掩码必须在进程生命周期内一致，
+  //   否则「引擎 spawn 时用一套掩码、宿主 pin 时又用另一套」→ 两组重叠，反而互相抢核。
+  //   用户把线程调小时，引擎线程少、掩码不变，视觉的核依旧独占 —— 识别不会变慢。
   int needWanted = ThreadsMax();
   static std::mutex csMu;
   static CpuSplitInfo cache;
@@ -2346,6 +2438,10 @@ static const CpuSplitInfo& CpuSplit() {
   cache = [needWanted] {
     CpuSplitInfo inf;
     
+    // ★★ 2026-10-17（用户：「为视觉引擎开一些没用到的核心，识别速度永远不会变慢」）：
+    //   **默认启用**核隔离 —— 识别进程钉在「引擎线程上限之外」的物理核上，
+    //   引擎 12 线程占 12 个逻辑核，识别独占剩下 4 个 ⇒ 搜索再久也挤不到识别。
+    //   关闭方式：GB_CPU_SPLIT=0（或排障开关 GB_NO_CPU_SPLIT=1）。
     char on[4] = {0};
     bool want = true;
     if (GetEnvironmentVariableA("GB_CPU_SPLIT", on, sizeof(on)) > 0 && on[0] == '0') want = false;
@@ -2361,6 +2457,11 @@ static const CpuSplitInfo& CpuSplit() {
       return inf;
     }
     
+    // ★ 2026-10-18：每个物理核连同它的 EfficiencyClass 一起收。
+    //   Intel 12 代以后的混合架构（P-core + E-core）靠这个字段区分：
+    //   EfficiencyClass 越小越偏性能核。AMD 全为 0，等价于「都是 P 核」。
+    //   排序后先给 P 核发线程 —— 否则引擎线程会被 Windows 摊到 E 核上，
+    //   同等线程数下整数吞吐差一截（E 核无 SMT、频率与缓冲都更弱）。
     struct CoreGrp { DWORD_PTR mask; int eff; };
     std::vector<CoreGrp> groups;
     DWORD len = 0;
@@ -2397,28 +2498,34 @@ static const CpuSplitInfo& CpuSplit() {
     if (n < 3) { inf.why = "物理核不足 3 个"; return inf; }
     std::stable_sort(groups.begin(), groups.end(),
                      [](const CoreGrp& a, const CoreGrp& b) { return a.eff < b.eff; });
-    int need = needWanted;
+    // ★★ 2026-10-17 二次修正（用户：「用户选了 8 个线程，系统里还有十多条线程，把空余的
+    //   分几个给视觉，不要耽搁正式的线程」）：上一版按 2/3 分**物理核**，本机只给引擎
+    //   6 个物理核（12 逻辑），比全核少 2 个物理核 —— 实测 nps 明显下降。
+    //   正确口径：引擎优先拿「每个物理核的第 1 个逻辑 CPU(primary)」，N 个搜索线程各占
+    //   一个物理核、互不共享执行单元；线程上限之外的空闲逻辑 CPU（超线程兄弟 + 多余核）
+    //   才归识别。引擎可用逻辑核**永远 ≥ 线程上限**，一个正式线程都不耽搁。
+    int need = needWanted;                    // 由外层按「当前用户线程数」决定
     if (need < 1) need = 1;
-    if (need > (int)CpuCount() - 1) {
+    if (need > (int)CpuCount() - 1) {         // 至少要给识别留 1 个逻辑核
       inf.why = "逻辑核不足（引擎上限 " + std::to_string(need) + " / 共 " +
                 std::to_string(CpuCount()) + "）";
       return inf;
     }
     DWORD_PTR all = 0, em = 0;
     for (int i = 0; i < n; ++i) all |= groups[i].mask;
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; ++i) {              // 1) 每物理核 1 个 primary（已按 eff 排序 ⇒ 先 P 核）
       DWORD_PTR g = groups[i].mask;
       if (g) em |= (g & (~g + 1));
     }
     int have = PopCountPtr(em);
-    for (int i = 0; i < n && have < need; ++i) {
+    for (int i = 0; i < n && have < need; ++i) {   // 2) 不够补超线程兄弟
       DWORD_PTR rest = groups[i].mask & ~em;
       while (rest && have < need) {
         DWORD_PTR low = rest & (~rest + 1);
         em |= low; rest &= ~low; ++have;
       }
     }
-    DWORD_PTR vm = all & ~em;
+    DWORD_PTR vm = all & ~em;                  // 3) 其余全归识别
     inf.engMask = em; inf.visMask = vm;
     inf.engCPUs = PopCountPtr(em); inf.visCPUs = PopCountPtr(vm);
     inf.engCores = inf.engCPUs; inf.visCores = inf.visCPUs;
@@ -2448,6 +2555,7 @@ static void LogCpuSplitOnce() {
   LogMsg(b);
 }
 
+// 引擎不钉核 ⇒ 预算按全部逻辑核算（0 = 不限制），线程上限仍由 ThreadsMax() 管
 static int EngThreadCPUs() { return 0; }
 
 static std::string CpuSplitStatusJson() {
@@ -2461,9 +2569,22 @@ static std::string CpuSplitStatusJson() {
 
 static bool ApplyEngineAffinity(HANDLE h) {
   if (!h) return false;
+  // ★★ 2026-10-18 两轮实测后的最终结论（勿再翻转，详见下方 23:15 真机记录）：
+  //   离线基准（powershell 子进程设亲和性）曾显示钉 engMask 快 15%，但那是测量噪声；
+  //   真机日志：钉 engMask(14 LP) = 644K nps，全核自由调度 = 3392K nps（5 倍）。
+  //   与 2026-10-17 的结论一致：**引擎在全部逻辑核上自由调度最快**，
+  //   Windows 调度器自己就会摊开线程；识别仍钉 visMask + HIGH，互不拖累。
   const CpuSplitInfo& c = CpuSplit();
   if (!c.active) return false;
   LogCpuSplitOnce();
+  // ★★ 真机实测（2026-10-18 23:15）：把引擎钉到 engMask(0x5FFF, 14 LP) 反而**大幅变慢** ——
+  //   同一盘面、同样 2000ms：钉核 Speed 644K / Node 1272K，不钉核 3392K / Node 6690K（5 倍）。
+  //   离线基准里「钉核更快」是测量噪声（设亲和性用 powershell 子进程、且各轮之间受功耗墙
+  //   漂移影响），真机日志才是可信口径。
+  //   结论（与 2026-10-17 的结论一致，勿再翻转）：**引擎在全部逻辑核上自由调度最快**。
+  //   Windows 调度器本身就会把线程摊到不同物理核；人为收窄反而压掉了 SMT 的吞吐补偿。
+  //   识别进程仍然钉在 visMask（本机 2 个 LP）+ HIGH —— 它占的是「配额里的富余核」，
+  //   引擎线程即便跑进那些核，也只会被短促的识别扫描打断一下，代价远小于自断 2 个核。
   SYSTEM_INFO si; GetNativeSystemInfo(&si);
   DWORD_PTR all = (DWORD_PTR)si.dwActiveProcessorMask;
   if (!SetProcessAffinityMask(h, all)) {
@@ -2489,6 +2610,11 @@ static bool ApplyVisionAffinity(HANDLE h) {
 
 static std::atomic<bool> g_hostPinned{ false };
 static void CpuSplitPinHost() {
+  // ★★ 2026-10-17（「选 1 就触发一连串 bug」的真凶）：**宿主绝对不能钉核**。
+  //   钉了之后 GetNativeSystemInfo()/GetLogicalProcessorInformationEx() 只返回
+  //   亲和性内的 4 个逻辑核 ⇒ host 消息变成 cpu=4 / threadsMax=3 / memMB=4096(兜底)
+  //   ⇒ 页面下拉上限缩成 3，用户选的线程数被反复夹取改写（看起来就是「改了又恢复」）。
+  //   只钉识别进程就够了（它才是要被保护的一方）。
   const CpuSplitInfo& c = CpuSplit();
   if (!c.active) return;
   LogCpuSplitOnce();
@@ -2520,6 +2646,14 @@ static LONG RegDword(HKEY root, const wchar_t* sub, const wchar_t* val, DWORD& o
   return r;
 }
 
+// ★ 2026-10-16（性能）：渲染进程**保持 HIGH_PRIORITY_CLASS**。
+//   实测教训（勿改）：把它降到 NORMAL 之后，页面**全程沉默** —— 宿主能 serve 出 calc.html /
+//   calc.css / calc.js，但渲染进程再没有任何后续请求、也收不到 {type:'ready'}
+//   （日志只有 `main page still silent ... re-navigating`），UI 本身是好的（同一份 calc.js
+//   解密后在无头 Edge 里 readySent=true / 零异常）。也就是说：这里给的不只是「优先权」，
+//   降到 NORMAL 会把 WebView2 渲染进程变成实质不可用。
+//   给搜索线程让路的正确做法是**抬引擎**（spawn 后 ABOVE_NORMAL_PRIORITY_CLASS），
+//   而不是压渲染进程。
 static void BoostWebViewPriority() {
   HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
   if (snap == INVALID_HANDLE_VALUE) return;
@@ -2620,6 +2754,9 @@ static void SendAll(SOCKET cs, const char* p, int n) {
   }
 }
 
+// ---- Job 对象（KILL_ON_JOB_CLOSE）----
+// 引擎子进程 AssignProcessToJobObject 到此 Job：宿主退出（含被硬杀）时由内核回收，
+// 不会留下孤儿 RapfiEngine 进程。
 static void EnsureJob() {
   if (g_job) return;
   g_job = CreateJobObjectW(nullptr, nullptr);
@@ -2791,6 +2928,7 @@ static void HttpUiServer() {
                         name.find('/') == std::string::npos && name.find('\\') == std::string::npos &&
                         name.find('.') != std::string::npos;
           if (nameOk) {
+            // ★ 2026-10-19：先取单一 ui.pak（二进制容器），再回退老的 <name>.enc，最后明文
             std::wstring dir = Join(ExeDir(), L"calc");
             std::wstring enc = Join(dir, Utf8ToWide(name) + L".enc");
             std::vector<uint8_t> dec;
@@ -2923,6 +3061,9 @@ static std::wstring AiMimeFor(const std::wstring& p) {
   return L"application/octet-stream";
 }
 
+// ★ 2026-10-19（用户：「有的电脑会 360 误杀，导致软件打不开」）：
+//   UI 包（calc/ui.pak）被杀软隔离时，宿主原来只会 404 → 用户对着白屏，完全不知道发生了什么。
+//   这里内置一张极简诊断页：把「文件没了 / 被隔离 / 怎么办」直接写在窗口里。
 static const char* kUiMissingHtml =
   "<!doctype html><meta charset=\"utf-8\"><title>\xE7\x95\x8C\xE9\x9D\xA2\xE7\xBC\xBA\xE5\xA4\xB1</title>"
   "<style>html,body{height:100%;margin:0;background:#1b1f24;color:#e6edf3;"
@@ -3005,6 +3146,8 @@ class ResHandler : public Cb<ICoreWebView2WebResourceRequestedEventHandler> {
     std::vector<uint8_t> content;
     bool ok = false;
     const char* how = "none";
+    // ★ 2026-10-19：优先单一 ui.pak（二进制容器，见 ui_crypto.h 头注释）；老包仍回退 .enc，
+    //   最后回退明文（开发态直接改 ui/ 里的源文件时走这条）。
     std::wstring enc = Join(UiDir(), path + L".enc");
     if (gbCalcReadUiPak(Join(UiDir(), L"ui.pak"), WideToUtf8(path), content)) { ok = true; how = "pak"; }
     else if (FileExists(enc) && gbCalcReadEncFile(enc, content)) { ok = true; how = "enc"; }
@@ -3018,6 +3161,7 @@ class ResHandler : public Cb<ICoreWebView2WebResourceRequestedEventHandler> {
     }
     if (!ok || content.empty()) {
       
+      // ★ 2026-10-19：calc.html 拿不到 ⇒ 给内置诊断页（白屏最难排查，也最像「软件打不开」）
       if (path == L"calc.html") {
         std::string page(kUiMissingHtml);
         LogMsg("[res] calc.html MISSING -> built-in notice page (ui.pak 被隔离/删除？)");
@@ -3047,6 +3191,10 @@ static void LayoutWebView() {
   g_controller->put_Bounds(r);
 }
 
+// ★ 2026-10-16：主页面「沉默」时的取证探针。沉默 = 宿主 serve 了 calc.html/css/js，
+//   此后页面一条消息都不发、也收不到 ready。两种完全不同的病因必须区分开：
+//     · 有回话 ⇒ 渲染进程活着、JS 能跑 ⇒ 卡在 boot() / chrome.webview 缺失；
+//     · 没回话 ⇒ 渲染进程根本没起来（浏览器/GPU 进程问题）。
 static const char* kSilentProbeJs =
     "(function(){try{return JSON.stringify({rs:document.readyState,"
     "cv:(window.chrome&&window.chrome.webview)?1:0,title:document.title,"
@@ -3073,6 +3221,13 @@ class EvalHandler : public Cb<ICoreWebView2ExecuteScriptCompletedHandler> {
   }
 };
 
+// ★ 2026-10-13：这里的更新链接**不再**跟着 GB_SUITE_ENGINE 走。
+//   本 fork（desktop-connect）是「单训练器独立版 / 连线版」，它的构建脚本为了拿到
+//   host.cpp 里的引擎看门狗而定义了 /DGB_SUITE_ENGINE —— 于是旧写法把更新链接也一起
+//   切成了三件套的 b016l4d3id / 55555，用户点「检查更新」会被导航到**错误的安装包**。
+//   链接只认本 fork 自己的身份：连线版 = 训练器独立版 = b016l49aqj / 15
+//   （与 desktop-connect/ui/calc.js 的 UPDATE_URL / UPDATE_PWD 一致，
+//    也与 tools/build-installer.js 的 TRAINER_URL 一致）。
 static const char* kUpdateShareUrl = "https://wwbbj.lanzout.com/b016l49aqj";
 static const char* kUpdateSharePwd = "15";
 
@@ -3713,6 +3868,8 @@ static void OpenUpdateWindow(bool asSearch) {
   SetForegroundWindow(g_updHwnd);
 }
 
+// ================================================================ 引擎层宿主回调
+// engine_host.cpp 与宿主之间的**唯一**反向依赖（面小、易审计）。
 namespace eng {
 namespace host {
 
@@ -3742,6 +3899,8 @@ class MsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
      CoTaskMemFree(raw);
      LogMsg("[msg] " + s.substr(0, 200));
     
+    // ★ 2026-10-19 引擎调用层重建：页面只发一个 op（ask/stop/caps/config），
+    //   协议编排与解析**全在宿主**（engine_host.cpp），宿主是唯一解析器。
     if (s.find("\"engine\"") != std::string::npos && s.find("\"op\":") != std::string::npos) {
       std::string op = JsonStrAfter(s, "\"op\":");
       int id = JsonIntAfter(s, "\"id\":");
@@ -3754,6 +3913,7 @@ class MsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       bool cfgChanged = (t != g_threads || h != g_hashMB);
       g_threads = t; g_hashMB = h;
       LogMsg("[ai] engineConfig threads=" + std::to_string(t) + " hashMB=" + std::to_string(h) + " (in-page)");
+      // 用户偏好进宿主引擎层（THREAD_NUM / HASH_SIZE 与 clamp 都在那边）
       eng::SetUserPrefs(t, h);
       if (cfgChanged || g_linkCfgSeen == 0) {
         g_linkCfgSeen = 1;
@@ -3872,6 +4032,11 @@ class MsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       return S_OK;
     }
     
+    // ★ 2026-10-16（用户：「变规则的时候不能顺利的切换规则而评估」）：
+    //   主窗口改规则时 calc.js 会发 {type:'linkCfgSync', rule:N}（见 sel_rule.onchange /
+    //   setLinkMode），但 MsgHandler 里**从来没有这个分支** —— 消息被静默吞掉，连线窗
+    //   永远不知道主界面把规则改了，继续按旧规则算平衡点与评估。这里补上转发：
+    //   连线页 calc.js 收到后 lkBridgeRule() → 高亮 + BS.rule 同步 → bridge.js 清置换表重算。
     if (s.find("\"linkCfgSync\"") != std::string::npos) {
       std::string payload = s;
       size_t p = payload.find('{');
@@ -3977,6 +4142,12 @@ static long long DirSizeRecursive(const std::wstring& dir) {
   return sum;
 }
 
+// ★ 2026-10-16（用户：「Webview 渲染进程使用最新最科学的渲染方式」）：
+//   原来**每次启动**都无条件删掉 Cache / Code Cache / GPUCache / ShaderCache。
+//   那是「渲染不科学」的经典反例：Code Cache 一没，整个 calc.js（32 万字节）首次
+//   解析/编译全部重来；GPUCache + ShaderCache 一没，GPU 进程每次都要重建着色器缓存，
+//   轻则首屏慢、重则 GPU 进程起不来直接退软渲染。改为**按体积阈值**清理：
+//   只有缓存涨到 96 MB 以上才清（长期使用仍然不会无限膨胀），正常启动一律保留热缓存。
 static const long long kCachePurgeMinBytes = 96LL * 1024 * 1024;
 static void ClearWebViewCache(const std::wstring& udf, const char* when) {
   if (udf.empty()) return;
@@ -4114,6 +4285,7 @@ class DomHandler : public Cb<ICoreWebView2DOMContentLoadedEventHandler> {
     snprintf(b, sizeof(b),
              "{\"type\":\"host\",\"cpu\":%d,\"threadsDefault\":%d,\"threadsMax\":%d,"
              "\"physCores\":%d,\"memMB\":%d,\"memAvailMB\":%d,\"native\":%s,"
+             // 用户线程/哈希偏好随握手下发，页面以宿主为唯一事实来源（0 = 未设置）
              "\"userThreads\":%d,\"userHashMB\":%d,"
              "\"variant\":%s,\"cpuName\":%s}",
              CpuCount(), ThreadsDefault(), ThreadsMax(), PhysCoreCount(),
@@ -4180,6 +4352,9 @@ static void FireTestHooks() {
     LogMsg("[ai] test hook: asked the page to run the AI-vs-AI self-play walkthrough");
   }
 
+  // ★ 2026-10-16：连线链路 E2E 测试钩子（无需真实对局窗口）——
+  //   GB_TEST_OPEN_LINK=1：延时打开连线窗，页面就绪后投「我执黑 + 合成 4B4W 扫描帧」，
+  //   走真实 analyze → 引擎 ack → engineOut 推送 → 推荐落点 全链路。
   memset(tv, 0, sizeof(tv));
   if (GetEnvironmentVariableA("GB_TEST_OPEN_LINK", tv, sizeof(tv)) && tv[0] == '1') {
     UINT delayMs = 2500;
@@ -4192,6 +4367,8 @@ static void FireTestHooks() {
     }
   }
 
+  // ★ 2026-10-17：持久化回归钩子 —— 把一段 JS 注入主页面（用于「改下拉 → 重启 → 值还在」这类
+  //   只能真机验证的场景）。只在设了 GB_TEST_EVAL 时生效，正常启动零开销。
   {
     char ev[2048] = {0};
     if (GetEnvironmentVariableA("GB_TEST_EVAL", ev, sizeof(ev)) && ev[0] && g_webview) {
@@ -4283,6 +4460,7 @@ static void SetupUiServing(ICoreWebView2* wv, const char* tag) {
   wv->add_ProcessFailed(new ProcFailHandler(base), &ptok);
 }
 
+// （前向声明：定义在 EnvHandler 之前，但 CtlHandler 里就要用）
 static void HardenWebviewSettings(ICoreWebView2* wv, const char* tag);
 
 class CtlHandler : public Cb<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler> {
@@ -4322,6 +4500,17 @@ class CtlHandler : public Cb<ICoreWebView2CreateCoreWebView2ControllerCompletedH
   }
 };
 
+// ★ 2026-10-16（用户：「Webview 渲染进程使用最新最科学的渲染方式」）：
+//   WebView2 的三类「科学渲染 / 不节流」开关。以前 CreateCoreWebView2EnvironmentWithOptions
+//   第 3 参是 nullptr ⇒ 完全走 Chromium 默认：桌面应用里默认值恰恰是最差的一组 ——
+//   （1）被遮挡/最小化的窗口会被判定为 occluded/backgrounded，渲染进程降优先级、定时器
+//       被节流到 1Hz 甚至冻结。本程序的主界面经常被「连线选框窗 / 识别窗 / 复盘窗」盖住，
+//       bridge.js 的 60ms 轮询、waitForMove 的 5ms 轮询一旦被节流 ⇒ 引擎明明在算、
+//       页面却读不到输出 = 用户报的「引擎连不上 / 迟迟不评估」。
+//   （2）canvas 曲线/棋盘走软件光栅，引擎吃满 CPU 时界面明显掉帧。
+//   这里显式关掉节流、开 GPU 光栅 + 零拷贝，并禁掉 Windows 原生遮挡计算（该特性会暂停
+//   被遮窗口的画面提交，对「叠加窗压在主窗上」这种布局是纯负作用）。
+//   另可用 GB_WV2_ARGS 环境变量整体覆盖（排查用），或 GB_WV2_ARGS_EXTRA 追加。
 static std::wstring GbWv2BrowserArgs() {
   auto getenvW = [](const char* n) -> std::wstring {
     char b[2048] = {0};
@@ -4329,22 +4518,28 @@ static std::wstring GbWv2BrowserArgs() {
     return (n2 > 0 && n2 < sizeof(b)) ? Utf8ToWide(std::string(b, n2)) : std::wstring();
   };
   std::wstring over = getenvW("GB_WV2_ARGS");
+  // GB_WV2_ARGS=none ⇒ 显式「不带任何附加参数」（排查用；空值会被 Windows 当成未设置）
   if (_wcsicmp(over.c_str(), L"none") == 0) return L"";
   if (!over.empty()) return over;
+  // 注意：Chromium 只认**最后一个** --enable-features / --disable-features，
+  //       所以每类只能出现一次（多特性用逗号连）。
   std::wstring a =
-      L"--disable-background-timer-throttling"
-      L" --disable-backgrounding-occluded-windows"
-      L" --disable-renderer-backgrounding"
-      L" --disable-features=CalculateNativeWinOcclusion"
-      L" --enable-gpu-rasterization"
-      L" --enable-zero-copy"
-      L" --enable-features=CanvasOopRasterization"
-      L" --ignore-gpu-blocklist";
+      L"--disable-background-timer-throttling"          // setInterval/setTimeout 不被降频
+      L" --disable-backgrounding-occluded-windows"      // 被遮挡也保持正常优先级
+      L" --disable-renderer-backgrounding"              // 后台/遮挡不降渲染优先级
+      L" --disable-features=CalculateNativeWinOcclusion" // 遮挡不暂停画面提交
+      L" --enable-gpu-rasterization"                    // GPU 光栅（棋盘/曲线更顺）
+      L" --enable-zero-copy"                            // 零拷贝合成
+      L" --enable-features=CanvasOopRasterization"      // canvas 走 OOP 光栅
+      L" --ignore-gpu-blocklist";                       // 别因驱动版本号被降级到软渲染
   std::wstring extra = getenvW("GB_WV2_ARGS_EXTRA");
   if (!extra.empty()) { a += L" "; a += extra; }
   return a;
 }
 
+// ICoreWebView2EnvironmentOptions 的最小实现（只用来塞 AdditionalBrowserArguments）。
+// ★ TargetCompatibleBrowserVersion 必须给一个**低于本机运行时**的值：给高了会让
+//   环境创建直接失败（整套 UI 起不来），给低了只是「不排除任何已装运行时」。
 class EnvOptions : public ICoreWebView2EnvironmentOptions {
  public:
   explicit EnvOptions(std::wstring args) : m_args(std::move(args)) {}
@@ -4397,6 +4592,10 @@ class EnvOptions : public ICoreWebView2EnvironmentOptions {
   std::wstring m_args;
 };
 
+// 每个 WebView2 都套一遍：统一「关掉不需要的内建 UI/交互 + 保持工程化缩放口径」。
+// 只加**不会改变现有交互**的项：状态栏、右键菜单、缩放、捏合、滑动导航、自动填充、
+// 拖放文件、内建错误页。刻意**不**动 AreBrowserAcceleratorKeysEnabled（关了会连
+// Ctrl+C 一起废掉，「复制代码」按钮的键盘通路就没了）。
 static void HardenWebviewSettings(ICoreWebView2* wv, const char* tag) {
   if (!wv) return;
   ICoreWebView2Settings* st = nullptr;
@@ -4435,6 +4634,11 @@ class EnvHandler : public Cb<ICoreWebView2CreateCoreWebView2EnvironmentCompleted
       char hrbuf[24] = {0};
       sprintf_s(hrbuf, "0x%08X", (unsigned)hr);
       LogMsg(std::string("[wv2] environment creation failed - is WebView2 Runtime installed? hr=") + hrbuf);
+      // ★ 2026-10-13（用户：「确保在其他电脑都可以正常且顺利的运行（Windows 10 以上）」）：
+      //   旧代码只写一行日志就 return —— 在没装 WebView2 运行时的机器上（Win10 精简版 /
+      //   LTSC / 从未装过 Edge），用户只会看到一个空白死窗口，既不知道发生了什么也不知道
+      //   怎么修；安装程序里点「否」跳过运行时检测也会走到这里。这里给一个明确的中英双语
+      //   提示 + 一键打开官方下载页（与安装脚本 MeterGomokuLink.iss 用的是同一个链接）。
       static const wchar_t* kUrl = L"https://go.microsoft.com/fwlink/p/?LinkId=2124703";
       std::wstring msg =
           L"本软件需要「Microsoft Edge WebView2 运行时」。\n"
@@ -4454,6 +4658,8 @@ class EnvHandler : public Cb<ICoreWebView2CreateCoreWebView2EnvironmentCompleted
     g_env = env;
     env->AddRef();
     LogBoot("wv2 env ready");
+    // ★ 2026-10-16：把真正在跑的 WebView2 运行时版本记进日志 —— 「最新最科学的渲染方式」
+    //   这件事必须可证：日志里能直接看到渲染内核版本，而不是靠猜。
     {
       LPWSTR bv = nullptr;
       if (SUCCEEDED(env->get_BrowserVersionString(&bv)) && bv) {
@@ -4526,6 +4732,7 @@ static void SaveUiPrefs(const std::string& s) {
 // which Chromium commits lazily (~5s) while the app terminates the WebView2 child on exit,
 // so the write was lost (observed: set 5 -> restart read back 3). engineConfig reaches the
 // host synchronously, so writing here bypasses that async commit entirely.
+// Persist point for the link "识别参数" overlay (single source of truth). Same rationale as
 // EnginePrefFile: the host gets the message synchronously, so writing here beats the page's
 // lazily-committed localStorage. Format: `interval|gray|blackOff|whiteOff|blackPct|whitePct`.
 static std::wstring LinkRecogPrefFile() {
@@ -4537,7 +4744,7 @@ static std::wstring LinkRecogPrefFile() {
 static void ClampLinkRecog(int& interval, int& gray, int& blackOff, int& whiteOff,
                            int& blackPct, int& whitePct) {
   auto clamp = [](int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); };
-  interval = clamp(interval, 40, 2000);
+  interval = clamp(interval, 40, 2000);   // 同步时间间隔(ms)：下界 40，避免空转
   gray     = clamp(gray, 0, 255);
   blackOff = clamp(blackOff, 0, 255);
   whiteOff = clamp(whiteOff, 0, 255);
@@ -4587,6 +4794,15 @@ static void SaveLinkRecogPrefs() {
   fclose(f);
 }
 
+// ★★ 2026-10-19（用户：「点击读档，会展开一个抽屉，里面就是之前用户保存的参数名称，最多只能保存
+//   50 个」）：连线「识别参数」的**存档列表**（最多 50 条，形如
+//   [{"name":"…","recog":{"interval":..,…},"ts":1690000000000}, …]）。
+//   本页 localStorage 是延迟提交的（宿主退出时直接杀掉 WebView2 子进程，写入常丢 —— 见
+//   EnginePrefFile 的注释），所以这里同样以宿主落盘为**单一权威**：
+//     · 页面只在「存档 / 删除 / 撤销」时把整包 JSON 发过来（linkRecogSlots），宿主原样写盘；
+//     · 连线窗 ready 时宿主把这包原样回填给页面。
+//   宿主**不解析**这包内容：页面用 JSON.stringify 生成、用 JSON.parse 读回，C++ 侧只校验
+//   「是个数组、体积合理」，省掉一个 JSON 解析器（名称里的引号/反斜杠由 JSON 的转义规则保证往返）。
 static std::wstring LinkRecogSlotsFile() {
   wchar_t tmp[MAX_PATH] = {0};
   GetTempPathW(MAX_PATH, tmp);
@@ -4602,7 +4818,7 @@ static std::string ReadLinkRecogSlots() {
   while ((n = fread(buf, 1, sizeof(buf), f)) > 0) out.append(buf, n);
   fclose(f);
   size_t p = out.find_first_not_of(" \r\n\t");
-  if (p == std::string::npos || out[p] != '[') return std::string("[]");
+  if (p == std::string::npos || out[p] != '[') return std::string("[]");   // 写坏/被手改成别的东西
   return out;
 }
 
@@ -5149,6 +5365,8 @@ class VisMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
         PostToVisPage(p);
       }
       ShowVisWindow();
+      // ★★ 2026-10-19：把宿主落盘的「识图识别参数」回填给识图页（页面自身 localStorage 不可靠，
+      //   宿主才是单一权威 —— 与连线窗 linkRecog 同一口径）。
       PostToVisPage("{\"type\":\"visRecog\",\"recog\":" + VisRecogJson() + "}");
       return S_OK;
     }
@@ -5158,6 +5376,10 @@ class VisMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       return S_OK;
     }
     
+    // ★★ 2026-10-19（用户：「识图这个界面上也添加一个识别参数……」）：识图参数的值一动就发一条 ——
+    //   宿主把值写进「有效参数」**并落盘**（单一权威：关软件再打开不回退默认，与连线窗
+    //   linkRecogPreview 同一口径）。下一拍「自动吸附盘」就用新阈值下发给视觉服务。
+    //   注意这条要排在 "visRecognize" 之前判：两种消息串不会互相包含，顺序仅为保险。
     if (s.find("\"visRecogPreview\"") != std::string::npos) {
       int gr = JsonIntAfter(s, "\"gray_offset\":");    if (gr < 0) gr = g_visRcGray.load();
       int bo = JsonIntAfter(s, "\"black_offset\":");   if (bo < 0) bo = g_visRcBlackOff.load();
@@ -6113,6 +6335,10 @@ static void LselApplyRegion(HWND h) {
   GetWindowRect(h, &wr);
   int top = wr.top + LSEL_TITLE_H;
   if (wr.right - wr.left < 120 || wr.bottom - top < 120) return;
+  // ★ 2026-10-13 回退（用户：「寻棋盘算法，自动功能跟随昨天 23 点左右的那一版」）：
+  //   小框（< 屏幕 1/3）几乎肯定没框住整个棋盘 —— 切到「自动寻盘」，让扫描区扩到整屏
+  //   再自动收紧到 ±0.6 格（自动保持开启，以后再开框也走同一条路）。这段是 10-12 22:09
+  //   加的，属于 23:00 那一版的行为；本轮的改动把它删掉了，是退步，现在照原样补回来。
   {
     int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
     if ((wr.right - wr.left) < sw / 3 || (wr.bottom - top) < sh / 3) {
@@ -6380,6 +6606,8 @@ static void StartLinkFrame() {
     y = wa.top + (wa.bottom - wa.top - h) / 2;
   }
   LselOpenAt(x, y, w, h);
+  // ★ 2026-10-13 回退：开着「自动」重新开框时，先跑一遍全屏寻盘，让框自己收紧到棋盘上，
+  //   而不是拿上一次的旧区域去扫。同属 23:00 那一版的行为（10-12 22:09 加的）。
   if (g_lselAuto) {
     LselSetAutoScanRegion();
     StartLinkScanLoop();
@@ -6506,6 +6734,12 @@ static void LinkScanTick() {
     }
   }
   if (!excl.empty()) body += ",\"exclude\":[" + excl + "]";
+  // ★★ 2026-10-18 最终口径（用户：「这是找棋盘的逻辑，用我们昨天的，然后识别棋子的逻辑，用今天新的，
+  //   识别参数恢复那 6 个参数」）：
+  //   **定位 = 自制**（findBoardRects + refineGrid，vision 里 sync 不接管 Hough 找盘，见 gbscreen.cpp
+  //   的「定位只走自制」注释）；**读子 = 同步算法**（readStonesSync / syncCellInfo，用户从大佬那拿的）。
+  //   所以这里必须下发 algo=sync + 6 项参数（含 interval 之外的 5 个阈值），
+  //   vision 侧 ScanDirect() 据此 useSync != nullptr ⇒ 只用 sync 的棋子黑白判定。
   {
     char sb[256];
     snprintf(sb, sizeof(sb),
@@ -6545,6 +6779,10 @@ static void LinkScanTick() {
     if (pB != std::string::npos) blkS = resp.substr(pB, 80);
     size_t pW = resp.find("\"white\"");
     if (pW != std::string::npos) whtS = resp.substr(pW, 80);
+    // ★ 2026-10-18：`reader=` 直接告诉我们是哪套读子算法在跑 ——
+    //   vision 的 sync 分支会写 diag.sync=true（gbsync.cpp），自制读子不写这个键。
+    //   `read/cells/hit` 是变化识别（帧指纹 + 逐格签名缓存）的实测指标：
+    //     hit=1 → 整帧没变，一格都没重算；cells=读了几格/复用了几格；read=读子耗时 ms。
     const char* reader = (resp.find("\"sync\": true") != std::string::npos ||
                           resp.find("\"sync\":true") != std::string::npos) ? "sync" : "adaptive";
     int rMs = JsonIntAfter(resp, "sync_read_ms");
@@ -6860,7 +7098,7 @@ static void StartLinkScanLoop() {
         else if (!g_lselAuto &&
                  (g_scanRegion.right > g_scanRegion.left &&
                   g_scanRegion.bottom > g_scanRegion.top))
-          period = g_syncInterval.load();
+          period = g_syncInterval.load();   // ★ 2026-10-18：非锁定扫描周期由「识别参数」的「同步时间间隔」接管（锁定分支仍 50ms）
         
         else if (g_linkMissStreak.load() >= 3) period = 1000;
         
@@ -7171,7 +7409,13 @@ class LinkMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       if (SUCCEEDED(e->TryGetWebMessageAsString(&raw2)) && raw2) {
         std::string t = WideToUtf8(raw2);
         CoTaskMemFree(raw2);
+        // ★ 2026-10-17：WebView2 的 TryGetWebMessageAsString 只对「以**字符串**形式发出」的
+        //   消息成功，即页面必须 postMessage(JSON.stringify(o))。页面若直接
+        //   postMessage({...})（对象消息），这里取到的是空串 ⇒ 下面整条 { } 分支被跳过
+        //   ⇒ 消息**静默丢弃**。实测事故：bridge.js 的 bridgeDiag 就是这么被丢的，
         //   LINK_ACK_TIMEOUT / LINK_ENG_STATUS / LINK_BOOT_GUARD / LINK_TT_RESET /
+        //   LINK_EVAL_FAIL 等 15 个诊断点一个都到不了日志。
+        //   兜底：t 为空时改用 AsJson 形式（s）—— 此时它正好是干净的 JSON 对象文本。
         if (t.empty() && !s.empty() && s[0] == '{') t = s;
         if (!t.empty() && t[0] == '{') {
           
@@ -7191,6 +7435,7 @@ class LinkMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
             return S_OK;
           }
           
+          // 引擎通道：ask/stop/caps/config 原样交宿主引擎层（ack/tick 由它推回连线页）
           if (t.find("\"engine\"") != std::string::npos && t.find("\"op\":") != std::string::npos) {
             std::string op = JsonStrAfter(t, "\"op\":");
             int id = JsonIntAfter(t, "\"id\":");
@@ -7302,7 +7547,10 @@ class LinkMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
         g_linkPending.clear();
         PostToLinkPage(p);
       }
+      // ★ 2026-10-18：把宿主落盘的「识别参数」回填给连线页浮层（页面自身 localStorage 不可靠）
       PostToLinkPage("{\"type\":\"linkRecog\",\"recog\":" + LinkRecogJson() + "}");
+      // ★★ 2026-10-19（用户要的「读档」抽屉）：把宿主落盘的**存档列表**整包回填。
+      //   窗口标题栏等都由宿主来；这里只搬 JSON，页面自己 JSON.parse。
       PostToLinkPage("{\"type\":\"linkRecogSlots\",\"json\":" + JsonQuote(ReadLinkRecogSlots()) + "}");
       LogMsg("[link] recog slots backfilled: " + std::to_string(ReadLinkRecogSlots().size()) + " bytes");
       ShowLinkWindow();
@@ -7314,6 +7562,17 @@ class LinkMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       return S_OK;
     }
     
+    // ★★ 2026-10-18 修订（用户：「点击识别参数，棋盘上面的按键更换为各种参数」「调节后真正能
+    //   识别的效果实时更新」）：识别参数从浮层小窗改为**就地编辑 + 实时联动**。
+    //   · linkRecogPreview：滑动条/数值框一动就发一条 —— 宿主把值写进「有效参数」**并落盘**，
+    //     再唤醒扫描循环。下一拍扫描就用新阈值读子 → 连线窗下方棋盘实时反映识别效果。
+    //     ★★ 2026-10-19 修正（用户：「连线调整参数的持久化没有做好，关闭软件再打开，参数又恢复
+    //     默认了」）：以前预览**不落盘**，用户拖完滑条就直接关软件 → 下次启动读的是上一次「应用」
+    //     的那份（或出厂默认），观感就是「参数白调了」。现在预览也落盘：磁盘上那一份恒等于屏幕上
+    //     正在生效的那一份，退出/断电都不会回退。（文件只有 ~17 字节，页面侧本身还有 120ms 防抖。）
+    //   · linkRecogCancel：页面把「打开时那份原值」再发一次 —— 宿主回写有效参数并同样落盘
+    //     （取消 = 回到上次已应用的那一份，那一份本来就该是磁盘上那一份）。
+    //   · linkRecogCfg（「应用」）：写盘（单一权威）+ 回填页面（沿用旧逻辑）。
     auto lkApplyRecog = [](const std::string& js, bool persist) {
       int iv = JsonIntAfter(js, "\"interval\":");        if (iv < 0) iv = g_syncInterval.load();
       int gr = JsonIntAfter(js, "\"gray_offset\":");     if (gr < 0) gr = g_syncGray.load();
@@ -7329,10 +7588,17 @@ class LinkMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       g_syncBlackPct.store(bp);
       g_syncWhitePct.store(wp);
       if (persist) SaveLinkRecogPrefs();
-      g_linkRescanSoon.store(true);
-      g_linkFastLeft.store(3);
+      g_linkRescanSoon.store(true);      // 立刻用新阈值重扫一次（锁定态 50ms 节拍）
+      g_linkFastLeft.store(3);           // 后续几拍也走快速节拍，便于观察实时效果
     };
 
+    // ★★ 2026-10-19（用户要的「存档 / 读档」）：页面把**整包**存档 JSON 发过来 → 原样写盘。
+    //   载荷形如 {"type":"linkRecogSlots","json":"[{\"name\":…},…]"}；JsonStrAfter 的
+    //   去转义规则与 JSON.stringify 的转义规则互为逆运算，所以这包内容能原样往返
+    //   （名称里的引号/反斜杠也在内）。宿主不解析内容，只校验「是数组 + 体积合理」。
+    //   ★ 这一条必须排在下面几个 linkRecog* 之前：存档里如果有个名字恰好叫「linkRecogCfg」，
+    //     那包 JSON 里就会出现那个子串，被后面的分支先命中就会把存档当成「应用参数」处理。
+    //     反过来，本页另外三种消息（Preview / Cancel / Cfg）都不会含 "linkRecogSlots"，无副作用。
     if (s.find("\"linkRecogSlots\"") != std::string::npos) {
       std::string blob = JsonStrAfter(s, "\"json\":");
       size_t bp = blob.find_first_not_of(" \r\n\t");
@@ -7346,17 +7612,18 @@ class LinkMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
     }
 
     if (s.find("\"linkRecogPreview\"") != std::string::npos) {
-      lkApplyRecog(s, true);
+      lkApplyRecog(s, true);            // ★ 2026-10-19：预览也落盘（见上方注释）
       LogMsg("[link] recog live: " + LinkRecogJson());
       return S_OK;
     }
 
     if (s.find("\"linkRecogCancel\"") != std::string::npos) {
-      lkApplyRecog(s, true);
+      lkApplyRecog(s, true);            // ★ 2026-10-19：还原后的那份也落盘
       LogMsg("[link] recog reverted to: " + LinkRecogJson());
       return S_OK;
     }
 
+    // 连线「识别参数」编辑区「应用」→ 宿主写盘（单一权威）+ 回填页面
     if (s.find("\"linkRecogCfg\"") != std::string::npos) {
       lkApplyRecog(s, true);
       PostToLinkPage("{\"type\":\"linkRecog\",\"recog\":" + LinkRecogJson() + "}");
@@ -7491,6 +7758,9 @@ static void CreateLinkWindow() {
   RECT work = { 0, 0, 0, 0 };
   SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
   
+  // ★ 2026-10-18 二次修订（用户：「这个连线，这个界面恢复之前的尺寸」）：恢复为加高之前的
+  //   原始口径 304×712。「识别参数」进入后只留「参数区 + 下方棋盘」（已收起按键区/统计条/
+  //   状态行），因此原高度够用。
   const int kLinkCssW = 304, kLinkCssH = 712;
   if (g_hwnd) {
     
@@ -7636,6 +7906,8 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       if (w == kMainTimerReload) {
         KillTimer(h, kMainTimerReload);
         if (g_mainPageShown) return 0;
+        // ★ 2026-10-16：自愈之前先取证 —— 每次看到沉默都记一条「渲染进程到底活没活」。
+        //   这是把「约五成随机沉默」变成可定位问题的关键一步（以前只有一句 still silent）。
         if (g_webview) g_webview->ExecuteScript(Utf8ToWide(kSilentProbeJs).c_str(), new MainProbeHandler());
         if (g_mainReloads < 2 && g_webview) {
           g_mainReloads++;
@@ -7645,6 +7917,10 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
           SetTimer(h, kMainTimerReload, 8000, nullptr);
           return 0;
         }
+        // ★ 2026-10-16：重导航两次仍沉默 ⇒ 换一个渲染进程（重建 WebView2 控制器）。
+        //   实测「页面沉默」时渲染进程是可以完全不工作的（探针无回话），此时重导航
+        //   救不回来，只有重建控制器能拿到新的渲染进程。以前走到这里直接
+        //   RevealMainPage() ⇒ 用户看到永久白屏（丢进待办的那个产品级风险）。
         if (g_mainCtrlRebuilds < 2 && g_env && g_hwnd) {
           g_mainCtrlRebuilds++;
           LogMsg("[ui] 页面始终无 ready ⇒ 重建 WebView2 控制器（换渲染进程）#" +
@@ -7719,6 +7995,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         return 0;
       }
 
+      // ★ 2026-10-16：连线链路 E2E 测试钩子的两段定时器。
       if (w == kMainTimerTestLink) {
         KillTimer(h, kMainTimerTestLink);
         LogMsg("[test] GB_TEST_OPEN_LINK: opening link window");
@@ -7732,6 +8009,8 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
           SetTimer(h, kMainTimerTestLinkScan, 2000, nullptr);
           return 0;
         }
+        // 我执黑 + 合成 4B4W 扫描帧（黑先、无五连）→ 触发真实 analyze 链路。
+        // setSide 是切换语义：若上次会话已持久化 side=0，发一次反而取消 —— 连发两次保证终态=黑。
         PostToLinkPageSoon("{\"type\":\"setSide\",\"v\":0}");
         PostToLinkPageSoon("{\"type\":\"setSide\",\"v\":0}");
         std::string fake =
@@ -7742,6 +8021,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
           "\"white\":[{\"x\":7,\"y\":8},{\"x\":8,\"y\":9},{\"x\":9,\"y\":7},{\"x\":10,\"y\":10}]}}";
         PostToLinkPageSoon(fake);
         LogMsg("[test] link fake scan posted (4B4W, side=black)");
+        // ★ 2026-10-17：连线窗持久化回归钩子 —— 连线窗的卡片固定/布局只能在这里验证。
         {
           char lev[2048] = {0};
           if (GetEnvironmentVariableA("GB_TEST_EVAL_LINK", lev, sizeof(lev)) && lev[0] && g_linkWebview) {
@@ -7749,8 +8029,18 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
             LogMsg("[test] GB_TEST_EVAL_LINK injected (" + std::to_string(strlen(lev)) + " chars)");
           }
         }
+        // ★ 2026-10-16 回归探针（GB_TEST_LINK_PROBE=1）：
+        //   ① 6s 后投空盘帧（连投数帧以过 STABLE_FRAMES/emptyStreak 门槛）
+        //      → 期望日志 LINK_TT_RESET reason=empty-board
+        //   ② 16s 后向**主页面**投 linkCfgSync（模拟主界面改规则）
+        //      → 期望宿主转发 + 连线页 LINK_TT_RESET reason=rule-change ...
+        //   这两条正是用户报的「空盘要清置换表」「变规则不能顺利切换并评估」。
         char pv2[8] = {0};
         if (GetEnvironmentVariableA("GB_TEST_LINK_PROBE", pv2, sizeof(pv2)) && pv2[0] == '1') {
+          // ★ 2026-10-17 次序修正：**先**在盘面仍非空（4B4W）时切规则（→ 必须立即按新规则
+          //   重算一次，这才是用户说的「变规则不能顺利切换并评估」），**后**再投空盘帧
+          //   （→ 清置换表）。原先把空盘放在前面，等到切规则时盘面已空，
+          //   kickAnalyze 在空盘下什么都不做 ⇒ 压根证明不了「换规则会重算」。
           SetTimer(h, kMainTimerTestLinkProbe2, 6000, nullptr);
           SetTimer(h, kMainTimerTestLinkProbe, 16000, nullptr);
           LogMsg("[test] link probe armed (rule-sync @6s on non-empty board, empty-board @16s)");
@@ -7759,6 +8049,8 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         return 0;
       }
       if (w == kMainTimerTestLinkProbe) {
+        // 空盘帧连投 5 次（每次 400ms）：handleScan 的 busy 守卫会丢帧，
+        // emptyStreak 也要 ≥2 才进空盘分支。
         static int s_emptyPost = 0;
         std::string empt =
           "{\"type\":\"scan\",\"data\":{\"ok\":true,\"found\":true,\"size\":15,"
@@ -7777,7 +8069,16 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       }
       if (w == kMainTimerTestLinkProbe2) {
         KillTimer(h, kMainTimerTestLinkProbe2);
+        // ★ 2026-10-17 修正：主界面改规则的**真实**路径是「页面主动发给宿主」
+        //   {type:'linkCfgSync',rule:N}（calc.js sel_rule.onchange → tellHost），
+        //   再由宿主 MsgHandler 转发给连线页。原来这里用 PostToPageSoon 把消息**投给
+        //   主页面**，可主页面根本没注册 onLinkHostMsg（那在 bootLink 里）⇒ 等于空投，
+        //   宿主的转发分支从没被走到，回归探针形同虚设。
+        //   现在改为往主页面**注入脚本**，复现页面真实的发送动作（真下拉 + 直发消息）。
         if (g_webview) {
+          // ★ 2026-10-17：**取反**当前规则再切 —— 上一轮探针会把规则持久化进全局键
+          //   （gbcalc.rule.v1），下一轮连线页开局就已经是新规则 ⇒ 写死 rule=1 会变成
+          //   「没有变化」的空操作，探针静默失效（实测踩过）。
           const char* inj =
             "(function(){try{"
             "var e=document.getElementById('sel_rule');"
@@ -7797,6 +8098,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         return 0;
       }
       if (w == kMainTimerTestLinkCheck) {
+        // ★ 2026-10-16：周期探查（4s x6）——覆盖候选快速交付（~1-2s）与各兜底路径。
         static int s_linkCheckCount = 0;
         if (g_linkWebview) {
           g_linkWebview->ExecuteScript(Utf8ToWide(
@@ -7882,8 +8184,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   
   LogCpuSplitOnce();
-  EnsureJob();
-  eng::Init();
+  EnsureJob();   // Job（KILL_ON_JOB_CLOSE）：宿主退出即回收引擎子进程
+  eng::Init();   // 探测变体 + 读回用户线程/哈希偏好（不 spawn，首个 ask 惰性启动）
                             
   std::string argPayload;
   {
@@ -7952,9 +8254,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
   }
   
   LoadUiPrefs();
+  // Load persisted link "识别参数" before the link page can be opened, so the overlay and the
   // scan loop start from the user's real choice.
   LoadLinkRecogPrefs();
-  LoadVisRecogPrefs();
+  LoadVisRecogPrefs();      // 识图「识别参数」：宿主落盘那份启动读回（单一权威）
   g_hwnd = CreateWindowExW(0, kCls, kTitle,
                            WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                            x, y, w, h, nullptr, nullptr, hInst, nullptr);
@@ -7982,6 +8285,9 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
   std::wstring wv2udf = WebView2UserDataDir();
   
   ClearWebViewCache(wv2udf, "启动");
+  // ★ 2026-10-16：不再传 nullptr（= Chromium 桌面默认，节流最狠的一组）。
+  //   直接带上「不节流 + GPU 光栅」的 browser args；万一这套 args 让环境创建失败
+  //   （驱动/企业策略等），自动退回默认口径，保证 UI 一定能起来。
   HRESULT hr = E_FAIL;
   {
     EnvOptions* opt = new EnvOptions(GbWv2BrowserArgs());

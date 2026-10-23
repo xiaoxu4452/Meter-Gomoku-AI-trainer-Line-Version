@@ -2,7 +2,7 @@
 
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <assemblyIdentity type="win32" name="Meter.DesktopGomokuLink"
-                    version="4.42.0.0" processorArchitecture="amd64"/>
+                    version="4.43.0.0" processorArchitecture="amd64"/>
 
  <!-- Run with caller privileges (asInvoker): This software does not require administrator privileges and will never request elevation. Without this section, security software may heuristically classify unknown EXEs as suspicious for "elevation/ransomware" purposes. -->
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">

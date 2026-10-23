@@ -1,3 +1,4 @@
+// Bundled RapFi engine (upstream: github.com/dhbloo/rapfi) — Meter Gomoku Link v4.43
 /*
  *  Rapfi, a Gomoku/Renju playing engine supporting piskvork protocol.
  *  Copyright (C) 2022  Rapfi developers
@@ -18,12 +19,13 @@
 
 #include "eval.h"
 
-#include "evalconfig.h"
 #include "../game/board.h"
+#include "evalconfig.h"
 #include "evaluator.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 using Evaluation::EvalCfg;
 
@@ -68,7 +70,8 @@ int makeThreatMask(const StateInfo &st, Color self)
 template <Rule R>
 inline Value evaluateThreat(const StateInfo &st, Color self)
 {
-    return (Value)Evaluation::EVALS_THREAT[Evaluation::tableIndex(R, self)][makeThreatMask(st, self)];
+    return (
+        Value)Evaluation::EVALS_THREAT[Evaluation::tableIndex(R, self)][makeThreatMask(st, self)];
 }
 
 /// Evaluates basic patterns on board.
@@ -79,18 +82,114 @@ inline Value evaluateBasic(const StateInfo &st, Color self)
 
 /// Finds a margin for switching to classical evaluation if
 /// it falls outside alpha-beta window with this margin.
+template <Rule R>
 inline int classicalEvalMargin(Value bound)
 {
     float winLossRate = 2 * (Evaluation::valueToWinRate(bound) - 0.5f);
-    float x           = EvalCfg.marginWinLossScale * winLossRate;
+    float x           = EvalCfg.marginWinLossScale[R] * winLossRate;
     float x2          = x * x;
-    return (int)(EvalCfg.marginScale
-                 * ::expf(-::powf(x2, EvalCfg.marginWinLossExponent)));
+    return (int)(EvalCfg.marginScale[R] * ::expf(-::powf(x2, EvalCfg.marginWinLossExponent[R])));
 }
 
 }  // namespace
 
 namespace Evaluation {
+
+// Value/win-rate conversions and readout construction share this scale.
+float ScalingFactor = 200.0f;
+
+namespace {
+
+    ClassicalValueReadouts valueReadouts;
+    std::array<std::array<Value, VALUE_EVAL_MAX - VALUE_EVAL_MIN + 1>, RULE_NB + 1>
+         valueReadoutCaches {};
+    void refreshClassicalValueReadoutCaches()
+    {
+        static constexpr std::array<double, ClassicalValueReadout::KnotCount> XKnots =
+            {0.0, 0.5, 1.0, 2.0, 4.0, 8.0};
+        const double scale = ScalingFactor;
+
+        for (size_t readoutIndex = 0; readoutIndex < valueReadouts.size(); readoutIndex++) {
+            if (!valueReadouts[readoutIndex].knotsActive)
+                continue;
+            const auto &yKnots = valueReadouts[readoutIndex].knots;
+            auto       &cache  = valueReadoutCaches[readoutIndex];
+            for (int raw = VALUE_EVAL_MIN; raw <= VALUE_EVAL_MAX; raw++) {
+                double x = std::abs(double(raw)) / scale;
+                double y;
+                if (x >= XKnots.back())
+                    y = yKnots.back() + x - XKnots.back();
+                else {
+                    size_t hi = 1;
+                    while (x > XKnots[hi])
+                        hi++;
+                    size_t lo = hi - 1;
+                    double t  = (x - XKnots[lo]) / (XKnots[hi] - XKnots[lo]);
+                    y         = yKnots[lo] + t * (yKnots[hi] - yKnots[lo]);
+                }
+                double mapped               = std::copysign(y * scale, double(raw));
+                cache[raw - VALUE_EVAL_MIN] = Value(
+                    std::clamp<long long>(std::llround(mapped), VALUE_EVAL_MIN, VALUE_EVAL_MAX));
+            }
+        }
+    }
+
+    Value applyClassicalValueReadout(Rule rule, Color self, Value rawValue)
+    {
+        assert(VALUE_EVAL_MIN <= rawValue && rawValue <= VALUE_EVAL_MAX);
+        const int table = tableIndex(rule, self);
+        return valueReadouts[table].knotsActive
+                   ? valueReadoutCaches[table][int(rawValue) - VALUE_EVAL_MIN]
+                   : rawValue;
+    }
+
+}  // namespace
+
+void setScalingFactor(float scale)
+{
+    assert(std::isfinite(scale) && scale > 0.0f);
+    ScalingFactor = scale;
+    refreshClassicalValueReadoutCaches();
+}
+
+const ClassicalValueReadouts &classicalValueReadouts()
+{
+    return valueReadouts;
+}
+
+void installClassicalValueReadouts(const ClassicalValueReadouts &readouts)
+{
+    valueReadouts = readouts;
+    refreshClassicalValueReadoutCaches();
+}
+
+const int ClassicalValueBlendWeights[RULE_NB + 1][ClassicalValueBlend::COMPONENT_NB] = {
+    {149, 106, 267},
+    {155, 116, 268},
+    {137, 122, 263},
+    {138, 125, 261},
+};
+
+namespace {
+
+    // Both basic terms use the current side-to-move perspective. Divide the complete
+    // 64-bit weighted sum once, then clamp before the optional integer readout lookup.
+    Value composeClassicalValue(Rule  rule,
+                                Color self,
+                                Value currentBasic,
+                                Value previousBasic,
+                                Value currentThreat)
+    {
+        const int *weights = ClassicalValueBlendWeights[tableIndex(rule, self)];
+
+        int64_t weightedValue =
+            int64_t(weights[ClassicalValueBlend::CURRENT_BASIC]) * int64_t(currentBasic)
+            + int64_t(weights[ClassicalValueBlend::PREVIOUS_BASIC]) * int64_t(previousBasic)
+            + int64_t(weights[ClassicalValueBlend::CURRENT_THREAT]) * int64_t(currentThreat);
+        return Value(weightedValue / ClassicalValueBlend::Scale);
+    }
+
+}  // namespace
 
 /// Calculates the final evaluation of a board.
 /// @note Board must have at least one stone placed (`ply() > 0`).
@@ -103,18 +202,23 @@ Value evaluate(const Board &board, Value alpha, Value beta)
     const StateInfo &st0 = board.stateInfo();
     const StateInfo &st1 = board.stateInfo(1);
 
-    Value basicEval  = (evaluateBasic(st0, self) + evaluateBasic(st1, self)) / 2;
-    Value threatEval = evaluateThreat<R>(st0, self);
-    Value eval       = std::clamp(basicEval + threatEval, VALUE_EVAL_MIN, VALUE_EVAL_MAX);
+    Value currentBasic  = evaluateBasic(st0, self);
+    Value previousBasic = evaluateBasic(st1, self);
+    Value currentThreat = evaluateThreat<R>(st0, self);
+    Value eval =
+        std::clamp(composeClassicalValue(R, self, currentBasic, previousBasic, currentThreat),
+                   VALUE_EVAL_MIN,
+                   VALUE_EVAL_MAX);
+    Value classicalEval = applyClassicalValueReadout(R, self, eval);
 
     if (board.evaluator()) {
         // Use evaluator eval if classical eval are in alpha-beta window margin
-        int margin = classicalEvalMargin(eval);
-        if (eval >= alpha - margin && eval <= beta + margin)
+        int margin = classicalEvalMargin<R>(classicalEval);
+        if (classicalEval >= alpha - margin && classicalEval <= beta + margin)
             return computeEvaluatorValue(board).value();
     }
 
-    return eval;
+    return classicalEval;
 }
 
 template Value evaluate<FREESTYLE>(const Board &, Value, Value);
@@ -137,18 +241,20 @@ Value evaluate(const Board &board, Rule rule)
         Color            self = board.sideToMove();
         const StateInfo &st   = board.stateInfo();
 
-        Value basicEval  = evaluateBasic(st, self);
-        Value threatEval = VALUE_ZERO;
+        Value currentBasic  = evaluateBasic(st, self);
+        Value currentThreat = VALUE_ZERO;
         switch (rule) {
         default:
-        case Rule::FREESTYLE: threatEval = evaluateThreat<Rule::FREESTYLE>(st, self); break;
-        case Rule::STANDARD: threatEval = evaluateThreat<Rule::STANDARD>(st, self); break;
-        case Rule::RENJU: threatEval = evaluateThreat<Rule::RENJU>(st, self); break;
+        case Rule::FREESTYLE: currentThreat = evaluateThreat<Rule::FREESTYLE>(st, self); break;
+        case Rule::STANDARD: currentThreat = evaluateThreat<Rule::STANDARD>(st, self); break;
+        case Rule::RENJU: currentThreat = evaluateThreat<Rule::RENJU>(st, self); break;
         }
 
-        Value eval = basicEval + threatEval;
-
-        return std::clamp(eval, VALUE_EVAL_MIN, VALUE_EVAL_MAX);
+        Value eval =
+            std::clamp(composeClassicalValue(rule, self, currentBasic, currentBasic, currentThreat),
+                       VALUE_EVAL_MIN,
+                       VALUE_EVAL_MAX);
+        return applyClassicalValueReadout(rule, self, eval);
     }
 }
 

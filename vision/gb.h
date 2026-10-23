@@ -1,4 +1,5 @@
-﻿/* Vision - board. */
+// Meter Gomoku Link — v4.43
+/* Vision - board. */
 
 
 #pragma once

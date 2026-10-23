@@ -1,4 +1,5 @@
-
+/* GomokuVision.exe 资源脚本：清单 + 版本信息。
+   ★ 2026-10-19 防查杀新增（改完必须重跑 desktop-vision/_build_vision.ps1 才生效）。 */
 
 1 24 "app.manifest"
 
