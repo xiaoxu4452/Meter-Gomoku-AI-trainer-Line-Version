@@ -1,4 +1,3 @@
-// Bundled RapFi engine (upstream: github.com/dhbloo/rapfi) — Meter Gomoku Link v4.43
 /*******************************************************************************
  * This file is part of the "https://github.com/blackmatov/flat.hpp"
  * For conditions of distribution and use, see copyright notice in LICENSE.md

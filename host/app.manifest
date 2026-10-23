@@ -4,7 +4,7 @@
   <assemblyIdentity type="win32" name="Meter.DesktopGomokuLink"
                     version="4.43.0.0" processorArchitecture="amd64"/>
 
- <!-- Run with caller privileges (asInvoker): This software does not require administrator privileges and will never request elevation. Without this section, security software may heuristically classify unknown EXEs as suspicious for "elevation/ransomware" purposes. -->
+  
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>
@@ -13,7 +13,7 @@
     </security>
   </trustInfo>
 
- <!-- Declaring supported Windows versions: The system no longer loads this program in 'compatibility mode'. -->
+  
   <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
     <application>
       <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
@@ -26,10 +26,10 @@
 
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
-     <!-- Consistent with the host runtime's GbSetDpiAwareness() (PER_MONITOR_AWARE_V2). -->
-      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
-      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">permonitorv2,permonitor</dpiAwareness>
-      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+      
+      <dpiAware xmlns="http:
+      <dpiAwareness xmlns="http:
+      <longPathAware xmlns="http:
     </windowsSettings>
   </application>
 </assembly>

@@ -1,4 +1,3 @@
-// Meter Gomoku Link — v4.43
 /* Vision - boardloader. */
 
 

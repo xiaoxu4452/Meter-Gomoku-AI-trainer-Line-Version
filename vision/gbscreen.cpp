@@ -1,5 +1,4 @@
-// Meter Gomoku Link — v4.43
-/* Vision - boardscreen. */
+﻿/* Vision - boardscreen. */
 
 
 #include "gbvision.h"
@@ -331,12 +330,6 @@ bool captureScreen(cv::Mat& rgb, int& ox, int& oy) {
     return false;
 }
 
-// ★ 2026-10-18（用户：「识别速度再快一点，当前稍慢」＋「每拍读子更快」）：
-//   连线稳态每拍只关心「已框定区域」这一小块像素，但旧路径每拍都 BitBlt 整个虚拟屏
-//   （1920×1080 的 32 位抓取 + 全屏 BGRA→RGB 转换）再裁到 region —— 每拍固定多花十几毫秒。
-//   这里按 region 直接抓那一块（400×400 时抓取/转换量约全屏的 1/13）。
-//   只走 CPU(GDI) 抓屏：DXGI 分支本就有整帧复用，走它反而更慢；越界或抓取失败一律返回
-//   false，由上层原样回退到整屏抓取，行为不变。
 bool captureScreenRect(cv::Mat& rgb, int& ox, int& oy, int x, int y, int w, int h) {
     setDpiAware();
     if (w <= 0 || h <= 0) return false;
@@ -1150,9 +1143,6 @@ struct StabGeo {
     }
 };
 
-// ★ 2026-10-18：指纹缓存提到文件作用域 —— 全新定位成功后要**主动播种**，
-//   否则 stab 复用分支第一次询问时 prevFp 还是空的，必然判「窗口变了」⇒ 多跑一次全屏定位，
-//   两级融合要多等一帧才切到同步读子（真机上就是多一次 ~200ms 的全搜）。
 static cv::Mat g_boardFp;
 
 static void boardFpStore(const cv::Mat& rgb, const std::vector<double>& xL,
@@ -1213,9 +1203,6 @@ ScanResult notFound(double offX, double offY, int multi, const std::string& reas
     return r;
 }
 
-// ★★ 2026-10-19：读子结果「像不像一盘棋」的粗判据（只用于识图单帧的兜底决策）。
-//   broken = 明显坏了：全空 / 只有一色 / 子数超过棋盘 60% / 黑白差 > 6 / suspect。
-//   sane   = 至少有子、没超限、不 suspect（不强求黑白平衡 —— VC 题面可以只有一色）。
 static bool boardLooksBroken(int b, int w, int n, bool suspect) {
     if (suspect) return true;
     if (b + w == 0) return true;
@@ -1240,9 +1227,6 @@ static void countBoard(const cv::Mat& board, int& b, int& w) {
         }
 }
 
-// ★ 2026-10-19：整行/整列 15 格**同色**（且非空）在五子棋里不可能（连五就终局了）——
-//   出现就说明这条边线落在棋盘**外面**（截图的 UI 留白 / 桌面背景被当成第 15 条线），
-//   也就是「网格整体错位一格」。返回需要平移的方向（单位 = 一格）。
 static bool uniformEdgeShift(const cv::Mat& b, int& dx, int& dy) {
     const int n = b.rows;
     if (n < 5) return false;
@@ -1296,9 +1280,6 @@ ScanResult finishWithGeometry(const cv::Mat& masked, int size,
         chk.x_lines = g.x_lines;
         chk.y_lines = g.y_lines;
         double live = gridLiveness(crop, chk);
-        // ★★ 2026-10-13：闸门恢复桌面版助手（10-09）的 0.25 —— 10-12 那次优化把它放宽到
-        //   0.18，等于允许「几何已经不太对」的缓存几何继续产出落子坐标（错位棋子会漏读/误读）。
-        //   0.25 是旧口径：只要缓存网格在当前帧里活得不够好，就判 false → 上层全屏重定位。
         if (live < 0.25) {
             ScanResult r = notFound(offX, offY, 0, "locked-grid-dead");
             r.diag.set("liveness", Json::makeNum(live));
@@ -1318,10 +1299,6 @@ ScanResult finishWithGeometry(const cv::Mat& masked, int size,
     cv::Mat board, conf;
     Json diag;
 
-    // ★ 2026-10-19：识图单帧额外量一次「网格活得怎么样」（几何是否真的对上了线）。
-    //   旋转/透视/被 UI 遮挡的图，轴线采样会明显偏低 —— 这是把「几何对了但线没对上」
-    //   和「几何压根不对」区分开的唯一廉价信号。
-    //   注意：读子函数会**重建** diag，所以要先把值存局部变量，最后再写回 diag。
     double liveForce = -1.0;
     if (forceSync && !livenessGate) {
         Geometry chk;
@@ -1330,22 +1307,9 @@ ScanResult finishWithGeometry(const cv::Mat& masked, int size,
         liveForce = gridLiveness(crop, chk);
     }
 
-    // ★★ 2026-10-18 两级融合（用户口径：「初始先用我们的代码定位棋盘位置、自动选棋盘、识别棋盘，
-    //   这个做好之后，自动转换到人家的棋子识别层」）：
     //
-    //   ① 第一级 = **我们**：全新定位（livenessGate=false，即本帧刚跑完 findBoardRects +
-    //      refineGrid）时读子仍走自制的 readStonesAdaptive —— 首次拿到的棋盘必须是自家标定过的，
-    //      不把两套判别器混在同一帧里。
-    //   ② 第二级 = **对方的**：几何来自宿主锁定（上一帧锁定）或 stab 复用（livenessGate=true）⇒
-    //      棋盘已经被我们定位并稳定住，这时自动切到 readStonesSync（逐格判定 + 变化识别）。
-    //      交接点是 scanSub 里 `stab.Adopt(...)`：全新定位成功那一帧写入 stab，下一帧就进复用分支。
-    //  ③ 兜底：同步层若把整盘判成同一色（swamped，即 suspect）视为不可信 —— 这一帧退回自制读子，
-    //      不让一次坏读数把整盘喂给引擎。
-    // ★ 2026-10-19：forceSync（识图单帧）同样走 sync —— 单帧没有「上一帧锁定几何」可等，若不放行
-    //   就永远只用自制读子，那 5 项识别阈值对识图就是死参数。
     const bool useSync = (sync != nullptr) && (livenessGate || forceSync);
     if (useSync) {
-        // ★ 2026-10-19：forceSync（识图单帧）允许「整盘读空 → 松阈值重判」，见 gbsync.cpp。
         readStonesSync(crop, g, *sync, board, diag, /*allowRelax*/forceSync);
         bool swamped = (diag.find("suspect") && diag.find("suspect")->b);
         auto countStones = [](const cv::Mat& b) {
@@ -1356,10 +1320,6 @@ ScanResult finishWithGeometry(const cv::Mat& masked, int size,
             return c;
         };
         const int cntSync = countStones(board);
-        // ★★ 2026-10-19（用户：「只识别了棋盘，常常不会自动识别棋子」）：
-        //   识图单帧读到「0 颗子」时，再让**自制读子**读一遍，谁读出的子多用谁。
-        //   松阈值重判（gbsync 里）解决「棋子比格子小」这一类；自制读子解决「阈值怎么调都
-        //   读不出来」的另一类。两条都只在 forceSync（识图单帧）触发，连线稳态不受影响。
         const bool emptyFrame = (cntSync == 0);
         if (swamped || (emptyFrame && forceSync)) {
             cv::Mat boardA, confA;
@@ -1380,7 +1340,7 @@ ScanResult finishWithGeometry(const cv::Mat& masked, int size,
         }
     } else {
     readStonesAdaptive(crop, g, board, conf, diag);
-    if (sync) diag.set("reader", Json::makeStr("self"));   // 第一级：自家定位+读子
+    if (sync) diag.set("reader", Json::makeStr("self"));
 
     {
         bool sus0 = (diag.find("suspect") && diag.find("suspect")->b);
@@ -1410,15 +1370,6 @@ ScanResult finishWithGeometry(const cv::Mat& masked, int size,
     }
     }
 
-    // ★★ 2026-10-19（用户：「识图不太智能，明明能识别却没识别出来，优化图片适应性」）：
-    //   第三层兜底 —— **局部对比读子**（readStonesLocal）。
-    //   走到这里的结果如果「明显不像一盘棋」（全空 / 只有一色 / 子数超 60% / 黑白差 > 6 /
-    //   suspect），就再让局部对比读一遍；只有它读得像样时才接管。
-    //   典型能救回来的场景：
-    //     · 深色主题盘：黑子只比底色暗一点，绝对阈值（≤96）判不出来 ⇒ 整盘只剩白子；
-    //     · 浅色木盘：空格底色本身就 ≥159，白子判定把**空盘**读成满盘白（W=200+）；
-    //     · 截图缩放/坐标边距导致黑白子占比都偏低。
-    //   只在识图单帧（forceSync）启用，连线稳态不受影响（每帧多跑一次采样不划算）。
     if (forceSync) {
         int b0 = 0, w0 = 0;
         countBoard(board, b0, w0);
@@ -1446,10 +1397,6 @@ ScanResult finishWithGeometry(const cv::Mat& masked, int size,
         if (liveForce >= 0.0 && diag.type == Json::OBJ)
             diag.set("liveness", Json::makeNum(liveForce));
 
-        // ★★ 2026-10-19：网格错位一格的自愈（见 uniformEdgeShift 注释）。
-        //   截图里棋盘外面有留白/UI 时，第 15 条线经常被定到棋盘外 —— 表现为最外一行/列
-        //   整排同色（实测：一张 900px 的截图上整行 15 颗白子 = 把页面底色当成了棋子）。
-        //   把网格整体平移一格重读，只要平移后不再有「整行同色」就采用。
         if (sync) {
             int sdx = 0, sdy = 0;
             if (uniformEdgeShift(board, sdx, sdy)) {
@@ -1523,19 +1470,6 @@ ScanResult scanSub(const cv::Mat& rgbIn, int size, const ScanHint& hint,
   cv::Mat masked = rgbIn.clone();
   maskExcluded(masked, exclude, (int)offX, (int)offY);
 
-  // ★ 2026-10-14（用户：「识别棋子前期非常快，随着游戏时间变长就变慢了，是不是管道堆积？」）
-  //   实测定位（真实运行日志 %TEMP%\GomokuTrainer.log + 管道基准 tools/_bench_pipe.cpp）：
-  //   不是管道堆积 —— 管道/shm/outbox 全部有界且平稳（300 连发中位 30~54ms 无增长）。
-  //   真凶是 **suspect 帧的重复全搜**：几何锁定/缓存命中时读子本只要 ~50-150ms，但读出
-  //   suspect（棋子越多越容易：贴边/遮挡/低置信）就会 ①2x 裁剪重读 ②stab 缓存重读
-  //   ③再跌落到 findBoardRects+refineGrid+第三次读 —— 同样的像素一遍遍搜，单 tick 从
-  //   ~0.3s 涨到 0.5-1s（p90 4.7s，叠加 auto 全屏重搜窗口最长 10.7s），正好是
-  //   「越往后越慢」。修法：几何还活着时，suspect 帧的**全区域重搜限流 1.2s 一次**，
-  //   窗口内直接把 suspect 结果交还宿主（页面本就有 suspectTip 处理，行为不变、只去掉
-  //   无谓的重复搜索）；liveness 判死（几何失效）不受限流，照常重定位。
-  //   （2026-10-14 11:19 曾按用户方案试过「锁定态 suspect 一律早退、不自动全搜」，
-  //    真机反馈反而更慢 —— 锁定几何一旦失真，suspect 垃圾局面每帧刷新导致页面/引擎
-  //    反复重算；已整体回退到本限流版，回退见 git-less 项目日志。）
   ScanResult suspectHold;
   bool haveSuspectHold = false;
 
@@ -1554,19 +1488,6 @@ ScanResult scanSub(const cv::Mat& rgbIn, int size, const ScanHint& hint,
   }
 
   static StabGeo stab;
-  // ★★ 2026-10-13（用户：「当前棋盘识别的准度较低」＋「自动框选棋盘的逻辑，学习桌面版本
-  //   助手的参数和算法」）：
-  //   10-12 21:10 那次「帧差复用」性能优化（280ms → 118ms）把**棋盘是否移动的判定整个
-  //   删掉了** —— 只剩 `stab.sp > 0` 就直接用上一帧的几何去读子，并且把 liveness 闸门
-  //   从 0.25 放宽到 0.18。后果：棋盘被拖动 / 窗口被缩放 / 页面滚动 / 换平台切换边框时，
-  //   仍然拿**过期的线位置**去读子 ⇒ 整盘错位，这就是「准度较低」。
-  //   桌面版助手（Desktop version/，10-09 那份）用的就是**带 boardWindowChanged 判定**的
-  //   老参数，所以这里按它的口径恢复：几何指纹变了（平均灰度差 > 2.2）⇒ 老老实实全屏重定位。
-  //   （一颗棋子只占窗口 ~0.2% 面积，指纹差约 0.3 ≪ 2.2，所以正常落子**不会**触发重扫，
-  //    复用的加速仍然保留；只有棋盘真的动了才重扫。）
-  // ★ 2026-10-18 修订：几何复用不再对 sync 关闭 —— sync 现在只替换「棋子判定」，
-  //   棋盘定位仍走自制逻辑，所以这条缓存几何复用对 sync 同样安全且必要（否则每帧都要
-  //   重新找盘，正是「算得快但不准/棋盘不方正」的来源）。
   if (!probe && stab.has && (int)stab.xl.size() == size && (int)stab.yl.size() == size &&
       stab.sp > 0 && !boardWindowChanged(masked, stab.xl, stab.yl, stab.sp)) {
       long long readMs = 0;
@@ -1582,25 +1503,16 @@ ScanResult scanSub(const cv::Mat& rgbIn, int size, const ScanHint& hint,
   }
 
   if (haveSuspectHold) {
-      // ★ 窗口取 2500ms —— 必须**大于宿主扫描循环的 2s 稳态周期**（watch 事件触发 +
-      //   2000ms 兜底），否则稳态 suspect 风暴下每个 tick 都重新放行全搜，限流形同虚设。
-      //   代价：真正的网格漂移恢复最多延迟一个窗口（几何彻底失效仍由 liveness 闸门兜底，
-      //   不受本限流约束，立即全屏重定位）。
       static DWORD s_lastGeoFullRetry = 0;
       DWORD nowMs = GetTickCount();
       bool geoAlive = (locked && locked->has && (int)locked->xLines.size() == size &&
                        (int)locked->yLines.size() == size && locked->spacing > 0) ||
                       (stab.has && (int)stab.xl.size() == size && stab.sp > 0);
       if (geoAlive && nowMs - s_lastGeoFullRetry < 2500)
-          return suspectHold;            // ★ 限流窗口内：直接报 suspect，不做全区域重搜
-      s_lastGeoFullRetry = nowMs;        // 窗口外：放行一次全搜并刷新时钟
+          return suspectHold;
+      s_lastGeoFullRetry = nowMs;
   }
 
-  // ★★ 2026-10-18 修订（用户：「定位只走自制，禁用 sync 的 Hough 找盘」）：
-  //   连线识别维持混合口径 —— 棋盘定位一律走自制的 findBoardRects + refineGrid（方正、边框稳），
-  //   只有「棋子黑白判定」用同步算法的 syncCellInfo。同步工具的 locateBoardSync（HoughLinesP
-  //   独立求 gapV/gapH）**不再接入连线识别路径**：它会把已方正的网格改成非正方形，并让找盘
-  //   多跑一遍 Hough，正是「棋盘不是方的、识别还慢」的来源。函数本体保留（未接线），便于回退。
   cv::Mat gray;
     cv::cvtColor(masked, gray, cv::COLOR_RGB2GRAY);
     if (perf) {
@@ -1620,13 +1532,6 @@ ScanResult scanSub(const cv::Mat& rgbIn, int size, const ScanHint& hint,
         }
     }
     const long long _t1 = perf ? (long long)(cv::getTickCount() * 1000 / cv::getTickFrequency()) : 0;
-    // ★★ 2026-10-19（用户：「识图不太智能，明明能识别却没识别出来，优化图片适应性」）：
-    //   找盘 / 定型从「只试第一个候选」升级为**阶梯重试**：
-    //     车道 1：原图灰度，topn=4 逐个 refine（以前只 refine 第 1 个候选，错一个整帧就废）
-    //     车道 2：3×3 高斯（压 JPEG 块效应 / 相机噪点）
-    //     车道 3：CLAHE 均衡（压不均匀光照 / 低对比）
-    //     车道 4：1.5× 放大（细线、棋盘在整张图里很小）
-    //   只有前面车道失败才往下走 —— 正常图仍是原来的耗时。
     bool haveGeo = false;
     RefineResult geo;
     int lane = 0;
@@ -1650,7 +1555,7 @@ ScanResult scanSub(const cv::Mat& rgbIn, int size, const ScanHint& hint,
         return false;
     };
 
-    if (haveCand) {                                   // probe：候选已经有了
+    if (haveCand) {
         geo = refineGrid(masked, cand, size);
         haveGeo = geo.ok;
         lane = 1;
@@ -1664,8 +1569,6 @@ ScanResult scanSub(const cv::Mat& rgbIn, int size, const ScanHint& hint,
         if (attempt(gray, masked, 1.0, 8, topn)) {
             lane = 1;
         } else if (forceSync) {
-            // 以下三条只给识图单帧用：连线稳态没有棋盘（没进游戏/窗口被遮）时每拍都跑
-            // 四套预处理会把 2s 的扫描周期直接吃满，得不偿失。
             cv::Mat gb, rgbB;
             cv::GaussianBlur(gray, gb, cv::Size(3, 3), 0);
             cv::cvtColor(gb, rgbB, cv::COLOR_GRAY2RGB);
@@ -1710,14 +1613,10 @@ ScanResult scanSub(const cv::Mat& rgbIn, int size, const ScanHint& hint,
             geo.spacing = spTmp;
             if (perf) fprintf(stderr, "[perf] scan stab=adopted-new(board moved or first)\n");
         }
-        // ★ 两级融合的交接：这一帧是我们自己定位出来的棋盘，立刻把窗口指纹播种进去，
-        //   下一帧 stab 复用分支就能直接命中 ⇒ 从第二帧起自动切到同步读子。
         boardFpStore(masked, geo.xLines, geo.yLines, spTmp);
     }
     double spacing = geo.spacing != 0 ? geo.spacing : cand.step;
     
-    // ★ 2026-10-18 修订：自制定位（findBoardRects + refineGrid）产出的正交几何 →
-    //   读子换成交互算法的 syncCellInfo（sync 非空时）。
     ScanResult res = finishWithGeometry(masked, size, geo.xLines, geo.yLines,
                                         spacing, multi, offX, offY, &tReadMs, false, sync, forceSync);
     if (lane > 1 && res.diag.type == Json::OBJ) res.diag.set("lane", Json::makeInt(lane));
@@ -1739,12 +1638,10 @@ ScanResult scanOnce(const cv::Mat* rgbIn, int size, const ScanHint& hint,
     cv::Mat owned;
     const cv::Mat* rgb = rgbIn;
     double offX = 0, offY = 0;
-    bool directRegion = false;     // ★ 图像本体即 region（未走整屏抓取再裁剪）
+    bool directRegion = false;
     if (!rgb) {
         int ox = 0, oy = 0;
         CapSelect();
-        // ★ 2026-10-18：连线稳态每拍只读「已框定区域」，按 region 直接抓取即可，
-        //   不必整屏抓取后再裁（详见 captureScreenRect 注释）。越界/失败自动回退整屏。
         if (region && region->size() >= 4 && g_capMode == CapMode::GDI) {
             directRegion = captureScreenRect(
                 owned, ox, oy,
@@ -1770,15 +1667,12 @@ ScanResult scanOnce(const cv::Mat* rgbIn, int size, const ScanHint& hint,
         int oxI = iRound(offX), oyI = iRound(offY);
         int rx0 = iRound((double)(*region)[0]), ry0 = iRound((double)(*region)[1]);
         int rw0 = iRound((double)(*region)[2]), rh0 = iRound((double)(*region)[3]);
-        // directRegion：图像本体就是该区域，区域在图像内的偏移恒为 0；否则按整屏图内的偏移裁剪。
         int rx = directRegion ? 0 : rx0 - oxI, ry = directRegion ? 0 : ry0 - oyI;
         int h = rgb->rows, w = rgb->cols;
         rx = std::max(0, std::min(rx, w - 1));
         ry = std::max(0, std::min(ry, h - 1));
         int rw = std::max(1, std::min(rw0, w - rx));
         int rh = std::max(1, std::min(rh0, h - ry));
-        // 子图原点的绝对坐标（bx,by）：用于把绝对坐标的 locked/几何换算成子图局部坐标，
-        // 以及把结果再从局部坐标平移回绝对坐标。
         int bx = directRegion ? rx0 : rx, by = directRegion ? ry0 : ry;
 
         cv::Mat sub = directRegion ? owned : (*rgb)(cv::Rect(rx, ry, rw, rh)).clone();
@@ -1805,7 +1699,7 @@ ScanResult scanOnce(const cv::Mat* rgbIn, int size, const ScanHint& hint,
             shiftJsonNum(res.boardRect, "y", by);
             shiftJsonArr(res.geometry, "x_lines", bx);
             shiftJsonArr(res.geometry, "y_lines", by);
-            res.ox = offX + rx;      // directRegion 时 offX=rx0、rx=0 → 仍是区域左上角绝对坐标
+            res.ox = offX + rx;
             res.oy = offY + ry;
         }
         return res;

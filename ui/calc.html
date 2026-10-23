@@ -1,6 +1,5 @@
-
+﻿
 <!DOCTYPE html>
-<!-- Meter Gomoku Link — v4.43 -->
 <html lang="zh">
 <head>
 <meta charset="utf-8">
@@ -20,7 +19,7 @@
   window.onerror = function (m, s, l, c, e) {
     report('JSERR', m + ' @' + (s || '') + ':' + l + ':' + c +
       (e && e.stack ? ' | ' + String(e.stack).split('\n').slice(0, 3).join(' <- ') : ''));
-    return false;   // 不吞掉：控制台照旧能看到
+    return false;
   };
   window.addEventListener('unhandledrejection', function (ev) {
     var r = ev && ev.reason;
@@ -362,7 +361,9 @@
         </div>
         <div class="row"><label id="t_bgThink">后台思考</label>
           <input id="chk_bgThink" class="chk-dot" type="checkbox">
-          <span class="hint" id="t_bgThinkHint">轮到你时引擎继续深算（速度/节点持续上涨），落子后 AI 应手直接命中热置换表</span>
+          <!-- ★ 2026-10-23（用户：「删除这段文案，只在仪表盘 log 栏每次打开展示一次」）：
+               说明文字不再常驻在开关下面（窄窗里它要占三四行），改为启动时往 log 栏写一次。 -->
+          <span class="hint" id="t_bgThinkHint"></span>
         </div>
         <div class="row"><label id="t_rule">规则</label>
           <select id="sel_rule">
@@ -387,6 +388,13 @@
         </div>
         <div class="row"><label id="t_hash">哈希表</label>
           <select id="sel_hash"></select>
+        </div>
+        <!-- ★ 2026-10-23（用户：「对局设置里加引擎权重下拉，可选不同权重，不同电脑默认搭配最佳」）：
+             NNUE = mix9svq 权重（准，慢）；传统估值 = 只加载 classical + model260809（快，
+             同时间搜得深）。宿主收到变化后对 config-classic.toml 发 RELOADCONFIG。 -->
+        <div class="row"><label id="t_weights">引擎权重</label>
+          <select id="sel_weights"></select>
+          <span class="hint" id="weightsHint"></span>
         </div>
         
         <div class="row"><span class="hint" id="hashInfo"></span></div>

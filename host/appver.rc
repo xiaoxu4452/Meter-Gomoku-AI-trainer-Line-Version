@@ -1,4 +1,4 @@
-/* 自动生成，勿手改 —— 由 tools/gen-appver-rc.js 从 calc.js 的 APP_VERSION 生成。 */
+
 #include <winver.h>
 
 VS_VERSION_INFO VERSIONINFO

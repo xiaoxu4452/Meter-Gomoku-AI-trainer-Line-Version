@@ -1,4 +1,3 @@
-// Meter Gomoku Link — v4.43
 /* Vision - boardscanapi. */
 
 
@@ -81,7 +80,7 @@ std::string ScanDirect(const std::string& body) {
     std::vector<int> region;
     std::vector<ExcludeRect> exclude;
     LockedGeo locked;                 
-    SyncRecogParams syncP;            // ★ 2026-10-18：连线同步算法识别参数
+    SyncRecogParams syncP;
     const SyncRecogParams* useSync = nullptr;
     if (!body.empty()) {
         if (jsonParse(body, reqJson)) {
@@ -117,10 +116,6 @@ std::string ScanDirect(const std::string& body) {
                 }
             }
 
-            // ★ 2026-10-18：algo=sync 时启用同步算法识别，并读取其 6 项参数。
-            //   ★ 参数归一化照 readboard 的 RecognitionThresholds.GetEffective：
-            //   `NormalizePositive(v, fallback)` —— 非正值一律回落到默认值，绝不把 0 当阈值用
-            //   （0 会让"占比 ≥ 0"恒真 ⇒ 整盘全黑/全白，正是错误来源）。
             if (reqJson.strOr("algo", "") == "sync") {
                 auto norm = [](int v, int fb) { return v > 0 ? v : fb; };
                 const Json* rc = reqJson.find("recog");
@@ -154,7 +149,6 @@ std::string ScanDirect(const std::string& body) {
         return j.dump();
     }
 
-    // ★ 诊断：明确回答“这次请求用的是哪套读子”（sync=同步算法 / adaptive=自制）
     if (res.ok) res.diag.set("algo", Json::makeStr(useSync ? "sync" : "adaptive"));
 
     if (res.found && !res.boardRect.obj.empty()) {

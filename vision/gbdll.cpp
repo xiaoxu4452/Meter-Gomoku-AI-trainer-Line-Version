@@ -1,4 +1,3 @@
-// Meter Gomoku Link — v4.43
 /* Vision - boarddll. */
 
 
@@ -205,10 +204,6 @@ int GbvRecognizeJson(const char* req, int reqLen, char* out, int cap) {
             result = recognizeWulin(geo ? *geo : Json::makeObj(),
                                     win ? *win : Json::makeObj(), size);
         } else if (reqJson.strOr("algo", "") == "sync") {
-            // ★ 2026-10-19：识图走「新的视觉引擎」——自制定位(findBoardRects+refineGrid) + 同步读子。
-            //   旧的 recognize()（暗细节投影/格轴那套）是另一条算法链，识图页的 5 项阈值对它完全无效，
-            //   这正是「拖动识别参数没有任何变化」的根因。此处改为和连线窗同一条 scanOnce 链，并用
-            //   forceSync=true 让单帧图片也直接进 sync 分支（单帧等不到「上一帧锁定几何」）。
             std::string image = reqJson.strOr("image", "");
             if (image.compare(0, 5, "data:") == 0) {
                 size_t p = image.find("base64,");
@@ -221,7 +216,6 @@ int GbvRecognizeJson(const char* req, int reqLen, char* out, int cap) {
             cv::Mat rgb;
             cv::cvtColor(decoded, rgb, cv::COLOR_BGR2RGB);
 
-            // 参数归一化口径与 ScanDirect 的 algo=sync 完全一致（非正值回落默认）。
             auto norm = [](int v, int fb) { return v > 0 ? v : fb; };
             SyncRecogParams syncP;
             const Json* rc = reqJson.find("recog");
@@ -237,13 +231,6 @@ int GbvRecognizeJson(const char* req, int reqLen, char* out, int cap) {
                                       &syncP, /*forceSync*/true);
             if (res.ok) res.diag.set("algo", Json::makeStr("sync"));
 
-            // ★★ 2026-10-19（用户：「识图不太智能，明明能识别却没识别出来，优化图片适应性」）：
-            //   **几何校验兜底**。sync 链要求棋盘正放（网格线必须与坐标轴平行）；旋转 3° 以上、
-            //   拍屏照片、透视变形会让 refineGrid 定出一个"假网格" —— found=true、liveness≈0、
-            //   棋子全在错的位置（实测：旋转 3° 时 sync 读出 0 黑 14 白，实际 10 黑 10 白）。
-            //   这时改用旧识别器（投影 + 部分格点，对旋转容忍得多）再算一遍，谁读出的子多用谁。
-            //   触发条件：没找到盘，或 liveness < 0.15。细线图 liveness 也可能偏低，所以还要求
-            //   旧识别器**真的读出了子**且数量不少于 sync，才允许接管。
             bool usedLegacy = false;
             {
                 const Json* lv = res.diag.find("liveness");

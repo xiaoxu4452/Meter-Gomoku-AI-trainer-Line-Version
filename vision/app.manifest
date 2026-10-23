@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<!-- Meter GomokuVision 应用程序清单。
-     ★ 2026-10-19：防查杀。这个 exe 是宿主按需拉起的本地识别服务（命名管道 + 共享内存），
-     以前连版本资源都没有；补一份「正常应用」清单，让安全软件的启发式少一条可疑依据。
-     本文件被 rc.exe 以 RT_MANIFEST(id=1) 原样编入 exe。 -->
+
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <assemblyIdentity type="win32" name="Meter.GomokuVision"
                     version="4.42.0.0" processorArchitecture="amd64"/>
@@ -27,7 +24,7 @@
 
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
-      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+      <longPathAware xmlns="http:
     </windowsSettings>
   </application>
 </assembly>
