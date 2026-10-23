@@ -1233,6 +1233,7 @@ void readStonesAdaptive(const cv::Mat& rgb, const GeoLike& geo,
 
     int removed = stripBorderArtifacts(board, &conf);
 
+    // Fixed star points of a 15x15 board: a low-confidence dark blob at a
     // star point is the board marker (possibly occluded by a corner logo),
     // not a stone.
     if (n == 15) {

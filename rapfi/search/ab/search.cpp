@@ -524,8 +524,6 @@ int ABSearcher::pickNextDepth(SearchEngine &threads, uint32_t thisId, int lastDe
 
         // If more than half of all threads are already searching depth above
         // the next depth, skip and find another next depth.
-        // 1/2 -> 1/4 stagger threshold experiment: ineffective (T8 depth 22.2,
-        // 83% move agreement), reverted to the official value.
         if (numThreadsAboveNextDepth > threads.size() / 2)
             continue;
         else

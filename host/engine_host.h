@@ -18,7 +18,7 @@ namespace host {
 HANDLE       Job();
 void         PostPage(const std::string& json);
 void         PostLink(const std::string& json);
-void         Log(const std::string& s);
+void         Log(const std::string& s);           // GomokuTrainer.log（LogMsg）
 std::wstring EngineDir();                         // <ExeDir>/rapfi-native
 void         ChildTracked(HANDLE hProcess);
 bool         ApplyAffinity(HANDLE hProcess);
@@ -89,6 +89,7 @@ void Shutdown();
 bool Available();
 const std::string& Diag();
 
+// ---------------------------------------------------------------- IPC（4 op）
 void HandleOp(const std::string& op, int id, const std::string& qJson, bool fromLink);
 
 Caps GetCaps();

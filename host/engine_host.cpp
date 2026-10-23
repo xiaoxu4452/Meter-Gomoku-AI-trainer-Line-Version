@@ -1,9 +1,4 @@
 //
-// engine_host.cpp - Rapfi "fast" engine invocation layer (single authority on the host).
-// Contract in engine_host.h. Sections: helpers -> state -> ISA probe/variant fallback
-// -> defaults & user prefs -> process lifecycle (Spawn/Reader/Shutdown) -> INFO-only
-// parser (ParseLine) -> ask orchestration -> public API (Init/HandleOp/GetCaps/...).
-//
 
 #include "engine_host.h"
 
@@ -593,10 +588,6 @@ static void SpawnLocked() {
   g_appliedSwapable = -1;
   g_appliedThreads = EffectiveThreads();
   g_appliedHashKB  = EffectiveHashKB();
-  // Boot: START + rule + detail, then optional classic-eval config, then the "readiness"
-  // probe. Rapfi 0.44 decompresses 4 NNUE weight files (~38MB) and allocates the TT
-  // before printing its first line; the ABOUT reply is FIFO-guaranteed to arrive after
-  // model load, so it is the only signal that never misreports ready.
   std::string boot = "START 15\nINFO RULE 0\nINFO SHOW_DETAIL 3\n";
   if (g_weightsMode == "classic") boot += "RELOADCONFIG config-classic.toml\n";
   boot += "INFO THREAD_NUM " + std::to_string(g_appliedThreads) + "\n";
@@ -728,6 +719,7 @@ void ParseLine(const std::string& line, ParseState& st) {
       int bp = (int)(d * 10000.0 + 0.5);
       st.cur.winrateBp = bp < 0 ? 0 : (bp > 10000 ? 10000 : bp);
     } else if (tok == "BESTLINE") {
+      // `INFO PV <idx>` … `INFO BESTLINE x,y …` … `INFO PV DONE`，
       st.cur.pv = ParseCoordList(val);
       if (!st.cur.pv.empty()) { st.cur.x = st.cur.pv[0].first; st.cur.y = st.cur.pv[0].second; }
     }
@@ -863,8 +855,6 @@ static std::string BuildAskCmds(const AskRequest& req, bool forceFull) {
   if (req.rule != g_appliedRule) { g_appliedRule = req.rule; c += "INFO RULE " + std::to_string(req.rule) + "\n"; }
   int pon = req.live ? 0 : (req.pondering ? 1 : 0);
   if (pon != g_appliedPonder) { g_appliedPonder = pon; c += "INFO PONDERING " + std::to_string(pon) + "\n"; }
-  // SWAPABLE is off by default in Rapfi; only INFO SWAPABLE 1 makes the root also
-  // search the swap move (searchengine.cpp). SWAP1/SWAP2 rules (mapped to 5) need it.
   int swapable = (req.rule == 5) ? 1 : 0;
   if (swapable != g_appliedSwapable) {
     g_appliedSwapable = swapable;
@@ -1263,8 +1253,6 @@ void HandleOp(const std::string& op, int id, const std::string& q, bool fromLink
     std::string w = QStr(q, "weights");
     if (w != "nnue" && w != "classic") w = "nnue";
     bool wChanged = (w != g_weightsMode);
-    // NNUE vs classic eval: switching restarts the engine process so model
-    // re-extraction and TT rebuild leave no dirty state.
     g_weightsMode = w;
     SetUserPrefs(t, h);
     if (wChanged && g_e.alive) {

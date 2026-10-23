@@ -258,6 +258,25 @@ var pendingEvalKey = null;
 var analyzeRetryTimer = null;          
 
 var lastBl = [], lastWh = [];        
+var bgChainTimer = 0;
+try {
+  window.addEventListener('storage', function (e) {
+    if (!e || e.key !== 'gbcalc.settings.v1' || !e.newValue) return;
+    try {
+      var o = JSON.parse(e.newValue);
+      var ch = [];
+      if (typeof o.bgThink === 'boolean' && o.bgThink !== S.bgThink) {
+        S.bgThink = o.bgThink;
+        if (!o.bgThink && bgChainTimer) { clearTimeout(bgChainTimer); bgChainTimer = 0; }
+        ch.push('bgThink=' + (o.bgThink ? 'on' : 'off'));
+      }
+      if (o.turnMs >= 200 && o.turnMs !== S.turnMs) { S.turnMs = o.turnMs; ch.push('turnMs=' + o.turnMs); }
+      if (o.cores >= 2 && o.cores !== S.cores) { S.cores = o.cores; ch.push('cores=' + o.cores); }
+      if (o.hashMB >= 1 && o.hashMB !== S.hashMB) { S.hashMB = o.hashMB; ch.push('hash=' + o.hashMB); }
+      if (ch.length) { try { if (typeof bridgeDiag === 'function') bridgeDiag('LINK_CFG 同步主窗设置 ' + ch.join(' ')); } catch (e2) {} }
+    } catch (x) {}
+  });
+} catch (eSt) {}
 var lastAdoptBl = [], lastAdoptWh = [];   
 
 var linkOppTurnAt = 0;
@@ -945,8 +964,10 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     return Math.max(300, S.turnMs || 2000);
   }
 
-  async function analyze(bl, wh) {
+  async function analyze(bl, wh, chain) {
     var fpNow = boardKey(bl, wh);
+    var isChain = !!chain;
+    if (bgChainTimer) { clearTimeout(bgChainTimer); bgChainTimer = 0; }
     if (engineBusy) { pendingEvalKey = fpNow; return; }   
     engineBusy = true;
     try {
@@ -987,7 +1008,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         postGuide(true, bx[0], bx[1]);
         if (final) {
           lastBest = bx; lastMainC0 = c00; lastEvalFp = fpNow;
-          if (adOn) adMaybeFire(bx[0], bx[1]);
+          if (adOn && !isChain) adMaybeFire(bx[0], bx[1]);
         }
         return bx;
       };
@@ -1085,8 +1106,32 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         analyze(lastBl, lastWh);
       } else {
         pendingEvalKey = null;
+        scheduleBgChain(fpNow);
       }
     }
+  }
+
+  function bgChainWanted(fp) {
+    if (!S.bgThink) return false;
+    try {
+      if (engineBusy) return false;
+      if (typeof swBusy !== 'undefined' && swBusy) return false;
+      if (balBusy) return false;
+      if (!boardGeo) return false;
+      if (boardKey(lastBl, lastWh) !== fp) return false;
+      if ((lastBl.length + lastWh.length) < 1) return false;
+      return sideToMove(lastBl, lastWh) === myColOf();
+    } catch (e) { return false; }
+  }
+  function scheduleBgChain(fp) {
+    if (bgChainTimer) { clearTimeout(bgChainTimer); bgChainTimer = 0; }
+    if (!bgChainWanted(fp)) return;
+    bgChainTimer = setTimeout(function () {
+      bgChainTimer = 0;
+      if (!bgChainWanted(fp)) return;
+      try { bridgeDiag('LINK_BGCHAIN 接力续算（盘面未变，TT 热）'); } catch (e) {}
+      analyze(lastBl, lastWh, true);
+    }, 120);
   }
 
   function boardToScreen(x, y) {

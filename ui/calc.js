@@ -9365,6 +9365,7 @@ function buildSelects() {
   renderSysInfo();
   var maxT = Math.max(1, host.threadsMax || 1);
   //     t=10 2879K nps / d22  ·  t=12 3567K / d29  ·  t=14~16 4.0M+ / d30
+  //     10s：T4 depth 23 / 0.73M      vs   T14 depth 22 / 2.36M
   var physC = Math.max(0, host.physCores | 0);
   var lowCores = (physC > 1) ? (S.cores < physC) : (S.cores >= 10 && S.cores <= 12);
   if (lowCores && maxT > S.cores && !migFlag('threadsTopo4')) {

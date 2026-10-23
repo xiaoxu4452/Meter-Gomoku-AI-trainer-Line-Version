@@ -4587,6 +4587,7 @@ static void SaveLinkRecogPrefs() {
   fclose(f);
 }
 
+//   [{"name":"…","recog":{"interval":..,…},"ts":1690000000000}, …]）。
 static std::wstring LinkRecogSlotsFile() {
   wchar_t tmp[MAX_PATH] = {0};
   GetTempPathW(MAX_PATH, tmp);
@@ -6844,6 +6845,7 @@ static void StartLinkScanLoop() {
           
           Sleep(100);
         } else {
+          // Fixed 50ms locked rhythm instead of the frame watch event: a
           // steady poll keeps per-tick latency uniform and engine load flat
           // (stone-change capture target ~50ms; the 10-04 vision DLL still
           // needs its ~65ms full recognition per tick, which is the floor).
@@ -7776,6 +7778,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       }
       if (w == kMainTimerTestLinkProbe2) {
         KillTimer(h, kMainTimerTestLinkProbe2);
+        //   {type:'linkCfgSync',rule:N}（calc.js sel_rule.onchange → tellHost），
         if (g_webview) {
           const char* inj =
             "(function(){try{"

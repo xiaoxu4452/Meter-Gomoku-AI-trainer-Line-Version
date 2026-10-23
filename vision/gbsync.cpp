@@ -15,6 +15,7 @@ namespace {
 inline int iRoundD(double v) { return (int)std::nearbyint(v); }
 
 //
+// C# LegacyVerticalLine / LegacyHorizontalLine：
 //   VerticalLine(pos=x, StartPoint=(x,minY), EndPoint=(x,maxY))
 //   HorizontalLine(pos=y, StartPoint=(minX,y), EndPoint=(maxX,y))
 struct SyncVLine { int pos = 0, lo = 0, hi = 0; bool del = false; bool validate = false; };
@@ -224,6 +225,8 @@ void trimHOffsets(std::vector<SyncOffset>& o, const std::vector<SyncVLine>& v, i
 }
 
 //
+//   · LegacyBoardCaptureService.IsSameAsPreviousContent：
+//   · LegacyBoardRecognitionService.RecognitionCacheEntry.Matches：
 //
 constexpr uint64_t kFnvBasis = 14695981039346656037ULL;
 constexpr uint64_t kFnvPrime = 1099511628211ULL;
