@@ -173,6 +173,10 @@ static int          g_appliedHashKB  = 0;
 static int          g_appliedRule    = -1;
 static int          g_appliedPonder  = -1;
 static int          g_appliedSwapable = -1;
+static int          g_candRange      = -1;
+static int          g_maxDepth       = -1;
+static long long    g_maxNodes       = -1;
+static std::string  g_variantOverride;
 static std::string  g_weightsMode = "nnue";    // "nnue" | "classic"
 
 static std::mutex g_writeMu;
@@ -240,14 +244,20 @@ static CpuCaps CpuIdCaps() {
   bool zmm    = osxsave && (xcr0 & 0xE6) == 0xE6;
   if (r[0] < 7) return c;
   __cpuidex(r, 7, 0);
+  unsigned maxSub = (unsigned)r[0];
   bool avx2bit = (r[1] >> 5) & 1;
   bool f512 = (r[1] >> 16) & 1, dq = (r[1] >> 17) & 1, bw = (r[1] >> 30) & 1, vl = (r[1] >> 31) & 1;
   bool v512 = (r[2] >> 11) & 1;
   c.avx2       = avxSup && xmmYmm && avx2bit;
   c.avx512f    = c.avx2 && zmm && f512 && dq && bw && vl;
   c.avx512vnni = c.avx512f && v512;
-  __cpuidex(r, 7, 1);
-  c.avxvnni    = c.avx2 && (((unsigned)r[0] >> 4) & 1) != 0;
+  if (maxSub >= 1) {
+    __cpuidex(r, 7, 1);
+    c.avxvnni = c.avx2 && (((unsigned)r[0] >> 4) & 1) != 0;
+  }
+  else {
+    c.avxvnni = false;
+  }
   return c;
 }
 
@@ -353,6 +363,152 @@ static bool SmokeVariantOk(const std::wstring& dir, const std::string& name) {
   return sawMove && (code == 0 || code == STILL_ACTIVE);
 }
 
+static long long BenchOneRound(const std::wstring& dir, const std::string& name, int threads) {
+  std::wstring exe = Join(dir, std::wstring(L"RapfiEngine-") + Utf8ToWide(name) + L".exe");
+  SECURITY_ATTRIBUTES sa = {};
+  sa.nLength = sizeof(sa);
+  sa.bInheritHandle = TRUE;
+  HANDLE inR = nullptr, inW = nullptr, outR = nullptr, outW = nullptr;
+  if (!CreatePipe(&inR, &inW, &sa, 0)) return -1;
+  if (!CreatePipe(&outR, &outW, &sa, 0)) { CloseHandle(inR); CloseHandle(inW); return -1; }
+  SetHandleInformation(inW, HANDLE_FLAG_INHERIT, 0);
+  SetHandleInformation(outR, HANDLE_FLAG_INHERIT, 0);
+  STARTUPINFOW si = {};
+  si.cb = sizeof(si);
+  si.dwFlags = STARTF_USESTDHANDLES;
+  si.hStdInput = inR; si.hStdOutput = outW; si.hStdError = outW;
+  PROCESS_INFORMATION pi = {};
+  std::wstring cmd = L"\"" + exe + L"\"";
+  std::vector<wchar_t> cbuf(cmd.begin(), cmd.end());
+  cbuf.push_back(0);
+  if (!CreateProcessW(nullptr, cbuf.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
+                      nullptr, dir.c_str(), &si, &pi)) {
+    CloseHandle(inR); CloseHandle(inW); CloseHandle(outR); CloseHandle(outW);
+    return -1;
+  }
+  CloseHandle(pi.hThread);
+  HANDLE job = host::Job();
+  if (job) AssignProcessToJobObject(job, pi.hProcess);
+  host::ChildTracked(pi.hProcess);
+  CloseHandle(inR);
+  std::string script =
+      "START 15\nINFO RULE 0\nINFO SHOW_DETAIL 3\nINFO THREAD_NUM " + std::to_string(threads) +
+      "\nINFO HASH_SIZE 65536\nINFO PONDERING 0\nINFO TIMEOUT_MATCH 6000000\nINFO TIME_LEFT 6000000\n"
+      "INFO TIMEOUT_TURN 1000\n"
+      "YXBOARD 7,7,1 7,8,2 8,8,1 6,7,2 8,7,1 6,8,2 9,9,1 DONE\nYXNBEST 1\n";
+  DWORD written = 0;
+  WriteFile(inW, script.data(), (DWORD)script.size(), &written, nullptr);
+  CloseHandle(inW);
+
+  long long nodes = 0;
+  bool sawMove = false;
+  std::string pending;
+  char rb[4096];
+  const DWORD t0 = NowMs();
+  while (NowMs() - t0 < 6000) {
+    DWORD avail = 0;
+    if (PeekNamedPipe(outR, nullptr, 0, nullptr, &avail, nullptr) && avail > 0) {
+      DWORD n = 0;
+      DWORD want = avail > (DWORD)sizeof(rb) ? (DWORD)sizeof(rb) : avail;
+      if (ReadFile(outR, rb, want, &n, nullptr) && n > 0) {
+        pending.append(rb, n);
+        size_t pos = 0;
+        while ((pos = pending.find('\n')) != std::string::npos) {
+          std::string line = pending.substr(0, pos);
+          pending.erase(0, pos + 1);
+          if (!line.empty() && line.back() == '\r') line.pop_back();
+          if (line.compare(0, 16, "INFO TOTALNODES ") == 0) {
+            long long v = _atoi64(line.c_str() + 16);
+            if (v > nodes) nodes = v;
+          } else if (IsBareMove(line)) {
+            sawMove = true;
+          }
+        }
+      }
+    }
+    if (sawMove) break;
+    DWORD code2 = 0;
+    if (GetExitCodeProcess(pi.hProcess, &code2) && code2 != STILL_ACTIVE) break;
+    Sleep(30);
+  }
+  DWORD code = 0;
+  GetExitCodeProcess(pi.hProcess, &code);
+  if (code == STILL_ACTIVE) TerminateProcess(pi.hProcess, 0);
+  CloseHandle(pi.hProcess);
+  CloseHandle(outR);
+  return sawMove ? nodes : -1;
+}
+
+static std::atomic<bool> g_benchRun{false};
+
+static void BenchThreadMain() {
+  for (int i = 0; i < 8 && g_benchRun; ++i) Sleep(500);
+  if (!g_benchRun) return;
+  CpuCaps caps = CpuIdCaps();
+  int threads = EffectiveThreads();
+  std::string cur = g_variant;
+  std::string best;
+  long long bestN = -1, logN = -1;
+  std::string log;
+  for (const char* v : kVariantOrder) {
+    if (!g_benchRun) return;
+    std::string name(v);
+    if (name == "sse") break;
+    if (!VariantCpuOk(name, caps)) continue;
+    if (!FileExists(Join(g_dir, std::wstring(L"RapfiEngine-") + Utf8ToWide(name) + L".exe"))) continue;
+    long long warm = BenchOneRound(g_dir, name, threads);
+    if (warm < 0) { ELOG("auto-bench: " + name + " 跑不动（非法指令？）跳过"); continue; }
+    long long n2 = BenchOneRound(g_dir, name, threads);
+    long long n3 = g_benchRun ? BenchOneRound(g_dir, name, threads) : -1;
+    long long sc = n2 > n3 ? n2 : n3;
+    if (logN < 0) logN = 0;
+    log += name + "=" + std::to_string(sc / 1000) + "k ";
+    if (sc > bestN) { bestN = sc; best = name; }
+  }
+  if (!g_benchRun || best.empty()) return;
+  ELOG("auto-bench（T" + std::to_string(threads) + " 节点/局）: " + log + "→ " + best);
+  {
+    FILE* f = _wfopen(Join(g_dir, L".variant-bench").c_str(), L"wb");
+    if (f) {
+      std::string rec = best + " " + CpuFingerprint() + "\n";
+      fwrite(rec.data(), 1, rec.size(), f);
+      fclose(f);
+    }
+  }
+  if (best == cur || !g_variantOverride.empty()) return;
+  bool busy = false;
+  { std::lock_guard<std::mutex> ls(g_stMu); busy = g_cur.active || g_cur.alive; }
+  if (busy) { ELOG("auto-bench: 引擎忙，" + best + " 下次启动生效"); return; }
+  g_probed = false; g_avail = false; g_variant.clear();
+  if (g_e.alive) {
+    std::lock_guard<std::mutex> lk(g_e.spawnMu);
+    if (g_e.hProcess) { TerminateProcess(g_e.hProcess, 0); CloseHandle(g_e.hProcess); g_e.hProcess = nullptr; }
+    { std::lock_guard<std::mutex> lw(g_writeMu); if (g_e.hStdin) { CloseHandle(g_e.hStdin); g_e.hStdin = nullptr; } }
+    g_e.alive = false;
+    { std::lock_guard<std::mutex> ls(g_stMu);
+      g_cur.active = false; g_cur.alive = false; g_cur.done = true; g_drain = 0; }
+    g_stCv.notify_all();
+  }
+  ELOG("auto-bench: 热切换 → " + best + "（下次 ask 生效）");
+  host::OnVariantChanged();
+}
+
+static std::string ReadBenchCache() {
+  FILE* f = _wfopen(Join(g_dir, L".variant-bench").c_str(), L"rb");
+  if (!f) return std::string();
+  char buf[256] = {0};
+  size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+  fclose(f);
+  std::string cached(buf, n);
+  while (!cached.empty() && (cached.back() == '\n' || cached.back() == '\r' || cached.back() == ' '))
+    cached.pop_back();
+  size_t sp = cached.find(' ');
+  std::string v = (sp != std::string::npos) ? cached.substr(0, sp) : cached;
+  std::string fp = (sp != std::string::npos) ? cached.substr(sp + 1) : std::string();
+  if (v.empty() || fp != CpuFingerprint()) return std::string();
+  return v;
+}
+
 static std::string ReadEngineSourceTag(const std::string& variant) {
   FILE* f = _wfopen(Join(g_dir, L"engines.json").c_str(), L"rb");
   if (!f) return std::string();
@@ -379,10 +535,33 @@ static bool Probe() {
   }
   g_dir = dir;
   CpuCaps caps = CpuIdCaps();
+  if (!g_variantOverride.empty()) {
+    if (VariantCpuOk(g_variantOverride, caps) &&
+        FileExists(Join(dir, std::wstring(L"RapfiEngine-") + Utf8ToWide(g_variantOverride) + L".exe"))) {
+      g_variant = g_variantOverride;
+      g_avail   = true;
+      ELOG("可用（用户指定变体）：variant=" + g_variant);
+      return true;
+    }
+    ELOG("用户指定的变体不可用 → 回退自动探测：" + g_variantOverride);
+    g_variantOverride.clear();
+  }
   ELOG("cpuid: avx2=" + std::string(caps.avx2 ? "1" : "0") +
        " avx512f=" + std::string(caps.avx512f ? "1" : "0") +
        " avx512vnni=" + std::string(caps.avx512vnni ? "1" : "0") +
        " avxvnni=" + std::string(caps.avxvnni ? "1" : "0"));
+
+  {
+    std::string v = ReadBenchCache();
+    if (!v.empty() && VariantCpuOk(v, caps) &&
+        FileExists(Join(dir, std::wstring(L"RapfiEngine-") + Utf8ToWide(v) + L".exe"))) {
+      g_variant = v;
+      g_avail = true;
+      ELOG("可用（本机实测最快）：variant=" + g_variant);
+      return true;
+    }
+    if (!v.empty()) ELOG(".variant-bench 与本机不匹配 → 跳过（" + v + "）");
+  }
 
   {
     FILE* f = _wfopen(Join(dir, L".variant-ok").c_str(), L"rb");
@@ -570,7 +749,7 @@ static void SpawnLocked() {
   HANDLE job = host::Job();
   if (job) AssignProcessToJobObject(job, pi.hProcess);
   host::ApplyAffinity(pi.hProcess);
-  SetPriorityClass(pi.hProcess, ABOVE_NORMAL_PRIORITY_CLASS);
+  SetPriorityClass(pi.hProcess, NORMAL_PRIORITY_CLASS);
   host::PinHostAway();
   host::ChildTracked(pi.hProcess);
 
@@ -860,6 +1039,11 @@ static std::string BuildAskCmds(const AskRequest& req, bool forceFull) {
     g_appliedSwapable = swapable;
     c += "INFO SWAPABLE " + std::to_string(swapable) + "\n";
   }
+  if (g_candRange >= 0) c += "INFO CAUTION_FACTOR " + std::to_string(g_candRange) + "\n";
+  if (!req.live) {
+    if (g_maxDepth >= 2)  c += "INFO MAX_DEPTH " + std::to_string(g_maxDepth) + "\n";
+    if (g_maxNodes >= 1)  c += "INFO MAX_NODE "  + std::to_string(g_maxNodes) + "\n";
+  }
   c += "INFO TIMEOUT_TURN " + std::to_string(budget) + "\n";
   c += "INFO TIMEOUT_MATCH 6000000\nINFO TIME_LEFT 6000000\n";
   if (incr) {
@@ -1089,12 +1273,20 @@ static void DoAsk(const AskRequest& req, int id, bool fromLink) {
        (g_cur.superseded ? " [superseded]" : ""));
 }
 
+static std::thread g_benchThread;
+
 bool Init() {
   StartWorker();
   LoadPrefs();
   bool ok = Probe();
   ELOG(std::string("Init: ") + (ok ? "ok" : "failed") + " variant=" +
        (g_variant.empty() ? "(none)" : g_variant));
+  char tbEnv[8] = {0};
+  bool e2eMode = GetEnvironmentVariableA("GB_TEST_OPEN_LINK", tbEnv, sizeof(tbEnv)) > 0;
+  if (ok && !e2eMode && g_variantOverride.empty() && ReadBenchCache().empty()) {
+    g_benchRun = true;
+    std::thread([] { BenchThreadMain(); }).detach();
+  }
   return ok;
 }
 
@@ -1102,6 +1294,7 @@ bool Available() { return Probe(); }
 const std::string& Diag() { return g_diag; }
 
 void Shutdown() {
+  g_benchRun = false;
   if (g_e.hProcess) {
     WriteRaw("STOP\nEND\n");
     if (WaitForSingleObject(g_e.hProcess, 900) != WAIT_OBJECT_0)
@@ -1133,6 +1326,7 @@ Caps GetCaps() {
   Probe();
   c.available   = g_avail;
   c.variant     = g_variant;
+  c.benchVariant = ReadBenchCache();
   c.engineSource = g_variant.empty() ? std::string() : ReadEngineSourceTag(g_variant);
   CpuCaps k = CpuIdCaps();
   c.hasSSE = k.sse; c.hasAVX2 = k.avx2; c.hasAVX512 = k.avx512f;
@@ -1254,8 +1448,24 @@ void HandleOp(const std::string& op, int id, const std::string& q, bool fromLink
     if (w != "nnue" && w != "classic") w = "nnue";
     bool wChanged = (w != g_weightsMode);
     g_weightsMode = w;
+    int cr = QInt(q, "caution");
+    int md = QInt(q, "maxDepth");
+    long long mn = (long long)QI64(q, "maxNodes");
+    g_candRange = (cr >= 0 && cr <= 5) ? cr : -1;
+    g_maxDepth  = (md >= 2) ? md : -1;
+    g_maxNodes  = (mn >= 1) ? mn : -1;
+    std::string var = QStr(q, "variant");
+    bool vChanged = (var != g_variantOverride);
+    if (vChanged) {
+      g_variantOverride = var;
+      g_probed = false;
+      g_avail  = false;
+      g_variant.clear();
+      DeleteFileW(Join(g_dir, L".variant-ok").c_str());
+      ELOG("引擎变体切换 -> " + (var.empty() ? "自动" : var) + "（下次 ask 重新探测）");
+    }
     SetUserPrefs(t, h);
-    if (wChanged && g_e.alive) {
+    if ((wChanged || vChanged) && g_e.alive) {
       std::lock_guard<std::mutex> lk(g_e.spawnMu);
       if (g_e.hProcess) { TerminateProcess(g_e.hProcess, 0); CloseHandle(g_e.hProcess); g_e.hProcess = nullptr; }
       { std::lock_guard<std::mutex> lw(g_writeMu); if (g_e.hStdin) { CloseHandle(g_e.hStdin); g_e.hStdin = nullptr; } }

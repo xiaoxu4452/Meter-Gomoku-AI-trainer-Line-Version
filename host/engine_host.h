@@ -24,6 +24,7 @@ void         ChildTracked(HANDLE hProcess);
 bool         ApplyAffinity(HANDLE hProcess);
 void         PinHostAway();
 void         UnpinHost();
+void         OnVariantChanged();
 int          PhysCores();
 int          LogicCores();
 int          ThreadsMaxHost();
@@ -72,6 +73,7 @@ struct AskResult {
 struct Caps {
   bool        available = false;
   std::string variant;                  // sse / avx2 / avxvnni / avx512 / avx512vnni
+  std::string benchVariant;
   std::string engineSource;
   bool        hasSSE = true, hasAVX2 = false, hasAVX512 = false;
   bool        hasAVX512VNNI = false, hasAVXVNNI = false;

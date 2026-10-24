@@ -2210,12 +2210,15 @@ static int CpuCount() {
   }();
   return cached > 0 ? cached : 4;
 }
+static int PhysCoreCount();
+
 static int ThreadsMax() {
-  int n = CpuCount();
+  int phys = PhysCoreCount();
+  int n    = CpuCount();
   if (n < 1) n = 1;
-  int sub = (n >= 8) ? 2 : 1;
-  int t = n - sub;
+  int t = (phys >= 2) ? phys : ((n >= 8) ? n - 2 : n - 1);
   if (t < 1) t = 1;
+  if (t > n) t = n;
   return t;
 }
 static int ThreadsDefault() {
@@ -3713,6 +3716,7 @@ static void OpenUpdateWindow(bool asSearch) {
   SetForegroundWindow(g_updHwnd);
 }
 
+static std::string SysInfoJson();
 namespace eng {
 namespace host {
 
@@ -3725,6 +3729,8 @@ void ChildTracked(HANDLE h) { ChildTrack(h); }
 bool ApplyAffinity(HANDLE h) { return ApplyEngineAffinity(h); }
 void PinHostAway() { CpuSplitPinHost(); }
 void UnpinHost() { CpuSplitUnpinHost(); }
+void OnVariantChanged() { PostToPage(SysInfoJson()); }
+
 int PhysCores() { return PhysCoreCount(); }
 int LogicCores() { return CpuCount(); }
 int ThreadsMaxHost() { return ThreadsMax(); }
@@ -3746,6 +3752,7 @@ class MsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       std::string op = JsonStrAfter(s, "\"op\":");
       int id = JsonIntAfter(s, "\"id\":");
       eng::HandleOp(op, id, s, false);
+      if (op == "config") PostToPage(SysInfoJson());
       return S_OK;
     }
     if (s.find("\"engineConfig\"") != std::string::npos) {
@@ -4085,6 +4092,7 @@ static std::string SysInfoJson() {
   }
 
   o += ",\"variant\":" + JsonQuote(ec.variant);
+  o += ",\"variantBench\":" + JsonQuote(ec.benchVariant);
   o += ",\"native\":" + std::string(ec.available ? "true" : "false");
 
   o += "}";
@@ -4115,12 +4123,18 @@ class DomHandler : public Cb<ICoreWebView2DOMContentLoadedEventHandler> {
              "{\"type\":\"host\",\"cpu\":%d,\"threadsDefault\":%d,\"threadsMax\":%d,"
              "\"physCores\":%d,\"memMB\":%d,\"memAvailMB\":%d,\"native\":%s,"
              "\"userThreads\":%d,\"userHashMB\":%d,"
-             "\"variant\":%s,\"cpuName\":%s}",
+             "\"variant\":%s,\"cpuName\":%s,"
+             "\"sse\":%s,\"avx2\":%s,\"avx512\":%s,\"avx512vnni\":%s,\"avxvnni\":%s,"
+             "\"variantBench\":%s}",
              CpuCount(), ThreadsDefault(), ThreadsMax(), PhysCoreCount(),
              MemTotalMB(), MemAvailMB(),
              ec.available ? "true" : "false",
              ec.userThreads, ec.userHashMB,
-             JsonQuote(ec.variant).c_str(), JsonQuote(CpuName()).c_str());
+             JsonQuote(ec.variant).c_str(), JsonQuote(CpuName()).c_str(),
+             ec.hasSSE ? "true" : "false", ec.hasAVX2 ? "true" : "false",
+             ec.hasAVX512 ? "true" : "false", ec.hasAVX512VNNI ? "true" : "false",
+             ec.hasAVXVNNI ? "true" : "false",
+             JsonQuote(ec.benchVariant).c_str());
 
     LogMsg(std::string("[host] probe cpu=") + std::to_string(CpuCount()) +
            " threadsDefault=" + std::to_string(ThreadsDefault()) +

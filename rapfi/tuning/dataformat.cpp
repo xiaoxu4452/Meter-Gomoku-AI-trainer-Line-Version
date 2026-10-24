@@ -99,6 +99,12 @@ Pos decodeU16Move(uint16_t move)
 {
     int x = (move >> 5) & 0x1f;
     int y = move & 0x1f;
+    // Wire fields cover [0,31] but only [0, MAX_BOARD_SIZE) is a coordinate
+    // (UINT16_MAX marks an absent move). Map anything else to Pos::NONE so
+    // readers reject it through their isInBoard checks and throw the typed
+    // DatasetError instead of tripping the Pos constructor's debug asserts.
+    if (x >= MAX_BOARD_SIZE || y >= MAX_BOARD_SIZE)
+        return Pos::NONE;
     return Pos {x, y};
 }
 
@@ -111,6 +117,8 @@ bool readBinEntry(std::istream &is, DataEntry *entry, BinDecodeScratch &scratch)
 
     BinEntryHead ehead;
     is.read(reinterpret_cast<char *>(&ehead), sizeof(BinEntryHead));
+    if (!is)
+        throw DatasetError("truncated entry head in dataset");
 
     // Check legality of the entry head
     if (ehead.boardsize < 5 || ehead.boardsize > MAX_BOARD_SIZE)
@@ -124,8 +132,11 @@ bool readBinEntry(std::istream &is, DataEntry *entry, BinDecodeScratch &scratch)
         throw DatasetError("wrong ply in dataset");
 
     if (!entry) {
-        // Just skip the position move sequence
+        // Just skip the position move sequence. A short skip only sets eofbit,
+        // so the skipped length must be checked explicitly.
         is.ignore(ehead.ply * sizeof(uint16_t));
+        if (is.gcount() != std::streamsize(ehead.ply * sizeof(uint16_t)))
+            throw DatasetError("truncated entry in dataset");
         return true;
     }
 
@@ -205,6 +216,8 @@ bool readPackedGame(std::istream        &is,
 
     PackedEntryHead ehead;
     is.read(reinterpret_cast<char *>(&ehead), sizeof(PackedEntryHead));
+    if (!is)
+        throw DatasetError("truncated game head in dataset");
 
     // Check legality of the entry head
     if (ehead.boardSize < 5 || ehead.boardSize > 22)

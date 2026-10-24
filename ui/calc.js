@@ -39,6 +39,18 @@ var I18N = {
     rule: '规则', cores: '线程数', hash: '哈希表',
     weights: '引擎权重', weightsHint: 'NNUE 评估更准；传统估值更快，快棋更划算',
     wNnue: 'NNUE（准确）', wClassic: '传统估值（快）',
+    variant: '引擎变体', vAuto: '自动（推荐）',
+    vHintAuto: '自动：按本机指令集 + 实测吞吐选最快（推荐）',
+    vHintBench: '本机实测最快：{v}',
+    vHint512vnni: 'AVX-512 VNNI：宽向量 + int8 点积，现代 CPU 通常最快',
+    vHint512: 'AVX-512：无 int8-VNNI 路径；Zen4 上与 VNNI 相当',
+    vHintVnni: 'AVX-VNNI：256 位 int8 点积（部分 Intel CPU）',
+    vHint2: 'AVX2：无 512 位路径，本系列权重下明显偏慢（约 1/3 速度）',
+    vHintSse: 'SSE：最老兜底，仅应急',
+    sysBench: '实测最快',
+    candRange: '选点范围', maxDepth: '最大深度', maxNodes: '最大节点',
+    cr2: '两格', cr2l3: '两格+三线', cr3: '三格', cr3l4: '三圈半（推荐）', cr4: '四格', crFull: '全盘',
+    mdNone: '不限', mnNone: '不限',
     coresHint: '本机 {n} 线程 · 上限 {m}',
     coach: '指导视图', coachHint: '方形四色热力：AI 帮你算最佳落点，落子即消失',
     heatBest: '最佳', heatGood: '良好', heatFair: '一般', heatPoor: '劣势',
@@ -488,6 +500,19 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     rule: 'Rules', cores: 'Threads', hash: 'Hash',
     weights: 'Weights', weightsHint: 'NNUE is sharper; classical is faster (better in fast games)',
     wNnue: 'NNUE (accurate)', wClassic: 'Classical (fast)',
+    variant: 'Engine variant', vAuto: 'Auto (recommended)',
+    vHintAuto: 'Auto: picks the fastest by ISA + measured throughput (recommended)',
+    vHintBench: 'Measured fastest here: {v}',
+    vHint512vnni: 'AVX-512 VNNI: wide vectors + int8 dot product, usually fastest on modern CPUs',
+    vHint512: 'AVX-512: no int8-VNNI path; on par with VNNI on Zen4',
+    vHintVnni: 'AVX-VNNI: 256-bit int8 dot product (some Intel CPUs)',
+    vHint2: 'AVX2: no 512-bit path, notably slower with these weights (~1/3 speed)',
+    vHintSse: 'SSE: oldest fallback, emergencies only',
+    sysBench: 'measured fastest',
+    candRange: 'Candidate range', maxDepth: 'Max depth', maxNodes: 'Max nodes',
+    cr2: 'Square 2', cr2l3: 'Square 2 + line 3', cr3: 'Square 3', cr3l4: 'Square 3 + line 4 (recommended)',
+    cr4: 'Square 4', crFull: 'Full board',
+    mdNone: 'No limit', mnNone: 'No limit',
     coresHint: '{n} threads on this PC · max {m}',
     coach: 'Coach view', coachHint: 'Square 4-colour heat: AI computes your best spots; clears on move',
     heatBest: 'Best', heatGood: 'Good', heatFair: 'Fair', heatPoor: 'Poor',
@@ -929,6 +954,8 @@ var S = {
   rule: 0,
   cores: 0, hashMB: 0,
   weights: '',
+  candRange: 3, maxDepth: 72, maxNodes: 0,
+  variant: '',
   hashDefMig: false,          
   coresDefault: '',
   
@@ -1094,7 +1121,8 @@ function grab() {
    't_setup','seg_mode','seg_side','t_mode','t_side','t_turn','sideHint',
    'egBar','btn_eg_ok','btn_eg_seq','btn_eg_free','egKeys','btn_eg_b','btn_eg_w',   
    'num_turn','t_rule','sel_rule','ruleHint',
-   'sysInfo','t_cores','sel_cores','coresHint','t_hash','sel_hash','t_weights','sel_weights','weightsHint',
+   'sysInfo','t_cores','sel_cores','coresHint','t_hash','sel_hash','t_variant','sel_variant','variantHint','t_weights','sel_weights','weightsHint','t_candRange','sel_candRange',
+   't_maxDepth','sel_maxDepth','inp_maxDepth','t_maxNodes','sel_maxNodes','inp_maxNodes',
    
    't_secGame','t_secEngine','t_secView','t_secCode',
    
@@ -1102,7 +1130,7 @@ function grab() {
    't_coach','chk_coach','t_coachHint',
    'heatLegend','t_heatBest','t_heatGood','t_heatFair','t_heatPoor',
    't_showNum','chk_num','t_showNumHint',
-   't_bgThink','chk_bgThink','t_bgThinkHint',
+   't_bgThink','btn_bgThink','t_bgThinkHint',
    'btn_rv_num',                                   
    't_preview','chk_preview','t_previewHint',
    'fwdBox','btn_fwd','btn_fwd_vcf','btn_fwd_vct','btn_fwd_ok','btn_fwd_prev','btn_fwd_next','fwdBody','fwdMsg','fwdSeq','fwdLg','fwdLgB','fwdLgW','btn_fwd_clear',
@@ -2125,6 +2153,11 @@ async function refreshCoach() {
 var gAiGen = 0;
 async function aiMove() {
   if (G.busy) return;
+  if (G.moves.length === 0 && curColor() === 1) {
+    var cx = Math.floor(G.size / 2), cy = Math.floor(G.size / 2);
+    place(cx, cy, false, true);
+    return;
+  }
   var myGen = ++gAiGen;          
   G.busy = true;
   G.think = G.nums.length ? G.nums.map(function (n) { return { x: n.x, y: n.y }; }) : [];
@@ -3389,6 +3422,7 @@ function drawCurveInfo() {
     if (els.ci_b_win) els.ci_b_win.textContent = '-';
     if (els.ci_w_score) els.ci_w_score.textContent = '-';
     if (els.ci_w_win) els.ci_w_win.textContent = '-';
+    paintCiBar(els.ci_b_win, 0); paintCiBar(els.ci_w_win, 0);
     return;
   }
   var wb = scoreWin(b);
@@ -3396,7 +3430,17 @@ function drawCurveInfo() {
   if (els.ci_b_win) els.ci_b_win.textContent = Math.round(wb * 100) + '%';
   if (els.ci_w_score) els.ci_w_score.textContent = scoreTxt(-b);
   if (els.ci_w_win) els.ci_w_win.textContent = Math.round((1 - wb) * 100) + '%';
+  paintCiBar(els.ci_b_win, wb); paintCiBar(els.ci_w_win, 1 - wb);
 }
+function paintCiBar(node, ratio) {
+  if (!node || !node.parentNode || !node.parentNode.parentNode) return;
+  var row = node.parentNode.parentNode;      // .v → .cir → .ci
+  if (!row || !row.classList || !row.classList.contains('ci')) return;
+  var r = (typeof ratio === 'number' && isFinite(ratio)) ? ratio : 0;
+  if (r < 0) r = 0; if (r > 1) r = 1;
+  row.style.setProperty('--wr', (r * 100).toFixed(2) + '%');
+}
+
 function wireCurveHover() {
   var cv = els.curve;
   if (!cv || cv.__gbHover) return;
@@ -6180,7 +6224,7 @@ function onCardUp() {
 
 function applyLang() {
   var d = I18N[S.lang];
-  ['title','setup','mode','side','turn','rule','cores','hash','weights','heat','heatHint',
+  ['title','setup','mode','side','turn','rule','cores','hash','variant','weights','candRange','maxDepth','maxNodes','heat','heatHint',
    'showNum','showNumHint','bgThink','preview','previewHint','engine','depth','speed','nodes','time','eval','best','curve',
    'blackCurve','whiteCurve','curveHint','reciteHint','code','drTip',
    'heatBest','heatGood','heatFair','heatPoor','coach','coachHint',
@@ -6432,6 +6476,13 @@ window.GB_onHost = function (m) {
     G.host.physCores = m.physCores | 0;
     G.host.userThreads = m.userThreads | 0;
     G.host.userHashMB = m.userHashMB | 0;
+    if (typeof m.avx2 === 'boolean') {
+      G.host.sse = !!m.sse; G.host.avx2 = !!m.avx2; G.host.avx512 = !!m.avx512;
+      G.host.avx512vnni = !!m.avx512vnni; G.host.avxvnni = !!m.avxvnni;
+      G.host.variant = m.variant || '';
+      G.host.variantBench = m.variantBench || '';
+      try { fillVariantSelect(); } catch (eV) {}
+    }
   } catch (e0) {}
   var maxT = m.threadsMax | 0;
   if (!(maxT >= 1)) return;
@@ -6445,6 +6496,83 @@ window.GB_onHost = function (m) {
   try { applyEngineConfig(); } catch (e3) {}
   try { console.log('[threads] topo migrate ' + _old + ' -> ' + maxT); } catch (e4) {}
 };
+function variantCapsNorm(x) {
+  x = x || {};
+  return {
+    hasSSE:        !!(x.hasSSE        !== undefined ? x.hasSSE        : x.sse),
+    hasAVX2:       !!(x.hasAVX2       !== undefined ? x.hasAVX2       : x.avx2),
+    hasAVX512:     !!(x.hasAVX512     !== undefined ? x.hasAVX512     : x.avx512),
+    hasAVX512VNNI: !!(x.hasAVX512VNNI !== undefined ? x.hasAVX512VNNI : x.avx512vnni),
+    hasAVXVNNI:    !!(x.hasAVXVNNI    !== undefined ? x.hasAVXVNNI    : x.avxvnni)
+  };
+}
+function fillVariantSelect() {
+  var el = els.sel_variant;
+  if (!el) return;
+  var cur = variantPrefGet();
+  S.variant = cur;
+  var vHint = function (val) {
+    var h = els.variantHint;
+    if (!h) return;
+    var txt;
+    if (!val) {
+      txt = T('vHintAuto');
+      var b = (G.host || {}).variantBench || (G.sysInfo || {}).variantBench;
+      if (b) txt += ' · ' + T('vHintBench').replace('{v}', b);
+    } else {
+      txt = T('vHint' + (val === 'avx512vnni' ? '512vnni' :
+                         val === 'avx512' ? '512' :
+                         val === 'avxvnni' ? 'Vnni' :
+                         val === 'avx2' ? '2' : 'Sse'));
+    }
+    if (h.textContent !== txt) h.textContent = txt;
+  };
+  vHint(cur);
+  var mk = function (c) {
+    c = variantCapsNorm(c);
+    var list = [];
+    if (c.hasAVX512VNNI) list.push(['avx512vnni', 'AVX-512 VNNI', 'vHint512vnni']);
+    if (c.hasAVX512)     list.push(['avx512', 'AVX-512', 'vHint512']);
+    if (c.hasAVXVNNI)    list.push(['avxvnni', 'AVX-VNNI', 'vHintVnni']);
+    if (c.hasAVX2)       list.push(['avx2', 'AVX2', 'vHint2']);
+    if (c.hasSSE)        list.push(['sse', 'SSE', 'vHintSse']);
+    var html = '<option value=""' + (cur ? '' : ' selected') + ' title="' + escHtml(T('vHintAuto')) + '">' + T('vAuto') + '</option>' +
+      list.map(function (o) {
+        return '<option value="' + o[0] + '"' + (o[0] === cur ? ' selected' : '') +
+               ' title="' + escHtml(T(o[2])) + '">' + o[1] + '</option>';
+      }).join('');
+    if (el.innerHTML !== html) el.innerHTML = html;
+  };
+  var html0 = '<option value=""' + (cur ? '' : ' selected') + '>' + T('vAuto') + '</option>';
+  if (el.innerHTML !== html0) el.innerHTML = html0;
+
+  var h = G.host || {};
+  if (typeof h.avx2 === 'boolean' || typeof h.hasAVX2 === 'boolean') { mk(h); return; }
+  if (G.capsCache2) { mk(G.capsCache2); return; }
+  try {
+    LocalAI.caps().then(function (c) {
+      c = c || {};
+      if (!c.hasSSE) return;
+      G.capsCache2 = { hasSSE: c.hasSSE, hasAVX2: c.hasAVX2, hasAVX512: c.hasAVX512,
+                       hasAVX512VNNI: c.hasAVX512VNNI, hasAVXVNNI: c.hasAVXVNNI };
+      mk(G.capsCache2);
+    });
+  } catch (e) {}
+}
+
+function selSyncCustom(el, v, fmt) {
+  if (!el) return;
+  var has = false;
+  [].forEach.call(el.options, function (o) { if (+o.value === v) has = true; });
+  if (!has) {
+    var o = document.createElement('option');
+    o.value = String(v);
+    o.textContent = fmt(v);
+    el.appendChild(o);
+  }
+  el.value = String(v);
+}
+
 function applyEngineConfig() {
   // Send threads/hash from the dedicated engine key (S may have been polluted by another
   // window's save). This is the single gate that keeps the link window and the main UI in
@@ -6454,14 +6582,20 @@ function applyEngineConfig() {
   if (eo.hashMB >= 1) S.hashMB = eo.hashMB;
   if (!S.weights) S.weights = weightsPrefGet();
   var wMode = (S.weights === 'classic' || S.weights === 'nnue') ? S.weights : defaultWeightsMode();
-  LocalAI.config(S.cores, S.hashMB, wMode);
+  if (!S.variant) S.variant = variantPrefGet();
+  var extra = { caution: (S.candRange >= 0 && S.candRange <= 5) ? S.candRange : 3,
+                maxDepth: S.maxDepth || 0, maxNodes: S.maxNodes || 0,
+                variant: S.variant || '' };
+  LocalAI.config(S.cores, S.hashMB, wMode, extra);
 
-  tellHost({ type: 'engineConfig', threads: S.cores || 0, hashMB: S.hashMB || 0, weights: wMode });
+  tellHost({ type: 'engineConfig', threads: S.cores || 0, hashMB: S.hashMB || 0, weights: wMode,
+             caution: extra.caution, maxDepth: extra.maxDepth, maxNodes: extra.maxNodes,
+             variant: extra.variant });
 }
 
 function defaultWeightsMode() {
   var h = G.host || {};
-  if (h.hasAVX2 === false) return 'classic';
+  if (h.hasAVX2 === false || h.avx2 === false) return 'classic';
   return 'nnue';
 }
 
@@ -6786,7 +6920,8 @@ var PREFS_KEY = 'gbcalc.prefs.v1';
 // stale window overwrote the value the user had just changed. They now live in ENGINE_PREF_KEY
 // and are only written on an explicit change.
 var PREF_FIELDS = ['cores', 'hashMB', 'turnMs', 'rule', 'lang', 'theme',
-                   'cards', 'customBase', 'aiB', 'aiW', 'linkAuto', 'linkClicks'];
+                   'cards', 'customBase', 'aiB', 'aiW', 'linkAuto', 'linkClicks',
+                   'candRange', 'maxDepth', 'maxNodes'];
 function prefsAll() {
   var o = null;
   try { o = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'); } catch (e) { o = null; }
@@ -6862,6 +6997,11 @@ function enginePrefSet(cores, hashMB) {
 
 
 var WEIGHTS_PREF_KEY = 'gbcalc.engine.weights';
+var VARIANT_PREF_KEY = 'gbcalc.engine.variant';
+function variantPrefGet() {
+  try { var v = localStorage.getItem(VARIANT_PREF_KEY); return v || ''; } catch (e) { return ''; }
+}
+function variantPrefSet(v) { try { localStorage.setItem(VARIANT_PREF_KEY, v || ''); } catch (e) {} }
 function weightsPrefGet() {
   try {
     var v = localStorage.getItem(WEIGHTS_PREF_KEY);
@@ -7607,6 +7747,7 @@ function bgThinkIntroOnce() {
 
 function bgThinkWanted() {
   if (!S.bgThink || G.engineOffline || bgThinkBusyBy()) return false;
+  if (!S.aiB && !S.aiW) return false;
   if (S.mode !== 'pve' || S.paused) return false;
   if (linkSessionOn() || LINK_MODE || VIS_MODE || RV_MODE || G.review || G.over || G.busy) return false;
   if (openActive()) return false;
@@ -9279,7 +9420,9 @@ function sysInfoCards() {
                  'AVX-512 ' + (isa.avx512 ? '✓' : '✗'),
                  'VNNI ' + ((isa.avxvnni || isa.avx512vnni) ? '✓' : '✗')].join(' · ');
   var isaSub = T('abSysEngine') + ' ' +
-    (s.native ? (s.variant || T('sysNative')) + '（' + T('sysNative') + '）' : T('sysWasm'));
+    (s.native ? (s.variant || T('sysNative')) + '（' + T('sysNative') +
+                (s.variantBench && s.variantBench === s.variant ? ' · ' + T('sysBench') : '') + '）'
+              : T('sysWasm'));
   
   var memSub = T('abSysUsed').replace('{u}', s.memLoad | 0).replace('{a}', gbOf(s.memAvailMB));
   
@@ -9421,12 +9564,44 @@ function buildSelects() {
   if (S.hashMul !== undefined) { delete S.hashMul; save(); }
   renderHashInfo();
 
+  fillVariantSelect();
   var wOpt = weightsPrefGet() || defaultWeightsMode();
   if (els.sel_weights) {
     els.sel_weights.innerHTML =
       '<option value="nnue"' + (wOpt === 'nnue' ? ' selected' : '') + '>' + T('wNnue') + '</option>' +
       '<option value="classic"' + (wOpt === 'classic' ? ' selected' : '') + '>' + T('wClassic') + '</option>';
   }
+
+  var CR_LABELS = ['cr2', 'cr2l3', 'cr3', 'cr3l4', 'cr4', 'crFull'];
+  var crNow = (S.candRange >= 0 && S.candRange <= 5) ? S.candRange : 3;
+  S.candRange = crNow;
+  if (els.sel_candRange) els.sel_candRange.innerHTML = CR_LABELS.map(function (k, i) {
+    return '<option value="' + i + '"' + (i === crNow ? ' selected' : '') + '>' + T(k) + '</option>';
+  }).join('');
+  var MD_OPTS = [0, 24, 32, 40, 48, 56, 64, 72];
+  var mdNow = S.maxDepth;
+  if (!(mdNow === 0 || (mdNow >= 4 && mdNow <= 128))) mdNow = 72;
+  S.maxDepth = mdNow;
+  if (els.sel_maxDepth) {
+    els.sel_maxDepth.innerHTML = MD_OPTS.map(function (v) {
+      return '<option value="' + v + '"' + (v === mdNow ? ' selected' : '') + '>' +
+             (v ? String(v) : T('mdNone')) + '</option>';
+    }).join('');
+    selSyncCustom(els.sel_maxDepth, mdNow, function (x) { return String(x); });
+  }
+  if (els.inp_maxDepth) els.inp_maxDepth.value = mdNow ? String(mdNow) : '';
+  var MN_OPTS = [0, 1000000, 4000000, 16000000, 64000000, 256000000];
+  var mnNow = S.maxNodes;
+  if (!(mnNow === 0 || (mnNow >= 100000 && mnNow <= 256000000))) mnNow = 0;
+  S.maxNodes = mnNow;
+  if (els.sel_maxNodes) {
+    els.sel_maxNodes.innerHTML = MN_OPTS.map(function (v) {
+      return '<option value="' + v + '"' + (v === mnNow ? ' selected' : '') + '>' +
+             (v ? (v / 1000000) + 'M' : T('mnNone')) + '</option>';
+    }).join('');
+    selSyncCustom(els.sel_maxNodes, mnNow, function (x) { return (x / 1000000) + 'M'; });
+  }
+  if (els.inp_maxNodes) els.inp_maxNodes.value = mnNow ? String(+(mnNow / 1000000).toFixed(1)) : '';
 
   applyEngineConfig();
 }
@@ -9763,6 +9938,63 @@ function boot() {
     
     renderHashInfo();
   };
+  if (els.sel_variant) els.sel_variant.onchange = function () {
+    S.variant = els.sel_variant.value || '';
+    variantPrefSet(S.variant);
+    try { fillVariantSelect(); } catch (eV) {}
+    applyEngineConfig();
+  };
+  if (els.sel_candRange) els.sel_candRange.onchange = function () {
+    S.candRange = +els.sel_candRange.value; save(); applyEngineConfig();
+  };
+  if (els.inp_maxDepth) {
+    els.inp_maxDepth.value = S.maxDepth ? String(S.maxDepth) : '';
+    els.inp_maxDepth.onchange = els.inp_maxDepth.onblur = function () {
+      var raw = String(els.inp_maxDepth.value || '').trim();
+      var v;
+      if (raw === '' || raw === '0') v = 0;
+      else {
+        v = parseInt(raw, 10);
+        if (!isFinite(v)) v = 72;
+        if (v > 0 && v < 4) v = 4;
+        if (v > 128) v = 128;
+      }
+      els.inp_maxDepth.value = v ? String(v) : '';
+      S.maxDepth = v;
+      selSyncCustom(els.sel_maxDepth, v, function (x) { return String(x); });
+      save(); applyEngineConfig();
+    };
+  }
+  if (els.inp_maxNodes) {
+    els.inp_maxNodes.value = S.maxNodes ? String(+(S.maxNodes / 1000000).toFixed(1)) : '';
+    els.inp_maxNodes.onchange = els.inp_maxNodes.onblur = function () {
+      var raw = String(els.inp_maxNodes.value || '').trim();
+      var m;
+      if (raw === '' || raw === '0') m = 0;
+      else {
+        m = parseFloat(raw);
+        if (!isFinite(m) || m <= 0) m = 0.1;
+        if (m > 256) m = 256;
+        m = Math.round(m * 10) / 10;
+      }
+      els.inp_maxNodes.value = m ? String(m) : '';
+      S.maxNodes = Math.round(m * 1000000);
+      selSyncCustom(els.sel_maxNodes, S.maxNodes, function (x) { return (x / 1000000) + 'M'; });
+      save(); applyEngineConfig();
+    };
+  }
+  if (els.sel_maxDepth) els.sel_maxDepth.onchange = function () {
+    var v = +els.sel_maxDepth.value;
+    S.maxDepth = v;
+    if (els.inp_maxDepth) els.inp_maxDepth.value = v ? String(v) : '';
+    save(); applyEngineConfig();
+  };
+  if (els.sel_maxNodes) els.sel_maxNodes.onchange = function () {
+    var v = +els.sel_maxNodes.value;
+    S.maxNodes = v;
+    if (els.inp_maxNodes) els.inp_maxNodes.value = v ? String(+(v / 1000000).toFixed(1)) : '';
+    save(); applyEngineConfig();
+  };
   if (els.sel_weights) els.sel_weights.onchange = function () {
     var v = els.sel_weights.value;
     if (v !== 'nnue' && v !== 'classic') return;
@@ -9778,8 +10010,13 @@ function boot() {
   };
   els.chk_num.onchange = function () { S.showNum = !!els.chk_num.checked; save(); paint(); };
   
-  els.chk_bgThink.onchange = function () {
-    S.bgThink = !!els.chk_bgThink.checked; save();
+  els.btn_bgThink.onclick = function () {
+    S.bgThink = !S.bgThink; save();
+    if (els.btn_bgThink) {
+      els.btn_bgThink.classList.toggle('on', !!S.bgThink);
+      els.btn_bgThink.setAttribute('aria-pressed', S.bgThink ? 'true' : 'false');
+    }
+    bgThinkHintSync();
     if (S.bgThink) { bgThinkKick(0); bgThinkIntroOnce(); }
     else bgThinkStop();
   };
@@ -9794,7 +10031,12 @@ function boot() {
   els.sel_rule.value = String(S.rule);
   els.chk_coach.checked = !!S.coach;
   els.chk_num.checked = !!S.showNum;
-  els.chk_bgThink.checked = !!S.bgThink;
+  els.chk_preview.checked = S.previewOn !== false;
+  if (els.btn_bgThink) {
+    els.btn_bgThink.classList.toggle('on', !!S.bgThink);
+    els.btn_bgThink.setAttribute('aria-pressed', S.bgThink ? 'true' : 'false');
+  }
+  try { bgThinkHintSync(); } catch (eBH) {}
   els.chk_preview.checked = S.previewOn !== false;   
   [].forEach.call(els.seg_mode.querySelectorAll('button'), function (b) { b.classList.toggle('on', b.getAttribute('data-mode') === S.mode); });
   syncSideUI();                              
@@ -9824,10 +10066,15 @@ function boot() {
         memMB: m.memMB || 0, native: !!m.native,
         // Host-persisted user engine prefs (0 = never set); buildSelects treats them as truth.
         userThreads: m.userThreads | 0, userHashMB: m.userHashMB | 0,
-        
+
         physCores: m.physCores || 0, memAvailMB: m.memAvailMB || 0,
         cpuName: m.cpuName || '', variant: m.variant || ''
       };
+      if (typeof m.avx2 === 'boolean') {
+        G.host.sse = !!m.sse; G.host.avx2 = !!m.avx2; G.host.avx512 = !!m.avx512;
+        G.host.avx512vnni = !!m.avx512vnni; G.host.avxvnni = !!m.avxvnni;
+      }
+      G.host.variantBench = m.variantBench || '';
       buildSelects();
     } else if (m.type === 'sysInfo') {
       

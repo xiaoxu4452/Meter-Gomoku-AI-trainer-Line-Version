@@ -360,9 +360,10 @@
           </span>
         </div>
         <div class="row"><label id="t_bgThink">后台思考</label>
-          <input id="chk_bgThink" class="chk-dot" type="checkbox">
-          <!-- ★ 2026-10-23（用户：「删除这段文案，只在仪表盘 log 栏每次打开展示一次」）：
-               说明文字不再常驻在开关下面（窄窗里它要占三四行），改为启动时往 log 栏写一次。 -->
+          <!-- ★ 2026-10-24（用户：「后台思考由选择键变成像 AI 执黑一样的开关键」）：
+               沿用 #seg_side 同款 .tglbtn/.tgl 滑动开关（左侧 label 已表意，右侧只放开关）；
+               下面的 hint 保留 —— 它还承担「计算占用时已自动暂停」的动态状态（bgThinkHintSync）。 -->
+          <button id="btn_bgThink" class="tglbtn" type="button" aria-pressed="false"><span class="tgl"><i></i></span></button>
           <span class="hint" id="t_bgThinkHint"></span>
         </div>
         <div class="row"><label id="t_rule">规则</label>
@@ -392,9 +393,39 @@
         <!-- ★ 2026-10-23（用户：「对局设置里加引擎权重下拉，可选不同权重，不同电脑默认搭配最佳」）：
              NNUE = mix9svq 权重（准，慢）；传统估值 = 只加载 classical + model260809（快，
              同时间搜得深）。宿主收到变化后对 config-classic.toml 发 RELOADCONFIG。 -->
+        <!-- ★ 2026-10-24（用户：「引擎变体也让用户选，默认配置最好的，不支持的别显示」）：
+             选项由宿主 caps 的 hasAVX2/hasAVXVNNI/hasAVX512/hasAVX512VNNI 动态生成，
+             默认「自动」= 按 kVariantOrder 从高到低探测；选了就强制那一档（不可用则自动回退）。 -->
+        <div class="row"><label id="t_variant">引擎变体</label>
+          <select id="sel_variant"></select>
+          <span class="hint" id="variantHint"></span>
+        </div>
         <div class="row"><label id="t_weights">引擎权重</label>
           <select id="sel_weights"></select>
           <span class="hint" id="weightsHint"></span>
+        </div>
+        <!-- ★ 2026-10-24（用户：「参考 gomoku-calculator 加选点范围 / 最大深度 / 最大节点」）：
+             三条都是 gomocup 的 INFO 选项，宿主在每轮 ask 前下发。
+             选点范围 = INFO CAUTION_FACTOR（3 = 三圈半，官方推荐）；
+             最大深度 = INFO MAX_DEPTH（72 官方推荐；2 秒内到不了，纯兜底）；
+             最大节点 = INFO MAX_NODE（0 = 不限制）。 -->
+        <div class="row"><label id="t_candRange">选点范围</label>
+          <select id="sel_candRange"></select>
+        </div>
+        <!-- ★ 2026-10-24 三次修订（用户截图反馈：嵌入版太挤，恢复之前的逻辑）：
+             撤掉 .sel-in 嵌入，恢复「下拉 + 输入框」两个控件；.duo 让二者独占一整行
+             （label 在上，控件占满下行）。逻辑保留升级版：输入自定义值（4~128 整数 /
+             0.1~256M）→ 下拉追加并选中显示该数字；留空 = 不限；非法值自动收敛。 -->
+        <div class="row"><label id="t_maxDepth">最大深度</label>
+          <span class="duo"><select id="sel_maxDepth"></select><input
+                 id="inp_maxDepth" class="num-in" type="number" min="4" max="128" step="1"
+                 placeholder="不限" inputmode="numeric" title="4 ~ 128 的整数，留空 = 不限"></span>
+        </div>
+        <div class="row"><label id="t_maxNodes">最大节点</label>
+          <span class="duo"><select id="sel_maxNodes"></select><input
+                 id="inp_maxNodes" class="num-in" type="number" min="0.1" max="256" step="0.1"
+                 placeholder="不限" inputmode="decimal" title="0.1 ~ 256（单位 M），留空 = 不限"><span
+                 class="unit">M</span></span>
         </div>
         
         <div class="row"><span class="hint" id="hashInfo"></span></div>

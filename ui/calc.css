@@ -596,8 +596,13 @@ input[type=checkbox].chk-dot:focus-visible{outline:2px solid var(--accent); outl
   border-radius:9px; padding:.24rem .5rem; font-size:.78rem;
   border:1px solid transparent;
 }
-.ci.cb{background:rgba(122,90,248,.16); border-color:rgba(122,90,248,.42)}
-.ci.cw{background:rgba(127,176,239,.18); border-color:rgba(127,176,239,.52)}
+
+.ci.cb{background-color:rgba(122,90,248,.10); border-color:rgba(122,90,248,.42);
+  background-image:linear-gradient(to right, rgba(122,90,248,.50), rgba(122,90,248,0));
+  background-repeat:no-repeat; background-size:var(--wr,0%) 100%}
+.ci.cw{background-color:rgba(127,176,239,.11); border-color:rgba(127,176,239,.52);
+  background-image:linear-gradient(to right, rgba(127,176,239,.52), rgba(127,176,239,0));
+  background-repeat:no-repeat; background-size:var(--wr,0%) 100%}
 .ci .cih{font-weight:700; font-size:.8rem; color:var(--ink)}
 .ci.cb .cih{color:#7a5af8}
 .ci.cw .cih{color:#5b96d8}
@@ -1351,3 +1356,17 @@ html[lang="en"] body.linkOn #hdr .brand::after{ content:'· Linking'; }
 .lk-namebox input{width:100%; box-sizing:border-box; padding:.13rem .38rem; border-radius:5px;
   border:1px solid var(--border); background:var(--chip); color:var(--ink); font-size:.82rem; line-height:1.25}
 .lk-namebox input:focus{outline:none; border-color:var(--accent)}
+
+
+.num-in{width:3.5rem; box-sizing:border-box; padding:.14rem .32rem; font-size:.78rem;
+  text-align:right; color:var(--ink); background:var(--chip);
+  border:1px solid var(--border); border-radius:.4rem; outline:none}
+.num-in:focus{border-color:var(--accent)}
+.num-in::-webkit-outer-spin-button,.num-in::-webkit-inner-spin-button{-webkit-appearance:none; margin:0}
+.num-in{-moz-appearance:textfield}
+
+
+.duo{display:flex; align-items:center; gap:.3rem; flex:1 1 100%; min-width:0}
+.duo select{flex:1.618 1 0; min-width:0}
+.duo .num-in{flex:1 1 0; width:auto; min-width:2.6rem; text-align:left}
+.duo .unit{flex:none}
