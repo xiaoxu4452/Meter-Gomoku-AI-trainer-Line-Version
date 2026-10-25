@@ -18,9 +18,11 @@
 #include <cstring>
 #include <deque>
 #include <intrin.h>
+#include <iterator>
 #include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace eng {
@@ -279,7 +281,7 @@ static std::string CpuFingerprint() {
   return std::string(b);
 }
 
-static const char* kVariantOrder[] = {"avx512vnni", "avxvnni", "avx512", "avx2", "sse"};
+static const char* kVariantOrder[] = {"avx512vnni", "avx512", "avxvnni", "avx2", "sse"};
 
 static bool VariantCpuOk(const std::string& v, const CpuCaps& c) {
   if (v == "avx512vnni") return c.avx512vnni;
@@ -287,6 +289,20 @@ static bool VariantCpuOk(const std::string& v, const CpuCaps& c) {
   if (v == "avx512")     return c.avx512f;
   if (v == "avx2")       return c.avx2;
   return true;
+}
+
+static int VariantTier(const std::string& v) {
+  if (v == "avx512vnni" || v == "avx512") return 3;
+  if (v == "avxvnni") return 2;
+  if (v == "avx2")    return 1;
+  return 0;
+}
+
+static int TopTier(const CpuCaps& c) {
+  if (c.avx512f) return 3;
+  if (c.avxvnni) return 2;
+  if (c.avx2)    return 1;
+  return 0;
 }
 
 static bool SmokeVariantOk(const std::wstring& dir, const std::string& name) {
@@ -447,26 +463,54 @@ static void BenchThreadMain() {
   CpuCaps caps = CpuIdCaps();
   int threads = EffectiveThreads();
   std::string cur = g_variant;
-  std::string best;
-  long long bestN = -1, logN = -1;
-  std::string log;
+
+  struct Cand { std::string name; long long s[3]; bool dead; long long score; };
+  std::vector<Cand> cands;
+  const int topTier = TopTier(caps);
   for (const char* v : kVariantOrder) {
-    if (!g_benchRun) return;
     std::string name(v);
     if (name == "sse") break;
     if (!VariantCpuOk(name, caps)) continue;
+    if (VariantTier(name) != topTier) continue;
     if (!FileExists(Join(g_dir, std::wstring(L"RapfiEngine-") + Utf8ToWide(name) + L".exe"))) continue;
-    long long warm = BenchOneRound(g_dir, name, threads);
-    if (warm < 0) { ELOG("auto-bench: " + name + " 跑不动（非法指令？）跳过"); continue; }
-    long long n2 = BenchOneRound(g_dir, name, threads);
-    long long n3 = g_benchRun ? BenchOneRound(g_dir, name, threads) : -1;
-    long long sc = n2 > n3 ? n2 : n3;
-    if (logN < 0) logN = 0;
-    log += name + "=" + std::to_string(sc / 1000) + "k ";
-    if (sc > bestN) { bestN = sc; best = name; }
+    cands.push_back({name, {-1, -1, -1}, false, -1});
+  }
+  if (cands.size() <= 1 || !g_benchRun) return;
+  for (auto& c : cands) {
+    if (!g_benchRun) return;
+    if (BenchOneRound(g_dir, c.name, threads) < 0) {
+      ELOG("auto-bench: " + c.name + " 跑不动（非法指令？）跳过");
+      c.dead = true;
+    }
+  }
+  for (int r = 0; r < 3 && g_benchRun; ++r)
+    for (auto& c : cands) {
+      if (c.dead || !g_benchRun) continue;
+      c.s[r] = BenchOneRound(g_dir, c.name, threads);
+    }
+
+  std::string log;
+  std::string best;
+  long long bestN = -1, curN = -1;
+  for (auto& c : cands) {
+    if (c.dead) continue;
+    long long v[3];
+    int n = 0;
+    for (long long x : c.s) if (x > 0) v[n++] = x;
+    long long sc = -1;
+    if (n >= 3)      sc = std::max(std::min(v[0], v[1]), std::min(std::max(v[0], v[1]), v[2]));
+    else if (n == 2) sc = std::min(v[0], v[1]);
+    else if (n == 1) sc = v[0];
+    if (sc < 0) continue;
+    c.score = sc;
+    log += c.name + "=" + std::to_string(sc / 1000) + "k ";
+    if (sc > bestN) { bestN = sc; best = c.name; }
+    if (c.name == cur) curN = sc;
   }
   if (!g_benchRun || best.empty()) return;
-  ELOG("auto-bench（T" + std::to_string(threads) + " 节点/局）: " + log + "→ " + best);
+  if (VariantTier(best) < TopTier(caps)) { ELOG("auto-bench: 判定跨档，忽略（" + best + "）"); return; }
+  if (curN > 0 && curN * 100 >= bestN * 88) best = cur;
+  ELOG("auto-bench（T" + std::to_string(threads) + " 节点/局，3 轮中位数）: " + log + "→ " + best);
   {
     FILE* f = _wfopen(Join(g_dir, L".variant-bench").c_str(), L"wb");
     if (f) {
@@ -506,6 +550,11 @@ static std::string ReadBenchCache() {
   std::string v = (sp != std::string::npos) ? cached.substr(0, sp) : cached;
   std::string fp = (sp != std::string::npos) ? cached.substr(sp + 1) : std::string();
   if (v.empty() || fp != CpuFingerprint()) return std::string();
+  CpuCaps caps = CpuIdCaps();
+  if (VariantTier(v) < TopTier(caps)) {
+    ELOG("auto-bench 缓存跨档（" + v + " 低于本机最高档位）→ 作废");
+    return std::string();
+  }
   return v;
 }
 
@@ -767,7 +816,9 @@ static void SpawnLocked() {
   g_appliedSwapable = -1;
   g_appliedThreads = EffectiveThreads();
   g_appliedHashKB  = EffectiveHashKB();
-  std::string boot = "START 15\nINFO RULE 0\nINFO SHOW_DETAIL 3\n";
+  int crBoot = (g_candRange >= 0 && g_candRange <= 5) ? g_candRange : 3;
+  std::string boot = "INFO CAUTION_FACTOR " + std::to_string(crBoot) + "\n";
+  boot += "START 15\nINFO RULE 0\nINFO SHOW_DETAIL 3\n";
   if (g_weightsMode == "classic") boot += "RELOADCONFIG config-classic.toml\n";
   boot += "INFO THREAD_NUM " + std::to_string(g_appliedThreads) + "\n";
   boot += "INFO HASH_SIZE "  + std::to_string(g_appliedHashKB)  + "\n";
@@ -936,10 +987,18 @@ static std::string ResJson(const Cur& c) {
   r += ",\"superseded\":" + std::string(c.superseded ? "true" : "false");
   r += ",\"finished\":" + std::string(ps.finished ? "true" : "false");
   r += ",\"swap\":" + std::string(ps.swap ? "true" : "false");
+  std::vector<std::pair<int, int>> seenCd;
+  seenCd.reserve(16);
   r += ",\"candidates\":[";
   bool first = true;
   for (const Candidate& cd : ps.cands) {
     if (cd.x < 0) continue;
+    bool dup = false;
+    for (size_t si = 0; si < seenCd.size(); ++si) {
+      if (seenCd[si].first == cd.x && seenCd[si].second == cd.y) { dup = true; break; }
+    }
+    if (dup) continue;
+    seenCd.push_back(std::make_pair(cd.x, cd.y));
     if (!first) r += ",";
     first = false;
     snprintf(h, sizeof(h), "{\"x\":%d,\"y\":%d,\"depth\":%d,\"selDepth\":%d,\"nodes\":%lld,",
@@ -974,14 +1033,6 @@ static int  g_seqSide = 0;
 static bool g_seqValid = false;
 static bool g_seqNoIncr = false;
 
-static bool SamePts(const std::vector<std::pair<int, int>>& a,
-                    const std::vector<std::pair<int, int>>& b) {
-  if (a.size() != b.size()) return false;
-  for (size_t i = 0; i < a.size(); ++i)
-    if (a[i] != b[i]) return false;
-  return true;
-}
-
 static bool g_askIncr = false;
 
 static std::string BuildAskCmds(const AskRequest& req, bool forceFull) {
@@ -1013,20 +1064,29 @@ static std::string BuildAskCmds(const AskRequest& req, bool forceFull) {
   }
   int topN = req.topN < 1 ? 1 : (req.topN > 8 ? 8 : req.topN);
 
+  auto hasPt = [](const std::vector<std::pair<int, int>>& v, const std::pair<int, int>& p) {
+    return std::find(v.begin(), v.end(), p) != v.end();
+  };
+  auto hasAll = [&](const std::vector<std::pair<int, int>>& small,
+                    const std::vector<std::pair<int, int>>& big) {
+    for (const auto& p : small) if (!hasPt(big, p)) return false;
+    return true;
+  };
   bool incr = false;
   int  ix = -1, iy = -1;
   if (!forceFull && g_seqValid && !g_seqNoIncr && req.mode == 0 && topN == 1 && g_seqSide != 0) {
     int newColor = 0;
-    if (SamePts(bl, g_seqBl) && wh.size() == g_seqWh.size() + 1 &&
-        std::equal(g_seqWh.begin(), g_seqWh.end(), wh.begin()))
+    if (bl.size() == g_seqBl.size() && wh.size() == g_seqWh.size() + 1 &&
+        hasAll(g_seqBl, bl) && hasAll(g_seqWh, wh))
       newColor = 2;
-    else if (SamePts(wh, g_seqWh) && bl.size() == g_seqBl.size() + 1 &&
-             std::equal(g_seqBl.begin(), g_seqBl.end(), bl.begin()))
+    else if (wh.size() == g_seqWh.size() && bl.size() == g_seqBl.size() + 1 &&
+             hasAll(g_seqWh, wh) && hasAll(g_seqBl, bl))
       newColor = 1;
     if (newColor && newColor == 3 - g_seqSide) {
       const std::vector<std::pair<int, int>>& src = (newColor == 2) ? wh : bl;
-      ix = src.back().first; iy = src.back().second;
-      incr = true;
+      const std::vector<std::pair<int, int>>& old = (newColor == 2) ? g_seqWh : g_seqBl;
+      for (const auto& p : src)
+        if (!hasPt(old, p)) { ix = p.first; iy = p.second; incr = true; break; }
     }
   }
 
@@ -1253,6 +1313,24 @@ static void DoAsk(const AskRequest& req, int id, bool fromLink) {
 
   if (!g_cur.done) g_seqValid = false;
 
+  if (g_cur.done && !g_cur.superseded && g_cur.alive && g_cur.opName == "ask" && req.mode == 0 &&
+      req.rule != 5 && req.rule != 6) {
+    int bx = g_cur.ps.bestX, by = g_cur.ps.bestY;
+    bool legal = bx >= 0 && by >= 0 && by < (int)req.board.size() && bx < (int)req.board[by].size() &&
+                 req.board[by][bx] == 0;
+    if (legal) {
+      std::vector<std::pair<int, int>>& dst = (g_cur.side == 1) ? g_seqBl : g_seqWh;
+      std::vector<std::pair<int, int>>& oth = (g_cur.side == 1) ? g_seqWh : g_seqBl;
+      auto mv = std::make_pair(bx, by);
+      if (std::find(dst.begin(), dst.end(), mv) == dst.end()) {
+        if (std::find(oth.begin(), oth.end(), mv) != oth.end())
+          g_seqValid = false;
+        else
+          dst.push_back(mv);
+      }
+    }
+  }
+
   std::string res = ResJson(g_cur);
   std::string ack = "{\"type\":\"engineAck\",\"id\":" + std::to_string(id) + ",\"op\":" + JsonQuote(g_cur.opName) +
                     ",\"ok\":" + std::string(g_cur.done ? "true" : "false");
@@ -1281,9 +1359,12 @@ bool Init() {
   bool ok = Probe();
   ELOG(std::string("Init: ") + (ok ? "ok" : "failed") + " variant=" +
        (g_variant.empty() ? "(none)" : g_variant));
+  //
   char tbEnv[8] = {0};
   bool e2eMode = GetEnvironmentVariableA("GB_TEST_OPEN_LINK", tbEnv, sizeof(tbEnv)) > 0;
-  if (ok && !e2eMode && g_variantOverride.empty() && ReadBenchCache().empty()) {
+  char bmEnv[8] = {0};
+  bool benchOptIn = GetEnvironmentVariableA("GB_VARIANT_BENCH", bmEnv, sizeof(bmEnv)) > 0;
+  if (ok && !e2eMode && benchOptIn && g_variantOverride.empty() && ReadBenchCache().empty()) {
     g_benchRun = true;
     std::thread([] { BenchThreadMain(); }).detach();
   }

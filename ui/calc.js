@@ -1,4 +1,4 @@
-﻿/* Meter Gomoku Trainer - analysis and calculation bridge. Wraps the native rapfi engine through in-process hard links and exposes evaluation/analysis APIs to the overlay UI. */
+/* Meter Gomoku Trainer - analysis and calculation bridge. Wraps the native rapfi engine through in-process hard links and exposes evaluation/analysis APIs to the overlay UI. */
 
 
 'use strict';
@@ -49,8 +49,15 @@ var I18N = {
     vHintSse: 'SSE：最老兜底，仅应急',
     sysBench: '实测最快',
     candRange: '选点范围', maxDepth: '最大深度', maxNodes: '最大节点',
-    cr2: '两格', cr2l3: '两格+三线', cr3: '三格', cr3l4: '三圈半（推荐）', cr4: '四格', crFull: '全盘',
+    cr2: '0 · 最窄（5×5）', cr2l3: '1 · 偏窄（5×5+3线）', cr3: '2 · 中性（7×7）',
+    cr3l4: '3 · 推荐（7×7+4线）', cr4: '4 · 偏宽（9×9）', crFull: '5 · 最宽（全盘）',
+    candRangeHint: '越大越不容易漏点，同时间算得更浅',
+    multiPv: '分析点数', multiPvHint: '「分析计算」最多给出的点数（与分析面板同一设置）',
+    multiPvUnit: ' 个点',
     mdNone: '不限', mnNone: '不限',
+    phNone: '不限',
+    phDepth: '4 ~ 128 的整数，留空 = 不限',
+    phNodes: '0.1 ~ 256（单位 M），留空 = 不限',
     coresHint: '本机 {n} 线程 · 上限 {m}',
     coach: '指导视图', coachHint: '方形四色热力：AI 帮你算最佳落点，落子即消失',
     heatBest: '最佳', heatGood: '良好', heatFair: '一般', heatPoor: '劣势',
@@ -68,7 +75,7 @@ var I18N = {
     turnAiBoth: 'AI 自打 · 轮到{c}',
     turnYouBoth: '轮到你 · {c}（双方都你下）',
     showNum: '显示序号', showNumHint: '棋子上标出第几手',
-    bgThink: '后台思考', bgThinkHint: '轮到你时引擎继续深算（速度/节点持续上涨），落子后 AI 应手直接命中热置换表',
+    bgThink: '后台思考', bgThinkHint: 'AI 落子后你在思考时，引擎在后台继续深算这一局面（算你的优势点 + 它的应对），你一落子它从热置换表接着算',
     bgThinkOffAi: 'AI 对打期间已自动关闭', bgThinkOffBusy: '有计算在跑，已自动暂停',
     
     rvNum: '序号', rvNumHint: '在棋子上标出它是第几手',
@@ -436,7 +443,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     visCode: '棋盘代码',
     visCodeCopied: '棋盘代码已复制',
     
-    nbest: '分析点数', nbestHint: '至多 8 点（引擎按局面给点，未必给满）',
+    nbest: '分析点数', nbestHint: '至多 8 点（与「对局设置 · 分析点数」同一设置）',
     anIdle: '选一个功能键开始计算，结果会标在棋盘上',
     anRunning: '计算中…', anStopped: '已停止计算', anEmpty: '棋盘还是空的：先落几手再算',
     anDraft: '演算中…第 {r} 轮草稿',
@@ -510,9 +517,15 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     vHintSse: 'SSE: oldest fallback, emergencies only',
     sysBench: 'measured fastest',
     candRange: 'Candidate range', maxDepth: 'Max depth', maxNodes: 'Max nodes',
-    cr2: 'Square 2', cr2l3: 'Square 2 + line 3', cr3: 'Square 3', cr3l4: 'Square 3 + line 4 (recommended)',
-    cr4: 'Square 4', crFull: 'Full board',
+    cr2: '0 · Narrowest (5×5)', cr2l3: '1 · Narrow (5×5+3)', cr3: '2 · Neutral (7×7)',
+    cr3l4: '3 · Recommended (7×7+4)', cr4: '4 · Wide (9×9)', crFull: '5 · Widest (full board)',
+    candRangeHint: 'Wider never misses a point but searches shallower in the same time',
+    multiPv: 'Analysis points', multiPvHint: 'Max points shown by Analyze (same setting as the panel)',
+    multiPvUnit: ' pts',
     mdNone: 'No limit', mnNone: 'No limit',
+    phNone: 'No limit',
+    phDepth: 'Integer 4 ~ 128, empty = no limit',
+    phNodes: '0.1 ~ 256 (in M), empty = no limit',
     coresHint: '{n} threads on this PC · max {m}',
     coach: 'Coach view', coachHint: 'Square 4-colour heat: AI computes your best spots; clears on move',
     heatBest: 'Best', heatGood: 'Good', heatFair: 'Fair', heatPoor: 'Poor',
@@ -529,7 +542,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     turnAiBoth: 'AI vs AI · {c} to move',
     turnYouBoth: 'Your turn · {c} (both sides)',
     showNum: 'Move numbers', showNumHint: 'Mark each stone with its move number',
-    bgThink: 'Background thinking', bgThinkHint: 'Keep searching during your turn (nodes keep rising) so the AI reply hits a hot transposition table',
+    bgThink: 'Background thinking', bgThinkHint: 'After the AI moves, the engine keeps deepening this position while you think (your threats + its replies), so your move hits a hot transposition table',
     bgThinkOffAi: 'auto-off while AI plays both sides', bgThinkOffBusy: 'paused while a calculation runs',
     
     rvNum: 'Numbers', rvNumHint: 'Mark each stone with its move number',
@@ -877,7 +890,7 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     veEditOn: 'Edit mode: right-click the board for the same menu',
     veEditOff: 'Edit mode off',
     veRightMenu: 'Right-click menu: pick an action',
-    nbest: 'Points', nbestHint: 'Up to 8 (engine may return fewer)',
+    nbest: 'Points', nbestHint: 'Up to 8 (same setting as Analysis points in Game settings)',
     anIdle: 'Pick a button to compute; results are drawn on the board',
     anRunning: 'Computing…', anStopped: 'Stopped', anEmpty: 'Board is empty: place a few stones first',
     anDraft: 'Drafting… round {r}',
@@ -954,7 +967,7 @@ var S = {
   rule: 0,
   cores: 0, hashMB: 0,
   weights: '',
-  candRange: 3, maxDepth: 72, maxNodes: 0,
+  candRange: 3, maxDepth: 100, maxNodes: 0,
   variant: '',
   hashDefMig: false,          
   coresDefault: '',
@@ -975,7 +988,7 @@ var S = {
   
   previewOn: true,
   customBase: 'light',         
-  nbest: 4,                    
+  nbest: 3,                    
   
   cards: null,                 
 };
@@ -1121,7 +1134,7 @@ function grab() {
    't_setup','seg_mode','seg_side','t_mode','t_side','t_turn','sideHint',
    'egBar','btn_eg_ok','btn_eg_seq','btn_eg_free','egKeys','btn_eg_b','btn_eg_w',   
    'num_turn','t_rule','sel_rule','ruleHint',
-   'sysInfo','t_cores','sel_cores','coresHint','t_hash','sel_hash','t_variant','sel_variant','variantHint','t_weights','sel_weights','weightsHint','t_candRange','sel_candRange',
+   'sysInfo','t_cores','sel_cores','coresHint','t_hash','sel_hash','t_variant','sel_variant','variantHint','t_weights','sel_weights','weightsHint','t_candRange','sel_candRange','candRangeHint','t_multiPv','sel_multiPv','multiPvHint',
    't_maxDepth','sel_maxDepth','inp_maxDepth','t_maxNodes','sel_maxNodes','inp_maxNodes',
    
    't_secGame','t_secEngine','t_secView','t_secCode',
@@ -1761,6 +1774,10 @@ var LIVE_MARK_PAL = [
   { fill: 'rgba(96,200,120,.30)', ring: 'rgba(110,214,134,.96)' },
   { fill: 'rgba(196,216,86,.30)', ring: 'rgba(212,228,104,.96)' },
   { fill: 'rgba(196,216,86,.20)', ring: 'rgba(212,228,104,.80)' },
+  { fill: 'rgba(196,216,86,.17)', ring: 'rgba(212,228,104,.70)' },
+  { fill: 'rgba(196,216,86,.15)', ring: 'rgba(212,228,104,.62)' },
+  { fill: 'rgba(196,216,86,.13)', ring: 'rgba(212,228,104,.55)' },
+  { fill: 'rgba(196,216,86,.11)', ring: 'rgba(212,228,104,.48)' },
 ];
 function drawRingLabels(ctx, px, py, r, topTxt, botTxt, fsScale, fitF) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
@@ -1789,7 +1806,7 @@ function drawRingLabels(ctx, px, py, r, topTxt, botTxt, fsScale, fitF) {
 }
 
 function drawLiveMarks(ctx, marks, pad, gap) {
-  marks.slice(0, 4).forEach(function (mk) {
+  marks.slice(0, 8).forEach(function (mk) {
     var px = pad + mk.x * gap, py = pad + mk.y * gap;
     var r = Math.max(9, gap * 0.47);
     var best = (mk.rank === 0);
@@ -2171,7 +2188,7 @@ async function aiMove() {
     var wasRecon = !!G.reconBoost;                 
     if (wasRecon) { G.reconBoost = false; }
     var r = await analyze(budget, 1, null, curColor(), T('tagAiMove'),
-                          { exclusive: true, urgent: true, noPonder: aiVsAi() });
+                          { exclusive: true, urgent: true, noPonder: !S.bgThink || aiVsAi() });
     
     if (myGen !== gAiGen) { G.think = []; G.busy = false; refreshUI(); return; }
     
@@ -3864,7 +3881,7 @@ function toast(msg) {
   setStat(null, msg);
 }
 
-var APP_VERSION = '4.43';
+var APP_VERSION = '4.46';
 
 var UPDATE_URL = 'https://wwbbj.lanzout.com/b016l49aqj';
 var UPDATE_PWD = '15';
@@ -6224,7 +6241,7 @@ function onCardUp() {
 
 function applyLang() {
   var d = I18N[S.lang];
-  ['title','setup','mode','side','turn','rule','cores','hash','variant','weights','candRange','maxDepth','maxNodes','heat','heatHint',
+  ['title','setup','mode','side','turn','rule','cores','hash','variant','weights','candRange','multiPv','maxDepth','maxNodes','heat','heatHint',
    'showNum','showNumHint','bgThink','preview','previewHint','engine','depth','speed','nodes','time','eval','best','curve',
    'blackCurve','whiteCurve','curveHint','reciteHint','code','drTip',
    'heatBest','heatGood','heatFair','heatPoor','coach','coachHint',
@@ -6322,6 +6339,22 @@ function applyLang() {
     anaCalcUI();                      
     els.t_nbest.textContent = d.nbest;
     els.t_nbestHint.textContent = d.nbestHint;
+    if (els.t_multiPv) els.t_multiPv.textContent = d.multiPv;
+    if (els.multiPvHint) els.multiPvHint.textContent = d.multiPvHint;
+    if (els.candRangeHint) els.candRangeHint.textContent = d.candRangeHint || '';
+    if (els.sel_candRange) els.sel_candRange.title = d.candRangeHint || '';
+    if (els.inp_maxDepth) { els.inp_maxDepth.placeholder = d.phNone || ''; els.inp_maxDepth.title = d.phDepth || ''; }
+    if (els.inp_maxNodes) { els.inp_maxNodes.placeholder = d.phNone || ''; els.inp_maxNodes.title = d.phNodes || ''; }
+    if (els.sel_maxDepth) els.sel_maxDepth.title = d.phDepth || '';
+    if (els.sel_maxNodes) els.sel_maxNodes.title = d.phNodes || '';
+    if (els.sel_multiPv) {
+      var mpSel = Math.max(1, Math.min(8, Math.round(+S.nbest || 3)));
+      var mpHtml = [];
+      for (var mi = 1; mi <= 8; mi++) {
+        mpHtml.push('<option value="' + mi + '"' + (mi === mpSel ? ' selected' : '') + '>' + mi + (d.multiPvUnit || '') + '</option>');
+      }
+      els.sel_multiPv.innerHTML = mpHtml.join('');
+    }
     cpSyncSegs();
     applyCardVis();                                   
     if (!G.ana.busy && !G.ana.rows.length) renderAna(d.anIdle, true);
@@ -7335,7 +7368,7 @@ function anaGuard(minStones) {
   if (G.moves.length < (minStones || 0)) { renderAna(T('anEmpty')); return false; }
   return true;
 }
-function anaIp() { return Math.max(2, Math.min(8, Math.round(+S.nbest || 4))); }
+function anaIp() { return Math.max(1, Math.min(8, Math.round(+S.nbest || 3))); }
 
 async function anaCalc() {
   if (!anaGuard(0)) return;
@@ -7590,12 +7623,16 @@ function liveAnaToggle() {
   }
 }
 
-function liveAnaPick(cs) {
+var LIVE_PICK_LIM = [0.08, 0.05, 0.03, 0.05, 0.07, 0.09, 0.11];
+
+
+function liveAnaPick(cs, n) {
   if (!cs || !cs.length) return [];
+  var cap = Math.max(1, Math.min(8, Math.round(n || anaIp())));
   var out = [cs[0]], bw = cs[0].wr;
-  var lim = [0.08, 0.05, 0.03];
-  for (var i = 1; i < cs.length && out.length < 4; i++) {
-    if (bw - cs[i].wr > lim[out.length - 1]) break;
+  for (var i = 1; i < cs.length && out.length < cap; i++) {
+    var k = Math.min(out.length - 1, LIVE_PICK_LIM.length - 1);
+    if (bw - cs[i].wr > LIVE_PICK_LIM[k] + 1e-9) break;
     out.push(cs[i]);
   }
   return out;
@@ -7608,7 +7645,7 @@ function liveAnaApply(res) {
              depth: c.depth || 0, rank: i, line: c.line || [] };
   });
   LIVE_AN.items = cs;
-  LIVE_AN.picked = liveAnaPick(cs);
+  LIVE_AN.picked = liveAnaPick(cs, anaIp());
   setPvLine((cs[0] && cs[0].line) || [], liveAnaSide());
   if (LIVE_AN.picked.some(function (c) { return /^[+-]?M\d+$/i.test(String(c.ev)); }))
     LIVE_AN.mate = true;
@@ -7648,7 +7685,7 @@ function liveAnaStart() {
   var ended = false;
   var h = LocalAI.live({
     board: G.board, moveList: [], matchMs: 600000, turnMs: 3600000, timeUsedMs: 0,
-    topN: 4, rule: engineRule(), cid: 'calc-live-' + mvN, lane: 'main', side: side,
+    topN: anaIp(), rule: engineRule(), cid: 'calc-live-' + mvN, lane: 'main', side: side,
     liveId: LocalAI.nextLiveId(), tag: T('tagLiveAna'),
   }, function (res) {
     if (gen !== LIVE_AN.gen) return;
@@ -7776,27 +7813,15 @@ function bgThinkKick(ms) {
   BG_AN.key = key;
   bgThinkSchedule(ms == null ? 200 : ms);
 }
-function bgThinkStart() {
-  if (!bgThinkWanted()) return;
-  var key = bgThinkKeyNow();
-  if (BG_AN.handle && BG_AN.key === key) return;
-  var gen = ++BG_AN.gen;
-  if (BG_AN.handle) { try { BG_AN.handle.stop(); } catch (e) {} BG_AN.handle = null; }
-  BG_AN.key = key;
-  var mvN = G.moves.length;
-  var ended = false;
-  var h = LocalAI.live({
-    board: G.board, moveList: [], matchMs: 600000, turnMs: 3600000, timeUsedMs: 0,
-    topN: 1, rule: engineRule(), cid: 'bg-' + mvN, lane: 'main', side: curColor(),
-    liveId: LocalAI.nextLiveId(), tag: T('tagBg'),
-  }, function () {}, function () {
-    ended = true;
-    if (gen !== BG_AN.gen) return;
-    BG_AN.handle = null;
-    if (G.moves.length !== mvN) return;
-    bgThinkSchedule(400);
-  });
-  if (!ended && gen === BG_AN.gen) BG_AN.handle = h;
+//
+//
+function bgThinkStart() {  }
+
+function bgThinkHaltEngine() {
+  if (G.busy) return;
+  if (G.ana && G.ana.busy) return;
+  if (G.fwd && G.fwd.busy) return;
+  try { LocalAI.stopLane('main'); } catch (e) {}
 }
 
 function boardDecided() {
@@ -8888,7 +8913,7 @@ async function fwdRun() {
       try {
         r = await LocalAI.analyze({ board: b, moveList: [], matchMs: 600000,
           turnMs: tms, timeUsedMs: 0,
-          topN: firstDeep ? Math.max(4, S.nbest || 4) : (of.length ? 4 : 1),
+          topN: firstDeep ? Math.max(2, S.nbest || 3) : (of.length ? 4 : 1),
           rule: engineRule(), cid: 'fwd-' + gen + '-' + step, lane: 'fwd', side: cc,
           
           exclusive: true,
@@ -9386,9 +9411,9 @@ function wireAnalysis() {
     toast(T('anBalnSet').replace('{n}', String(n)));
   };
   els.num_nbest.onchange = function () {
-    
-    S.nbest = Math.max(2, Math.min(8, Math.round(+els.num_nbest.value || 4)));
+    S.nbest = Math.max(1, Math.min(8, Math.round(+els.num_nbest.value || 3)));
     els.num_nbest.value = String(S.nbest);
+    if (els.sel_multiPv) els.sel_multiPv.value = String(S.nbest);
     save();
   };
   els.num_nbest.value = String(anaIp());
@@ -9553,7 +9578,13 @@ function buildSelects() {
   if (!migFlag('hash1024')) {
     if (S.hashMB === 1024) { S.hashMB = 512; enginePrefSet(S.cores, S.hashMB); save(); effH = 512; }
   }
-  if (!S.hashMB) { S.hashMB = 512; enginePrefSet(S.cores, S.hashMB); save(); effH = 512; } // factory default: 512MB
+  if (!S.hashMB) { S.hashMB = 2048; enginePrefSet(S.cores, S.hashMB); save(); effH = 2048; }
+  if (!migFlag('hash2048') && S.hashMB >= 256 && S.hashMB < 2048) {
+    S.hashMB = 2048;
+    enginePrefSet(S.cores, S.hashMB);
+    save();
+    effH = Math.min(2048, capMB);
+  }
   els.sel_hash.innerHTML = hs.map(function (h) {
     var off = (h > capMB);
     return '<option value="' + h + '"' + (h === effH ? ' selected' : '') +
@@ -9575,12 +9606,26 @@ function buildSelects() {
   var CR_LABELS = ['cr2', 'cr2l3', 'cr3', 'cr3l4', 'cr4', 'crFull'];
   var crNow = (S.candRange >= 0 && S.candRange <= 5) ? S.candRange : 3;
   S.candRange = crNow;
-  if (els.sel_candRange) els.sel_candRange.innerHTML = CR_LABELS.map(function (k, i) {
-    return '<option value="' + i + '"' + (i === crNow ? ' selected' : '') + '>' + T(k) + '</option>';
-  }).join('');
-  var MD_OPTS = [0, 24, 32, 40, 48, 56, 64, 72];
+  if (els.sel_candRange) {
+    els.sel_candRange.innerHTML = CR_LABELS.map(function (k, i) {
+      return '<option value="' + i + '"' + (i === crNow ? ' selected' : '') + '>' + T(k) + '</option>';
+    }).join('');
+    els.sel_candRange.title = T('candRangeHint');
+  }
+  if (els.multiPvHint) els.multiPvHint.textContent = T('multiPvHint');
+  if (!migFlag('multiPv3') && (S.nbest === undefined || S.nbest === 4)) { S.nbest = 3; save(); }
+  var mpNow = Math.max(1, Math.min(8, Math.round(+S.nbest || 3)));
+  S.nbest = mpNow;
+  if (els.sel_multiPv) {
+    var mpOpts = [];
+    for (var mi = 1; mi <= 8; mi++) {
+      mpOpts.push('<option value="' + mi + '"' + (mi === mpNow ? ' selected' : '') + '>' + mi + T('multiPvUnit') + '</option>');
+    }
+    els.sel_multiPv.innerHTML = mpOpts.join('');
+  }
+  var MD_OPTS = [0, 24, 32, 40, 48, 56, 64, 72, 88, 100];
   var mdNow = S.maxDepth;
-  if (!(mdNow === 0 || (mdNow >= 4 && mdNow <= 128))) mdNow = 72;
+  if (!(mdNow === 0 || (mdNow >= 4 && mdNow <= 128))) mdNow = 100;
   S.maxDepth = mdNow;
   if (els.sel_maxDepth) {
     els.sel_maxDepth.innerHTML = MD_OPTS.map(function (v) {
@@ -9590,9 +9635,9 @@ function buildSelects() {
     selSyncCustom(els.sel_maxDepth, mdNow, function (x) { return String(x); });
   }
   if (els.inp_maxDepth) els.inp_maxDepth.value = mdNow ? String(mdNow) : '';
-  var MN_OPTS = [0, 1000000, 4000000, 16000000, 64000000, 256000000];
+  var MN_OPTS = [0, 1000000, 4000000, 16000000, 64000000, 256000000, 1000000000];
   var mnNow = S.maxNodes;
-  if (!(mnNow === 0 || (mnNow >= 100000 && mnNow <= 256000000))) mnNow = 0;
+  if (!(mnNow === 0 || (mnNow >= 100000 && mnNow <= 1000000000))) mnNow = 0;
   S.maxNodes = mnNow;
   if (els.sel_maxNodes) {
     els.sel_maxNodes.innerHTML = MN_OPTS.map(function (v) {
@@ -9947,6 +9992,12 @@ function boot() {
   if (els.sel_candRange) els.sel_candRange.onchange = function () {
     S.candRange = +els.sel_candRange.value; save(); applyEngineConfig();
   };
+  if (els.sel_multiPv) els.sel_multiPv.onchange = function () {
+    S.nbest = Math.max(1, Math.min(8, Math.round(+els.sel_multiPv.value || 3)));
+    els.sel_multiPv.value = String(S.nbest);
+    if (els.num_nbest) els.num_nbest.value = String(S.nbest);
+    save();
+  };
   if (els.inp_maxDepth) {
     els.inp_maxDepth.value = S.maxDepth ? String(S.maxDepth) : '';
     els.inp_maxDepth.onchange = els.inp_maxDepth.onblur = function () {
@@ -10017,8 +10068,8 @@ function boot() {
       els.btn_bgThink.setAttribute('aria-pressed', S.bgThink ? 'true' : 'false');
     }
     bgThinkHintSync();
-    if (S.bgThink) { bgThinkKick(0); bgThinkIntroOnce(); }
-    else bgThinkStop();
+    if (S.bgThink) { bgThinkIntroOnce(); }
+    else { bgThinkStop(); bgThinkHaltEngine(); }
   };
   
   els.chk_preview.onchange = function () { S.previewOn = !!els.chk_preview.checked; save(); paint(); };
@@ -10426,6 +10477,15 @@ function migFlag(name) {
 }
 
 function save() {
+  if (LINK_MODE) {
+    try {
+      var _bs = window.GB_S;
+      if (_bs) {
+        if (typeof _bs.bgThink === 'boolean') S.bgThink = _bs.bgThink;
+        if (_bs.turnMs >= 200 && _bs.turnMs <= 300000) S.turnMs = _bs.turnMs;
+      }
+    } catch (eS) {}
+  }
   // Align the engine fields with the dedicated key before any window writes a save, so a stale
   // window can never write an old cores/hashMB again.
   enginePrefApplyToS();
@@ -11494,6 +11554,11 @@ function bootLink() {
     BS.customTurnSec = Math.round((c.turnMs >= 200 ? c.turnMs : 2000) / 100) / 10;
     
     BS.turnMs = (c.turnMs >= 200 ? c.turnMs : 2000); BS.customSec = 600; BS.hashMB = 0;
+    try {
+      var _bst = JSON.parse(localStorage.getItem('gbcalc.settings.v1') || '{}');
+      if (_bst && typeof _bst.bgThink === 'boolean') BS.bgThink = _bst.bgThink;
+    } catch (eBT) {}
+    if (typeof BS.bgThink !== 'boolean') BS.bgThink = false;
     BS.side = -1; BS.heatmap = false;          
     BS.history = []; BS.candCache = []; BS.myEval = '-'; BS.rawEval = '';
     

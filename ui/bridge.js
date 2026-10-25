@@ -1,4 +1,4 @@
-﻿/* Meter Gomoku Trainer - desktop overlay data bridge. Exposes page-facing APIs for board sync, engine analysis, balance-point suggestions and auto-move; the C++ host drives screen scanning and click injection. */
+/* Meter Gomoku Trainer - desktop overlay data bridge. Exposes page-facing APIs for board sync, engine analysis, balance-point suggestions and auto-move; the C++ host drives screen scanning and click injection. */
 
 
 (function () {
@@ -6,7 +6,7 @@
 
   var S = window.GB_S || (window.GB_S = {});
 
-  var GB_VER = 'v4.43';
+  var GB_VER = 'v4.46';
   try { window.__gbTacTest = engineTacTest; } catch (e) {}
   var UI = window.GBUI || {};
   var N = 15;

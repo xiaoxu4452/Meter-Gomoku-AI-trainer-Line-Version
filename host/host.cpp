@@ -264,11 +264,23 @@ static COLORREF MixColor(COLORREF a, COLORREF b, float t) {
   return RGB(cl((int)(ar + (br - ar) * t)), cl((int)(ag + (bg - ag) * t)), cl((int)(ab + (bb - ab) * t)));
 }
 
+static std::mutex g_logMu;
+
 static void LogMsg(const std::string& s) {
   wchar_t tmp[MAX_PATH] = {0};
   GetTempPathW(MAX_PATH, tmp);
   std::wstring path = Join(std::wstring(tmp), L"GomokuTrainer.log");
-  
+  SYSTEMTIME st; GetLocalTime(&st);
+  char head[64];
+  snprintf(head, sizeof(head), "[%02d:%02d:%02d.%03d] ", st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+
+  std::string line;
+  line.reserve(strlen(head) + s.size() + 2);
+  line.append(head, strlen(head));
+  line += s;
+  line += '\n';
+
+  std::lock_guard<std::mutex> lk(g_logMu);
   static DWORD lastLogRotate = 0;
   DWORD nowRot = GetTickCount();
   if (nowRot - lastLogRotate > 30000) {
@@ -281,12 +293,7 @@ static void LogMsg(const std::string& s) {
   }
   FILE* f = _wfopen(path.c_str(), L"ab");
   if (!f) return;
-  SYSTEMTIME st; GetLocalTime(&st);
-  char head[64];
-  snprintf(head, sizeof(head), "[%02d:%02d:%02d.%03d] ", st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
-  fwrite(head, 1, strlen(head), f);
-  fwrite(s.data(), 1, s.size(), f);
-  fwrite("\n", 1, 1, f);
+  fwrite(line.data(), 1, line.size(), f);
   fclose(f);
 }
 
@@ -905,9 +912,9 @@ enum { VSEL_NONE = 0, VSEL_MOVE, VSEL_L, VSEL_R, VSEL_T, VSEL_B,
 static bool VselLoadAuto() {
   wchar_t path[MAX_PATH] = { 0 };
   if (!GetEnvironmentVariableW(L"APPDATA", path, MAX_PATH)) return true;
-  std::wstring p = std::wstring(path) + L"\Meter Gomoku";
+  std::wstring p = std::wstring(path) + L"\\Meter Gomoku";
   CreateDirectoryW(p.c_str(), nullptr);
-  std::wstring f = p + L"\vsel-auto.cfg";
+  std::wstring f = p + L"\\vsel-auto.cfg";
   FILE* fp = _wfopen(f.c_str(), L"r");
   if (!fp) return true;
   int v = 1;
@@ -918,9 +925,9 @@ static bool VselLoadAuto() {
 static void VselSaveAuto(bool on) {
   wchar_t path[MAX_PATH] = { 0 };
   if (!GetEnvironmentVariableW(L"APPDATA", path, MAX_PATH)) return;
-  std::wstring p = std::wstring(path) + L"\Meter Gomoku";
+  std::wstring p = std::wstring(path) + L"\\Meter Gomoku";
   CreateDirectoryW(p.c_str(), nullptr);
-  std::wstring f = p + L"\vsel-auto.cfg";
+  std::wstring f = p + L"\\vsel-auto.cfg";
   FILE* fp = _wfopen(f.c_str(), L"w");
   if (!fp) return;
   fprintf(fp, "%d", on ? 1 : 0);

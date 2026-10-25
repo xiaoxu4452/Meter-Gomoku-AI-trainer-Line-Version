@@ -1309,8 +1309,14 @@ ScanResult finishWithGeometry(const cv::Mat& masked, int size,
 
     //
     const bool useSync = (sync != nullptr) && (livenessGate || forceSync);
+    auto recogIsDefault = [](const SyncRecogParams& p) {
+        return p.grayOffset == 50 && p.blackOffset == 96 && p.whiteOffset == 96 &&
+               p.blackPercent == 33 && p.whitePercent == 33;
+    };
+    const bool recogStrict = sync != nullptr && !recogIsDefault(*sync);
     if (useSync) {
-        readStonesSync(crop, g, *sync, board, diag, /*allowRelax*/forceSync);
+        readStonesSync(crop, g, *sync, board, diag, /*allowRelax*/forceSync && !recogStrict);
+        if (recogStrict) diag.set("recog_strict", Json::makeBool(true));
         bool swamped = (diag.find("suspect") && diag.find("suspect")->b);
         auto countStones = [](const cv::Mat& b) {
             int c = 0;
@@ -1321,7 +1327,7 @@ ScanResult finishWithGeometry(const cv::Mat& masked, int size,
         };
         const int cntSync = countStones(board);
         const bool emptyFrame = (cntSync == 0);
-        if (swamped || (emptyFrame && forceSync)) {
+        if (!recogStrict && (swamped || (emptyFrame && forceSync))) {
             cv::Mat boardA, confA;
             Json diagA;
             readStonesAdaptive(crop, g, boardA, confA, diagA);
@@ -1370,7 +1376,7 @@ ScanResult finishWithGeometry(const cv::Mat& masked, int size,
     }
     }
 
-    if (forceSync) {
+    if (forceSync && !recogStrict) {
         int b0 = 0, w0 = 0;
         countBoard(board, b0, w0);
         const bool sus0b = (diag.find("suspect") && diag.find("suspect")->b);
