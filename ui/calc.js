@@ -2062,8 +2062,8 @@ function mustAnswer(b, cc, cands, op, of, myFour) {
   return null;
 }
 
-// Reply: {cands:[{x,y,score,nodes,winrate,line}], best, timeout, elapsed, nodeCount, superseded, error}.
 // ---- engine bridge: one host engine, one in-flight ask, latest request wins ----
+// Reply: {cands:[{x,y,score,nodes,winrate,line}], best, timeout, elapsed, nodeCount, superseded, error}.
 var LocalAI = (function () {
   var seq = 0, liveSeq = 0;
   var pend = {};
@@ -6490,10 +6490,10 @@ function defaultLayoutLink() {
     if (c) els.dockL.appendChild(c);
   });
 }
+// ---- card layout: docking, reorder, collapse, hide ----
 // Link mode: collect every card into the left dock, so the empty right dock collapses to
 // zero width and the board gets a wider viewport. Mirrors cardOrderBySelect()'s link test,
 // so cards opened later from Settings land on the left too.
-// ---- card layout: docking, reorder, collapse, hide ----
 function cardsToLeftDock() {
   if (!els.dockL) return;
   [].forEach.call(document.querySelectorAll('.card'), function (c) {
