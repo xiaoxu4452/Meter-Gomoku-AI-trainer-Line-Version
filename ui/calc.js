@@ -11731,22 +11731,18 @@ function bootLink() {
       }
     }
     list.innerHTML = html;
-    // ★★ 2026-10-19 三次修订（用户：「存档里面的名称不用再改了，取消可改名称的这个功能」＋
-    //   「双击某一个历史，也能加载到相应的调整参数上」）：
-    //   · 单击任意处（含名字）→ 勾选/取消勾选（名字不再可点改名）；
-    //   · 双击整条 → 直接加载该存档的参数。
-    //   单击/双击会互相抢占（浏览器先派发 2 次 click 再派发 dblclick），所以单击用 190ms
-    //   去抖：若期间来了第二次点击，就丢弃单击动作，只让 dblclick 生效。
+    // Click toggles the row, double click loads it. A double click fires two clicks first,
+    // so a click is debounced by 190 ms and dropped when a second click arrives.
     [].forEach.call(list.querySelectorAll('.lk-dr-item'), function (it) {
       var nm = it.getAttribute('data-name'), hit = 0;
       it.onclick = function () {
-        if (hit) { clearTimeout(hit); hit = 0; return; }      // 第二次点击：交给 dblclick
+        if (hit) { clearTimeout(hit); hit = 0; return; }      // second click: let dblclick win
         hit = setTimeout(function () { hit = 0; lkSlotToggle(nm); }, 190);
       };
       it.ondblclick = function (ev) {
         if (ev) ev.preventDefault();
         if (hit) { clearTimeout(hit); hit = 0; }
-        lkSlotApply(nm);                                      // 双击 = 加载这个存档
+        lkSlotApply(nm);                                      // double click loads this save
       };
     });
     var ai = q('lk_slotAll');
@@ -11770,9 +11766,8 @@ function bootLink() {
     if (!all) for (var i = 0; i < lkSlots.length; i++) lkSlotSel[lkSlots[i].name] = 1;
     lkSlotPaint();
   }
-  // ★★ 2026-10-19 二次修订（用户：「把选择，改成加载，或者双击某一个历史，也能加载到相应的
-  //   调整参数上」）：`lkSlotApply(name)` 的 name 由双击直接给出（跳过必须是唯一勾选的要求）；
-  //   不传 name 时（点「加载」按钮）仍要求恰好勾选 1 个。
+  // A name passed by the double click skips the single-selection check; the Load button
+  // still needs exactly one row selected.
   function lkSlotApply(name) {
     var st = q('lkStatus'), nm = name || '';
     if (!nm) {
@@ -11790,7 +11785,7 @@ function bootLink() {
     rcState = { interval: r.interval, gray_offset: r.gray_offset, black_offset: r.black_offset,
                 white_offset: r.white_offset, black_percent: r.black_percent,
                 white_percent: r.white_percent };
-    rcPaint(); rcLive();                      // 即时生效（rcLive 会把这份参数也交给宿主落盘）
+    rcPaint(); rcLive();                      // apply now (rcLive also hands the params to the host)
     lkSlotClose();
     if (st) st.textContent = lkL('已加载「' + nm + '」并即时生效', 'Loaded preset "' + nm + '" (live)');
   }
@@ -11805,7 +11800,7 @@ function bootLink() {
       if (lkSlotSel[sl.name]) { batch.push(sl); return false; }
       return true;
     });
-    lkSlotUndo.push(batch);                   // 撤销栈：可回退最近一次删除
+    lkSlotUndo.push(batch);                   // undo stack for the last delete
     lkSlotSel = {};
     lkSlotsStore(); lkSlotPaint();
     if (st) st.textContent = lkL('已删除 ' + batch.length + ' 个存档（点「撤销」可找回）',
@@ -11821,13 +11816,9 @@ function bootLink() {
     lkSlotsStore(); lkSlotPaint();
     if (st) st.textContent = lkL('已撤销删除（恢复 ' + back + ' 个存档）', 'Undo done (' + back + ' restored)');
   }
-  // ★★ 2026-10-19 三次修订（用户：「存档命名这个弹窗标题左对齐」「存档里面的名称不用再改了，取消
-  //   可改名称的这个功能」「存档命名默认是（如果用户不想命名）：Parameter 1（2、3…）」＋「英文
-  //   字符名称不可以超过 45 个字母，汉字不可以超过 20 个字符」）：
-  //   · 标题固定四字「存档命名」，靠左（见 .lk-nm-hd/.lk-nm-ttl 的 space-between + text-align:left）；
-  //   · 改名入口已删除 —— 存档条上的名字不再可点改，单击=勾选、双击=加载；
-  //   · 打开即预填默认名 Parameter N（N = 未被占用的最小序号），不想命名直接点「确定」；
-  //   · 名称长度：含汉字 ≤ 20 字符；纯英文 ≤ 45 字母（输入与确定都做截断）。
+  // Save-name dialog: fixed left-aligned title, no rename path (click selects, double
+  // click loads), prefilled with the lowest free "Parameter N", capped at 20 chars for
+  // CJK names and 45 for ASCII ones (input and confirm both truncate).
   var LK_NAME_CJK = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef\u3000-\u303f]/;
   function lkNameClip(s) {
     s = String(s == null ? '' : s);
@@ -11855,7 +11846,7 @@ function bootLink() {
   function lkNameOk() {
     var st = q('lkStatus'), inp = q('lk_nameInp');
     var nm = lkNameClip(((inp && inp.value) || '').replace(/^\s+|\s+$/g, ''));
-    if (!nm) nm = lkDefaultName();                    // 空名即用默认 Parameter N
+    if (!nm) nm = lkDefaultName();                    // empty name falls back to Parameter N
     var rec = rcSnapshot(), hit = false;
     for (var i = 0; i < lkSlots.length; i++) {
       if (lkSlots[i].name === nm) { lkSlots[i].recog = rec; lkSlots[i].ts = Date.now(); hit = true; break; }
@@ -11872,7 +11863,7 @@ function bootLink() {
     if (st) st.textContent = lkL('已存档「' + nm + '」（共 ' + lkSlots.length + ' 个）',
                                  'Saved preset "' + nm + '" (' + lkSlots.length + ' total)');
   }
-  // 「存档」按钮 → 命名弹窗；「加载」按钮 → 用勾选的那个存档（不传 name）。
+  // Save opens the naming dialog; Load uses the selected save (no name passed).
   if (q('lk_rcSlotSave')) q('lk_rcSlotSave').onclick = function () { lkNameOpen(); };
   if (q('lk_rcSlotLoad')) q('lk_rcSlotLoad').onclick = function () {
     if (slotDrawer && !slotDrawer.hidden) lkSlotClose();
@@ -11883,14 +11874,14 @@ function bootLink() {
   if (q('lk_slotAll')) q('lk_slotAll').onclick = lkSlotAll;
   if (q('lk_slotDel')) q('lk_slotDel').onclick = lkSlotDel;
   if (q('lk_slotUndo')) q('lk_slotUndo').onclick = lkSlotUndoFn;
-  // ★ 2026-10-23（用户：「读档右上角需要关闭键」）：抽屉标题行右端的 ✕ 就等于「收起抽屉」。
+  // The ✕ in the drawer header collapses the drawer, nothing else.
   if (q('lk_slotX')) q('lk_slotX').onclick = lkSlotClose;
   if (q('lk_nameOk')) q('lk_nameOk').onclick = lkNameOk;
   if (q('lk_nameNo')) q('lk_nameNo').onclick = lkNameClose;
-  // ✕ 已从「存档命名」弹窗移除（用户 2026-10-23：存档窗不需要关闭键，只留确定/取消）。
+  // The naming dialog has no ✕: confirm or cancel only.
   if (q('lkNameMask')) q('lkNameMask').onclick = function (ev) { if (ev && ev.target === this) lkNameClose(); };
   if (q('lk_nameInp')) {
-    // 长度上限即时截断：含汉字 ≤20 字符 / 纯英文 ≤45 字母
+    // hard cap while typing: 20 CJK / 45 ASCII chars
     q('lk_nameInp').addEventListener('input', function () {
       var v = lkNameClip(this.value);
       if (v !== this.value) this.value = v;
@@ -11900,7 +11891,7 @@ function bootLink() {
       else if (ev.key === 'Escape') { ev.preventDefault(); lkNameClose(); }
     });
   }
-  lkSlots = lkSlotsFromLocal();               // 先用本页缓存顶上；宿主 ready 后会回填权威那份
+  lkSlots = lkSlotsFromLocal();               // local cache first, host pushes the authoritative copy once ready
 
   window.__lkRcOpen = rcOpen;
   window.__lkRcPaint = rcPaint;
@@ -11909,7 +11900,7 @@ function bootLink() {
     b.onclick = function () {
       c.rule = +b.getAttribute('data-rule'); lkSaveCfg(c); ruleSync(); lkSendCfg();
       lkBridgeRule(c.rule);
-      saveRuleGlobal(c.rule);                  // ★ 写全局规则键：主界面下次启动也认这个规则
+      saveRuleGlobal(c.rule);                  // Also write the global rule key so the main window starts on it.
       if (!lkFramedNow()) lkRemindFrame();
     };
   });
@@ -11938,10 +11929,8 @@ function bootLink() {
     else linkBalanceEval();
   };
 
-  // ★★ 2026-10-19（用户：「在交换平衡点、交换评估后面再添加一个取消按键，点击取消后，可以停止
-  //   交换平衡的计算，以及清除上面的平衡标记，恢复正常的初始连线状态」）：
-  //   真正的停止/清标记在 bridge.js 的 window.GB_LINK_SWAPCANCEL 里（中断引擎 → 作废在途
-  //   runSwapBal → 清 swQueue / balMarks → 复位界面），本页只负责调用与提示。
+  // Real stop / mark clearing lives in bridge.js (GB_LINK_SWAPCANCEL); this page only
+  // calls it and reports the result.
   if (q('lk_swxcancel')) q('lk_swxcancel').onclick = function () {
     var ok = false;
     if (typeof window.GB_LINK_SWAPCANCEL === 'function') {
@@ -11966,10 +11955,8 @@ function bootLink() {
     BS.customTurnSec = Math.round((c.turnMs >= 200 ? c.turnMs : 2000) / 100) / 10;
 
     BS.turnMs = (c.turnMs >= 200 ? c.turnMs : 2000); BS.customSec = 600; BS.hashMB = 0;
-    // ★ 2026-10-24（用户：「连线窗是否同步了主界面的后台思考」）：
-    //   冷启动只靠 bridge.js 的 storage 监听是不够的 —— storage 只发给**其它**窗口，
-    //   而且要等主窗下一次写设置才触发。主窗早就开着后台思考、然后才打开连线窗时，
-    //   BS.bgThink 一直是 undefined，「后台思考接力」整条链路不启动。开机就先认共享键。
+    // storage events reach other windows only and wait for the next write, so a link window
+    // opened later would never start pondering: read the shared key on boot.
     try {
       var _bst = JSON.parse(localStorage.getItem('gbcalc.settings.v1') || '{}');
       if (_bst && typeof _bst.bgThink === 'boolean') BS.bgThink = _bst.bgThink;
@@ -12009,10 +11996,8 @@ function bootLink() {
             if (!BS.hasOwnProperty(k)) continue;
 
             if (k === 'lang' || k === 'dark') continue;
-            // ★ 2026-10-13（用户：「在用户选择规则的时候，一定要正确链接」）：
-            //   **规则不由这份「助手状态」恢复** —— 它是另一个键（gbcalc.assist.s），
-            //   内容可能落后于全局规则键，恢复回来就会把刚同步好的规则又改错。
-            //   规则的唯一来源 = 全局规则键 → c.rule → BS.rule（见 bootLink / lkBridgeRule）。
+            // Rule is not restored from the assistant state (a stale key); the global rule key is the
+            // only source, see bootLink / lkBridgeRule.
             if (k === 'rule') continue;
             BS[k] = sv[k];
           }
@@ -12136,10 +12121,8 @@ function bootLink() {
     };
   }
 
-  // ★★ 2026-10-17（用户：「点固定变成 ×，下一次打开又变回固定」「卡片移到棋盘左边，
-  //   重启又回原位」）：连线窗走的是 **bootLink**，而原代码在这里**没有面板初始化** ——
-  //   `.pinkey`（固定）和 `.dash`（折叠）根本没绑事件、`loadLayout` 也从不被读。
-  //   主窗 boot() 里有这一整套，连线窗漏了，所以「保存过的固定/布局」在连线窗永远看不到。
+  // Link window boots through bootLink, which had no panel init: .pinkey / .dash had no
+  // handlers and loadLayout never ran, so a saved pin / layout stayed invisible there.
   try {
     prefsApplyToS();
     initPanels();
@@ -12197,19 +12180,16 @@ function bootLink() {
       return;
     }
     if (m.type === 'linkCfgSync') {
-      // ★ 2026-10-13（用户：「有禁手和无禁手的平衡点它都是不一样的，在用户选择规则的时候，
-      //   一定要正确链接」）：主界面改了规则推过来时，**必须同时改 bridge 的 BS.rule**。
-      //   原来这里只更新面板高亮（c.rule + ruleSync），而 bridge.js 的引擎调用读的是
-      //   window.GB_S.rule —— 高亮变了、实际喂给引擎的规则没变，等于没同步。
+      // A rule pushed from the main window must also update BS.rule, or the engine keeps the
+      // rule it already had.
       if (m.rule >= 0 && m.rule <= 2) {
         c.rule = m.rule; ruleSync(); lkBridgeRule(m.rule);
-        saveRuleGlobal(m.rule);              // 全局规则键也跟上（本次会话内一直有效）
+        saveRuleGlobal(m.rule);              // keep the global rule key in sync
       }
       return;
     }
     if (m.type === 'linkRecog' && m.recog) {
-      // ★ 2026-10-18：宿主是本页「识别参数」的单一权威 —— 页面 ready 时回填一次；
-      //   之后每次「应用」宿主也会回填规范化（夹取后）的结果。
+      // The host owns the recognition params: fill in on ready, and again after every apply.
       var rr = m.recog;
       if (typeof rr.interval === 'number')      rcState.interval = rr.interval | 0;
       if (typeof rr.gray_offset === 'number')   rcState.gray_offset = rr.gray_offset | 0;
@@ -12225,9 +12205,8 @@ function bootLink() {
       return;
     }
     if (m.type === 'linkRecogSlots' && typeof m.json === 'string') {
-      // ★★ 2026-10-19（用户：「点击读档会展开抽屉，里面就是之前用户保存的参数名称，最多只能保存 50 个」）：
-      //   存档列表以**宿主那份文件**为权威（localStorage 延迟提交会丢）。宿主文件还是空的时候
-      //   （比如刚从旧版本升上来）才把本页缓存顶上并回推给宿主，避免出现两套数据。
+      // The host file is the authority for saves (localStorage commits late); seed it from the
+      // local cache only while it is still empty.
       var arr = [];
       try { arr = JSON.parse(m.json) || []; } catch (eS) { arr = []; }
       if (!(arr && typeof arr.length === 'number')) arr = [];
@@ -12258,11 +12237,9 @@ function bootLink() {
       return;
     }
     if (m.type === 'linkStats') {
-      // ★ 2026-10-17（用户：「评估的分数还是会正负抖动，就是符号上的问题」）：
-      //   连线窗评估栏 lk_s_eval 只能有一个数据源 —— 连线窗自己的 bridge
-      //   （BS.myEval → GBUI.setStatPanel）。主窗经 linkStats 传来的 eval 是**主窗自己
-      //   那盘棋**的分数（而且空闲时是 '-'），写进同一个元素就是第二个来源：两个来源
-      //   交替覆盖同一个数字，表现正是「评估分数正负抖动」。此处去掉 eval 映射。
+      // lk_s_eval has one source: this window's bridge (BS.myEval → GBUI.setStatPanel). The
+      // eval relayed from the main window belongs to another board, and two writers made the
+      // number flip sign.
       var sMap = { depth: 'lk_s_depth', speed: 'lk_s_speed', nodes: 'lk_s_nodes' };
       for (var sk in sMap) {
         var elv = document.getElementById(sMap[sk]);
