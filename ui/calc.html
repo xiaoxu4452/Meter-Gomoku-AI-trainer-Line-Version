@@ -19,7 +19,7 @@
   window.onerror = function (m, s, l, c, e) {
     report('JSERR', m + ' @' + (s || '') + ':' + l + ':' + c +
       (e && e.stack ? ' | ' + String(e.stack).split('\n').slice(0, 3).join(' <- ') : ''));
-    return false;
+    return false;   // 不吞掉：控制台照旧能看到
   };
   window.addEventListener('unhandledrejection', function (ev) {
     var r = ev && ev.reason;

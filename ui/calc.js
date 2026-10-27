@@ -48,6 +48,9 @@ var I18N = {
     vHint2: 'AVX2：无 512 位路径，本系列权重下明显偏慢（约 1/3 速度）',
     vHintSse: 'SSE：最老兜底，仅应急',
     sysBench: '实测最快',
+    // ★ 2026-10-25（用户：「添加 style（谨慎度）、多主变两个功能键，默认选最好」）：
+    //   style 就是引擎官方 CAUTION_FACTOR（Yixin 整合包 settings.txt 的 `3 ;style`）。
+    //   数值越大 = 候选点范围越宽 = 越谨慎（不容易漏点，但同时间算得更浅）；越小 = 越激进。
     candRange: '选点范围', maxDepth: '最大深度', maxNodes: '最大节点',
     cr2: '0 · 最窄（5×5）', cr2l3: '1 · 偏窄（5×5+3线）', cr3: '2 · 中性（7×7）',
     cr3l4: '3 · 推荐（7×7+4线）', cr4: '4 · 偏宽（9×9）', crFull: '5 · 最宽（全盘）',
@@ -173,7 +176,7 @@ var I18N = {
         '交换平衡点：点它的同时会自动取消已选的 AI 执黑 / 执白（避免相互干扰）。空盘时走**官方定式**：先让引擎按当前规则吐官方开局（禁手用禁手公式、无禁手用无禁手公式，**绝不混用**），引擎不可用时退到本地公式表（无禁手 = 官方 Swap2 三手 9 组，禁手 = RIF 26 组，两张表都经引擎实测只留平衡定式、必胜定式一条都不加）；再不行才在中心区逐手取点。所以开局这三手是「官方平衡开局」，不是对弈引擎算出来的最强手。棋盘上已有棋子时（第 2 次交换，一黑一白），走原生 YXBALANCETWO 成对搜索给出这两手并报出评估分（|评估| ≤ 50 才算平）。黑紫白天蓝，可反复点击重新评估。评估完成引擎随即释放；你把相应子数下完（不管下哪），标记自动消失，也可点「清除标记」关闭。',
         '交换平衡点 + 自动落子的顺序逻辑：先点交换平衡点、后打开自动落子 → 评估完成时若自动落子已开，就按顺序自动把这几个平衡点落下（与单机版五子棋助手完全一致）；若是评估完才打开自动落子，则打开的那一刻按序补摆。',
         '交换评估：与交换平衡点相互独立的另一项功能，用于评估当前交换局面的优劣，判断是否值得交换。',
-        '盘中标记：推荐落点为天蓝圈；平衡标记为圆形 —— 上半中空显示落子序号、下半半透明填充显示评估分，黑子紫、白子天蓝；全部直接画在识别框内的对应交点，位于截图识别不到的最上层（绝不会被误读成棋子）。 —— 全部直接画在识别框内的对应交点，且不会被截图识别（绝不会被误读成棋子）。',
+        '盘中标记：推荐落点为天蓝圈；平衡标记为圆形 —— 上半中空显示落子序号、下半半透明填充显示评估分，黑子紫、白子天蓝；全部直接画在识别框内的对应交点，位于截图识别不到的最上层（绝不会被误读成棋子）。',
         '关闭：关掉连线窗后，主窗自动恢复你自己原来的模式与设置，对弈 / 计算等功能照常使用。',
       ]},
     ],
@@ -183,34 +186,22 @@ var I18N = {
     aboutVer: '版本', aboutFeat: '功能', aboutOss: '开源组件', aboutLic: '许可',
     aboutUpdates: '最近更新',
     aboutUpdateList: [
-      '扫描防守重写：改走 Rapfi 整合包同款引擎原生 YXSEARCHDEFEND（补一手 PASS 让对手行棋，每个点的 % = 对手下在这里的胜率）；按危险度分五档显示 —— 1 档最大圆环 + 半透明填充，2~4 档圆环依次缩小、变淡（最小 = 1 档的一半），5 档边角点铺数字、外围一圈更细的同尺寸小环扫盘；整套配色改为偏白的天蓝色系，最大圆环缩到与棋子等大、圆环更细；按钮变「停止扫描」，停止后最后一帧保留，落子或「清除计算」才消失；「清除标记」改名「清除计算」；多点分析 / 前瞻 / 文字提示统一改用虚线矩形框',
-      '识图图片适应性大升级：深色 / 浅色主题、旋转截图、拍屏照片、低对比与模糊图都能读 —— 新增「局部对比读子」第三套判别器（按每个交点自己的底色定阈值，深色盘不再丢黑子、浅色盘不再把空格读成白子）、找盘阶梯（3×3 高斯 → CLAHE 均衡 → 1.5× 放大）与几何校验兜底（网格没对上时自动改用旧识别器重算）',
-      '识图「识别参数」面板：打开即自动收起棋盘代码框；提示行改成固定高度的虚线文本框 —— 拖滑动条时整列不再上下抖',
-      '界面资源改为单一 ui.pak（不再是一堆 .enc 加密文件）：避免被杀毒软件当成「加密文档」误删导致窗口白屏；真缺文件时会显示一张诊断页（告诉你加白名单后重装），而不是一片空白',
-      '引擎调用整体回归 4.36 口径（官方 Rapfi 单发 Analyze）：评分不再正负颠倒，思考预算与 ponder 节奏回到 4.36 实测最稳的那套',
-      '智力回归（对齐官方 Rapfi 单发 Analyze）：「后台预热」整块删除，落子不再预搜；车道分配恢复 09-27 早上口径（主搜留核给视图车道、哈希 60/24/16 三分）',
-      '分析计算只分析 AI 未执子的一方（AI 执黑→分析白，执白→分析黑）；AI 自打时功能键停用；评估曲线白子面积填充改浅天蓝（不再发紫）',
-      '界面连接升级为进程内拦截器（零 TCP）：UI 与引擎桥全部由 C++ 宿主进程内直答，不再监听任何端口',
-      '智力回归：落子决策链撤除「浅模拟否决」与「历史众数覆盖」两层干扰 —— 引擎最佳点直接落子，只保留必应护栏（连五 / 堵五），原生引擎恢复满血棋力',
-      '分析计算重做（gomocalc 式持续分析）：主车道满血持续深算、无时间窗口，最佳点随搜索加深自然微变并收敛；用时跨轮累加，落子 / 悔棋自动重开；摆盘 / 残局 / 双人手动同样可用',
-      '摆棋评分下架：对局设置中的开关移除，盘面评估统一由「分析计算」接管（主车道深算取代 1 线程浅评分）',
-      '引擎仪表盘实时化：任意计算（AI 落子 / 计算评估 / 多点分析 / 平衡 / 扫描防守 / 热力 / 前瞻 / 后台预热）期间，速度与节点**边算边跳**；标题栏状态胶囊改青 / 浅天蓝色系：青点脉冲 = 计算中（并标注正在算的项目），绿点 = 空闲',
-      '推荐选点改用卡塔狗名次色：1 选蓝、2 选绿、3 选黄（4 橙、5 之后红）——不再与扫描防守的红黄青互相串色',
-      '棋子数字随棋盘缩放：序号 / 评估分 / 各类徽标的字号不再有 14px 封顶，高分辨率最大化窗口下也清晰可读',
-      '计算时间与思考时间对齐：计算评估放开 12 秒封顶（1.6× 思考时间）、前瞻首手加强计算放开 12 秒封顶（4× 思考时间），每一步推演本就随思考时间走',
-      '后台预热（默认关闭，勾选开启）：对手思考时 AI 在后台持续预演你的应手 —— 落子后命中即秒答，未命中置换表也是热的，同样的时间能搜得更深',
-      '多引擎投票已移除（算力集中一路 = 智力上限）：引擎为单实例、吃满「核心数」所选全部线程；裁决层只保留必应护栏（连五 / 堵五 / 活三）与引擎头名，选点更稳',
-      '扫描防守配色升级：徽标与清单从五档名次色改为青→绿→黄→橙→红的连续渐变（%越高越红）',
-      '识图强化：密集局面识别失败时按锁定网线整盘外推重建（不再 no-grid）；识别窗口向外扩约棋盘 1/30，边缘棋子读得更全',
-      '「清除标记」搬家并泛化：键从「前瞻」框移到「计算评估」卡、与「计算」并排（各占半宽），一次点击可擦掉**任意项目**留下的棋盘标记（计算 / 多点分析 / 平衡点 / 扫描防守 / 前瞻 · VCF · VCT）',
-      '新增「残局」模式：顺序摆盘 / 任意摆盘（数量与顺序都不限），并用「确定」键把局面定下来 —— 重新开始回到它，存进历史时它就是首帧',
-      '识图「VC 模式」放开：补充黑 / 白子不限数量、删除棋子任意删，左侧提示栏逐条说明',
-      'VCF / VCT 标记精简：只留蓝色虚线杀路 + 五（深蓝双环）/ 四（天蓝方框），不再满盘花',
-      '前瞻首手改为加强全局计算找突破口，首次预算从 ×6 降到 ×4；提示栏新增预计耗时区间（秒 ~ 秒）',
-      '攻防算法修正：行棋方显式传给引擎（子数不均衡不再站到对面去算），并加必应校验 —— 连五优先、对手成五必堵、活三必应',
-      'VC / 残局记录打开即以整盘为首帧，不必再从第一手重放；残局模式下交换手规则变灰',
-      '三个模式键缩短为两字（对弈 / 摆盘 / 残局）；英文模式补齐「清除标记」等文案，历史日期随语言',
-      '截图自动贴盘的外扩修正：改为向外扩约棋盘 1/30（原先扩到了框内侧，边缘棋子被压住）',
+      { v: '4.46', items: [
+        '识别参数真正生效：5 项阈值（灰度 / 黑白偏移、黑 / 白百分比）任意一项偏离默认值就切换到严格判定 —— 结果按你设的参数出，底层的「松阈值重判 / 自制读子 / 局部对比」整条兜底链不再静默改写；只有全部保持默认时才启用兜底',
+        '后台思考重做：改用引擎原生 pondering（与官方整合包同一套节奏）—— 开着时对手思考期间引擎就在算我方应对，你一落子它已就绪；关着时引擎落子后立刻停，不再空转（CPU 常年高占用的一大来源）',
+        '对局设置新增「style（谨慎度）」六档：0 最激进（5×5 候选）… 5 最谨慎（全盘），默认 3（官方推荐档），带方向说明；同一板块新增「多主变」行（1~8，默认 3）',
+        '「分析点数」与「多主变」共用同一份值、两端双向同步，并接通多点分析、前瞻深算（下限放到 1~2）与扫描防守的候选上限',
+        '引擎变体自动基准修正：auto-bench 之前会把 avx2 误判成最快，现在按实测 nps 选出真实最快的变体',
+        '候选点去重下沉到引擎回执层：同一个点只出现一次，不再出现重复名次',
+        '对局设置卡片分组：只有「引擎」板块（选点范围 / 分析点数 / 线程 / 哈希）用虚线框，其余板块不加框',
+        '英文界面补齐全部占位符（{n} / {p} 等不再原样露出）；修复日志并发写偶发丢行',
+      ]},
+      { v: '4.43', items: [
+        '扫描防守改用引擎原生 YXSEARCHDEFEND：先补一手 PASS 把行棋方让给对手，每个点的 % 就是对手下在那里的胜率；按危险度分五档画环（1 档最大圆环 + 半透明填充，2~4 档依次缩小变淡，5 档边角点只铺数字 + 细环）扫盘，偏白天蓝色系；按钮变「停止扫描」，停止后最后一帧留在棋盘上，「清除标记」改名「清除计算」',
+        '识图图片适应性大升级：深色 / 浅色主题、旋转截图、拍屏照片、低对比与模糊图都能读 —— 新增「局部对比读子」第三套判别器、找盘阶梯（3×3 高斯 → CLAHE 均衡 → 1.5× 放大），以及网格对不上时的几何校验兜底',
+        '识图「识别参数」面板：打开即自动收起棋盘代码框，提示行改成固定高度的虚线文本框 —— 拖滑动条时整列不再上下抖',
+        '界面资源合并为单一 ui.pak（不再是一堆 .enc 文件）：避免被杀毒软件当成「加密文档」误删导致窗口白屏；真缺文件时会显示一张诊断页（告诉你加白名单后重装），而不是一片空白',
+      ]},
     ],
     aboutApp: 'Meter Gomoku',
     aboutFeatList: [
@@ -223,12 +214,12 @@ var I18N = {
       '历史与复盘：txt 导入导出、重命名、右键菜单、独立复盘窗口（背诵 / 回顾，VC 记录整盘首帧）',
     ],
     aboutOssList: [
-      ['Rapfi', '五子棋 / 连珠引擎内核（编译为 WebAssembly，随本软件分发）', 'GPL-3.0'],
+      ['Rapfi', '五子棋 / 连珠引擎内核（原生引擎 rapfi-native，随本软件分发）', 'GPL-3.0'],
       ['OpenCV', '棋盘与棋子识别（静态链入 GomokuVision.exe，不额外分发 DLL）', 'Apache-2.0'],
       ['Microsoft WebView2 Runtime', '桌面界面运行时（由 Windows / Edge 提供，本软件不分发）', '专有'],
     ],
     aboutOssNote: '说明：上表只列随本软件分发、或运行时必需的第三方组件。开发期用来对拍的脚本与其依赖（NumPy、Pillow 等）只在本机跑，不随本软件分发，因此不在此列。',
-    aboutLicText: '本软件自身的界面与配套代码以 MIT 许可发布。棋力内核 Rapfi 以 GPL-3.0 发布，本软件以编译后的 WebAssembly（页面内 Worker）或独立进程的方式调用它，双方只通过消息与本地端口通信，不与其合并为同一作品；随本软件分发 Rapfi 时，须一并保留它的许可证与源码获取方式（可从其上游仓库 dhbloo/rapfi 取得对应源码）。识别所用的 OpenCV 以 Apache-2.0 静态链入 GomokuVision.exe。界面运行时 Microsoft WebView2 由 Windows / Edge 提供，按其自身条款使用，不随本软件分发。以上各组件的著作权与许可均归各自作者所有。',
+    aboutLicText: '本软件自身的界面与配套代码以 MIT 许可发布。棋力内核 Rapfi 以 GPL-3.0 发布，本软件以独立进程的方式调用它（本地管道，不监听任何端口），双方只通过消息与本地文件句柄通信，不与其合并为同一作品；随本软件分发 Rapfi 时，须一并保留它的许可证与源码获取方式（可从其上游仓库 dhbloo/rapfi 取得对应源码）。识别所用的 OpenCV 以 Apache-2.0 静态链入 GomokuVision.exe。界面运行时 Microsoft WebView2 由 Windows / Edge 提供，按其自身条款使用，不随本软件分发。以上各组件的著作权与许可均归各自作者所有。',
     engine: '引擎仪表盘', depth: '深度', speed: '速度', nodes: '节点', time: '用时',
     calcOn: '计算中', calcIdle: '空闲',   
     
@@ -353,6 +344,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     visTitle: '识图 · 把棋盘图片变成局面',
     visTtl: '把棋盘图片变成局面',
     visHint: '支持一次选多张（至多 150 张）；白框里可直接 Ctrl+V 粘贴图片，截屏弹出三键选择',
+    // ★ 2026-10-19 补：中文表缺这两个键 ⇒ 识图窗输入框占位符直接显示 "visBoxHintCode"（原样露键名）
     visBoxHint: '在这里输入或粘贴局面代码（如 h8h9g7…，回车即载入）\n也可以 Ctrl+V 直接粘贴棋盘图片',
     visBoxHintCode: '局面代码（改完回车重新解析；Ctrl+V 可粘贴图片）',
     visUpload: '上传图片', visShot: '屏幕截图',
@@ -363,6 +355,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     visCropSmall: '框选区域太小，请拖一个大一点的矩形',
     visCropDone: '已裁剪（{w} × {h}）', visCropFail: '裁剪失败，图片可能已损坏',
     visRec: '重新识别', visLoad: '加载到练习',
+    // ★★ 2026-10-19：识图「识别参数」（原「保存到历史」位）—— 5 项阈值 + 「通用 / 取消 / 确定」一行
     visRc: '识别参数', visRcGeneral: '通用', visRcCancel: '取消', visRcOk: '确定',
     visRcOn: '识别参数：拖动滑动条立即重新识别（实时预览）并自动保存；「通用」恢复默认，「取消」回到打开时那组值',
     visRcOff: '识别参数已收起（这 5 项阈值仍按当前值生效）',
@@ -452,6 +445,12 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     anBalBusy: '官方平衡搜索中…',
     anBalDone: '已给出 {n} 个平衡点：{list}',
     anBalEval: '（引擎判定这一手最平：|评估| ≈ {v}，≤ 50 才是官方平衡窗口内）',
+    // ★ 2026-10-13（用户）：「如果用户想在开局的时候定平衡点的话，应该要评估几个才合理」。
+    //   依据 = 中国五子棋竞赛规则(2025) 第 11 条 / RIF 指定开局：官方开局**只有三手**
+    //   （黑1 天元 · 白2 在以天元为中心的 3×3 内 · 黑3 在 5×5 内），所以开局评估 3 个点最合理；
+    //   第 4 手起进入白4(7×7)/黑5(9×9) 阶段（塔拉山口-10 走满 5 手），再多评估评估分就失真。
+    //   ★ 2026-10-13（用户：「这个提示文案是多条的，是灵活多变的，不应该只是一个大段话」）：
+    //     原来的单条长句拆成**短句池**，每次评估随机抽 1~2 条、分行显示（见 balOpenHintTxt）。
     anBalOpenHints: [
       '官方指定开局只有 3 手（黑1 天元 · 白2 在 3×3 内 · 黑3 在 5×5 内），开局评估 3 个点最合理。',
       '天元是固定的第 1 手，不必评估；真正要搜的只有白 2 与黑 3 这两手。',
@@ -647,31 +646,22 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     aboutVer: 'Version', aboutFeat: 'Features', aboutOss: 'Open-source components', aboutLic: 'Licence',
     aboutUpdates: 'Recent updates',
     aboutUpdateList: [
-      'Defense scan rewritten: it now uses the engine-native YXSEARCHDEFEND that ships with the Rapfi bundle (one PASS hands the move to the opponent, so each % is the opponent\'s win rate if they play there); danger is shown in five tiers - tier 1 is the full-size ring with a translucent fill, tiers 2-4 shrink and fade (the smallest ring is half of tier 1), tier 5 edge points show a number inside a thinner ring of the same size as tier 4, sweeping the board; the palette is now a pale sky-blue ramp, the largest ring is shrunk to stone size and all rings are thinner; the key turns into "Stop scan" and the last frame stays on the board after stopping - only a new move or "Clear calc" wipes it; "Clear marks" is renamed "Clear calc"; the multi-point list, look-ahead panels and hint lines now share the same dashed box style',
-      'Vision adapts far better to real pictures: dark and light board themes, rotated screenshots, photos of a screen, low-contrast and blurry images all read now - a third "local contrast" reader judges each intersection against its own background (dark boards no longer lose black stones, light boards no longer read empty cells as white stones), board search climbs a ladder (3x3 blur, CLAHE equalisation, 1.5x upscale), and a geometry check falls back to the legacy recogniser when the grid does not line up',
-      'Vision "Recognition params": opening the panel now hides the position-code box automatically, and the hint line is a fixed-height dashed box - dragging the sliders no longer makes the column jump',
-      'UI assets are now one ui.pak instead of many .enc files - antivirus products no longer mistake the encrypted documents for ransomware and delete them (which used to leave a blank window); if the file really is missing, a diagnostic page explains how to whitelist and reinstall',
-      'Engine calls go back to the 4.36 baseline (official Rapfi single-shot Analyze): the score no longer flips sign, and the thinking budget and pondering rhythm follow the 4.36 behaviour that measured best',
-      'Strength restored: the move-decision chain drops the shallow-simulation veto and the history-mode override - the engine best move is now played directly, keeping only the must-answer guard (win / block), so the native engine plays at full power again',
-      'Live analysis rebuilt (gomocalc style): continuous full-lane deep search with no time window; the best point varies naturally with search depth and converges; elapsed time accumulates across rounds and the session restarts on every move; works in setup / endgame / two-player modes too',
-      'Setup scores retired: the settings switch is removed - board evaluation is now handled entirely by the Live analysis button (full-lane deep search instead of a 1-thread shallow probe)',
-      'Live engine dashboard: every calculation (AI move / Evaluate / Multi-point / Balanced / Defense scan / Heat map / Look-ahead / Preheat) now streams speed and node counts WHILE it runs - parallel lanes are summed so the total throughput of the vote is visible; a status pill on the card header pulses red while computing (naming the active item) and shows a green dot when idle',
-      'Candidate colours now follow KataGo: 1st choice blue, 2nd green, 3rd yellow (4th orange, 5th+ red) - no more clashing with the defence scan palette',
-      'Stone numbers scale with the board: move numbers, eval digits and all badge fonts no longer cap at 14px, so they stay readable on high-resolution maximised windows',
-      'Compute budgets now match the thinking time: Evaluate drops its 12s cap (1.6x thinking time), the look-ahead opening search drops its 12s cap (4x thinking time); every look-ahead step already follows the setting',
-      'Background warm-up (on by default): while you think, the AI keeps rehearsing your likely replies in the background - a hit answers instantly, and even a miss leaves the hash table warm so the same time budget searches deeper',
-      'Parallel engines voting has been removed (all compute on one instance = peak strength): the engine runs as a single instance using every thread chosen in Core count; the decision layer keeps only the must-answer guard (win / block-five / open-four) and the engine top choice',
-      'Defense scan colours upgraded: badges and the list now use a continuous cyan -> green -> yellow -> orange -> red gradient (the higher the %, the redder)',
-      'Vision hardened: dense positions rebuild the whole grid by extrapolating the locked lines (no more no-grid); the capture window expands outward by ~1/30 of the board so edge stones are read fully',
-      '"Clear marks" moved and generalised: it now sits next to "Compute" inside the Evaluation card, half width each, and one press wipes the board marks left by ANY card item (Compute / Multi-point / Balanced 1 / Balanced 2 / Defense scan / Look-ahead, VCF, VCT)',
-      'New Endgame mode: sequential / free-colour placement (any count, any order) plus a Confirm key that locks the position in - Restart returns to it and it becomes the first frame in History',
-      'Vision "VC Mode" relaxed: unlimited stone filling, free removal, with every rule spelled out in the left hint bar',
-      'VCF / VCT markers simplified to a blue dashed kill line plus a deep-blue double ring (five) and a sky-blue square (four)',
-      'Look-ahead first move now uses a deeper global search to find the breakthrough (budget lowered from x6 to x4), and the hint shows an expected duration range',
-      'Play corrected: the side to move is now passed to the engine explicitly (unbalanced stone counts no longer make it play for the wrong side), plus a must-answer check - win first, block a five, answer an open three',
-      'VC / endgame records open with the whole board as the first frame; swap-style rules are greyed out in endgame mode',
-      'Mode buttons shortened to two characters; English mode fixed for "Clear marks" and other labels, History dates follow the language',
-      'Auto-snap margin corrected: it now expands outward by ~1/30 of the board instead of inward, so edge stones stay inside the frame',
+      { v: '4.46', items: [
+        'Recognition params now really take effect: if any of the five thresholds (grey level, black / white offset, black / white percentage) differs from its default, the strict path is used - results follow exactly what you set, and the whole fallback chain (relaxed re-read, home-grown reader, local-contrast pass) no longer silently overrides it; the fallbacks only run while every value is still at its default',
+        'Background thinking rebuilt on the engine-native pondering used by the official bundle - while it is on, the engine is already working out your reply during the opponent turn; while it is off the engine stops the moment it moves instead of spinning idle (a major source of constant high CPU)',
+        'New "style (caution)" selector in Game settings with six steps: 0 most aggressive (5x5 candidate range) ... 5 most cautious (whole board), default 3 (the officially recommended step), each step explained; a "Multi-PV" row (1-8, default 3) joins it in the same card',
+        'The analysis-point count and Multi-PV share one value and stay in sync both ways; it now also feeds multi-point analysis, look-ahead deep search (floor lowered to 1-2) and the candidate cap of the defence scan',
+        'Engine variant auto-bench fixed: it used to pick avx2 as fastest by mistake and now picks the genuinely fastest variant from measured nps',
+        'Candidate de-duplication moved down to the engine reply layer: each point appears once, duplicate ranks are gone',
+        'Game settings cards are grouped: only the Engine section (candidate range / analysis points / threads / hash) uses the dashed frame',
+        'All placeholders filled in for the English UI ({n} / {p} no longer leak); fixed occasional lost lines in concurrent logging',
+      ]},
+      { v: '4.43', items: [
+        'Defense scan now uses the engine-native YXSEARCHDEFEND: a PASS hands the move to the opponent, so each percentage is the opponent win rate at that point; danger is drawn in five tiers (tier 1 is the largest ring with a translucent fill, tiers 2-4 shrink and fade, tier 5 edge points show only a number in a thin ring), in a pale sky-blue ramp; the key becomes "Stop scan" and the last frame stays on the board; "Clear marks" is renamed "Clear calc"',
+        'Vision adapts far better to real pictures: dark and light board themes, rotated screenshots, photos of a screen, low-contrast and blurry images all read now - a third "local contrast" reader judges each intersection against its own background, board search climbs a ladder (3x3 blur, CLAHE equalisation, 1.5x upscale), and a geometry check takes over when the grid does not line up',
+        'Vision "Recognition params": opening the panel hides the position-code box automatically, and the hint line is a fixed-height dashed box - dragging the sliders no longer makes the column jump',
+        'UI assets are now one ui.pak instead of many .enc files - antivirus products no longer mistake the encrypted documents for ransomware and delete them (which used to leave a blank window); if the file really is missing, a diagnostic page explains how to whitelist and reinstall',
+      ]},
     ],
     aboutApp: 'Meter Gomoku',
     aboutFeatList: [
@@ -684,12 +674,12 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
       'History & review: txt import/export, rename, right-click menu, separate review window (recite / replay, VC records open on the full board)',
     ],
     aboutOssList: [
-      ['Rapfi', 'Gomoku / Renju engine core (compiled to WebAssembly, distributed with this app)', 'GPL-3.0'],
+      ['Rapfi', 'Gomoku / Renju engine core (native build, rapfi-native, shipped with this app)', 'GPL-3.0'],
       ['OpenCV', 'Board and stone recognition (statically linked into GomokuVision.exe, no extra DLL)', 'Apache-2.0'],
       ['Microsoft WebView2 Runtime', 'Desktop UI runtime (provided by Windows / Edge, not distributed with this app)', 'Proprietary'],
     ],
     aboutOssNote: 'Note: the table lists only third-party components that ship with this app or are required at runtime. Development-only scripts and their dependencies (NumPy, Pillow, ...) run on the build machine and are not distributed with this app, so they are not listed here.',
-    aboutLicText: 'The interface and companion code of this app are released under the MIT licence. The playing core Rapfi is released under GPL-3.0; this app calls it as compiled WebAssembly (an in-page worker) or as a separate process, communicating only through messages and a local port, and is not merged with it into a single work. When redistributing Rapfi together with this app you must keep its licence and the way to obtain its source (available from its upstream repository, dhbloo/rapfi). OpenCV, used for recognition, is statically linked into GomokuVision.exe under Apache-2.0. The Microsoft WebView2 Runtime is provided by Windows / Edge under its own terms and is not distributed with this app. Copyright and licensing of each component above remain with its respective authors.',
+    aboutLicText: 'The interface and companion code of this app are released under the MIT licence. The playing core Rapfi is released under GPL-3.0; this app calls it as a separate process over a local pipe (no port is opened), communicating only through messages, and is not merged with it into a single work. When redistributing Rapfi together with this app you must keep its licence and the way to obtain its source (available from its upstream repository, dhbloo/rapfi). OpenCV, used for recognition, is statically linked into GomokuVision.exe under Apache-2.0. The Microsoft WebView2 Runtime is provided by Windows / Edge under its own terms and is not distributed with this app. Copyright and licensing of each component above remain with its respective authors.',
     engine: 'Engine', depth: 'Depth', speed: 'Speed', nodes: 'Nodes', time: 'Time',
     calcOn: 'Thinking', calcIdle: 'Idle',   
     tagAiMove: 'AI move', tagAssist: 'Hint', tagHeat: 'Heat map', tagCoach: 'Coach',
@@ -966,14 +956,22 @@ var S = {
   turnMs: 2000,               
   rule: 0,
   cores: 0, hashMB: 0,
+  // ★ 2026-10-23：引擎权重档位 ''=跟随机器默认，'nnue'=mix9svq，'classic'=纯传统估值
   weights: '',
+  // ★ 2026-10-24：参考 gomoku-calculator —— 选点范围(0..5) / 最大深度 / 最大节点（0=不限）
   candRange: 3, maxDepth: 100, maxNodes: 0,
+  // '' = 自动（按 CPU 能力选最高档）；否则强制某个变体
   variant: '',
   hashDefMig: false,          
-  coresDefault: '',
+  coresDefault: '',           // ★ 线程默认口径迁移标记（'v439' = 已按「下拉上限」口径校正过一次）
   
   coach: false,
   
+  // ★ 2026-10-22（用户：「对局设置里的对局，添加一个后台思考的选择键，参考 gomocalc 的预热算法」）：
+  //   开启后 = AI 落子后引擎不退出搜索，而是按**引擎原生 pondering** 继续算「对手回合」的局面
+  //   （算对手优势点 + 我方应对），你一落子它从热置换表接着算。静默、不吐 INFO、页面侧不额外搜索。
+  // ★ 2026-10-25（用户：「不要默认打开后台思考」）：保持默认**关**，与整合包/gomocalc 默认一致。
+  //   开关语义已在 10-25 修正为纯原生 pondering（不再用 live 搜索冒充），打开/关闭都干净。
   bgThink: false,
   
   showNum: false,
@@ -988,6 +986,9 @@ var S = {
   
   previewOn: true,
   customBase: 'light',         
+  // ★ 2026-10-25（用户：「多主变，默认选最好」）：4 → 3，对齐 Yixin 整合包
+  //   settings.txt 的 `3 ;default number of multi-pv`。这是多主变的**唯一**存储字段，
+  //   对局设置的「多主变」与分析面板的「分析点数」读写的是同一个值（不另设 topN）。
   nbest: 3,                    
   
   cards: null,                 
@@ -1058,7 +1059,7 @@ function setMissBox() {
   els.rvMiss.textContent = T('miss') + ' ' + n;
 }
 function resetGame(keepLoaded) {
-  engMsgClear();                               
+  engMsgClear();                               /* ★ 消息框（2026-10-16）：新局 / 重置时清空消息区 */
   G.moves = []; G.board = newBoard(); G.curve = [];
   clearHeat();                                 
   clearCoach();                                
@@ -1097,7 +1098,10 @@ function setAiSides(b, w) {
   }
   S.aiB = !!b; S.aiW = !!w;
   S.side = (S.aiB === S.aiW) ? '' : (S.aiB ? 'w' : 'b');   
+  // ★ 2026-10-23：执子方一变，「评估」的视角口径立刻跟着翻（不必等下一次引擎 tick）。
   try { dashEvalRefresh(); } catch (e) {}
+  // ★ 2026-10-23（用户：「AI 黑白同时开（AI 对打）直接自动关掉后台思考」）：
+  //   勾成双 AI 的这一刻就把在跑的后台思考停掉（原来是等下一次 kick 才停，中间白烧 CPU）。
   try { bgThinkYield(); } catch (e2) {}
 }
 
@@ -1441,6 +1445,9 @@ function paint() {
     G.heat.forEach(drawHeatNum);                   
   }
 
+  // ★ 2026-10-22（用户：「新的着色点和旧的着色点重合了，没有清理历史的着色点的绘制」）：
+  //   这里原来还会把 LIVE_AN.items **全部候选**再画一遍大圆点（旧 LIVE_PAL 橙/红），
+  //   与新标记圈叠在同一张盘面上 = 历史着色点残留。整段删除，只保留 drawLiveMarks 一层。
 
   if (G.busy && G.think.length && aiDecorOn()) {
     var t = (Date.now() % 1200) / 1200;
@@ -1478,6 +1485,10 @@ function paint() {
     }
   }
 
+  // ★ 2026-10-22：点击「路线」某一手 → 从当前局面把这条线按黑白交替展开成半透明棋子
+  //   （颜色比真棋子浅一档），和 gomocalc 的 PV 预览一样；纯画布绘制，不再向引擎要算力。
+  //   ★ 2026-10-22（用户：「悬浮在某一个代码上…扩展到那个代码所在的棋子局面」）：
+  //   悬停也展开同一段（临时预览）；点击仍然钉住。悬停优先，移开即回到钉住的那一段。
   var gpv = null, psd = curColor();
   if (PV_HOVER && PV_RENDER.length) {
     var ghi = PV_HOVER.i | 0;
@@ -1500,7 +1511,7 @@ function paint() {
       if (G.board[p[1]] && G.board[p[1]][p[0]]) return;
       var col = (i % 2 === 0) ? psd : 3 - psd;
       var cx = pad + p[0] * gap, cy = pad + p[1] * gap;
-      ctx.globalAlpha = (col === 1) ? 0.56 : 0.66;
+      ctx.globalAlpha = (col === 1) ? 0.56 : 0.66;         // 只透一点点：仍像真棋子，又能和已下的区分
       ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.fillStyle = (col === 1) ? css('--blk') : css('--wht'); ctx.fill();
       ctx.globalAlpha = 1;
@@ -1514,6 +1525,8 @@ function paint() {
     ctx.restore();
   }
 
+  // ★ 2026-10-22：引擎仪表盘「路线」代码的悬停指示 —— 鼠标停在某个走法代码上时，
+  //   在棋盘对应交叉点画一圈虚线 + 手数徽标（参考 gomocalc 的 PV 预览）。
   if (PV_HOVER && aiDecorOn() && S.mode !== 'place' && S.mode !== 'endgame') {
     var hx = pad + PV_HOVER.x * gap, hy = pad + PV_HOVER.y * gap;
     ctx.save();
@@ -1522,6 +1535,7 @@ function paint() {
     if (ctx.setLineDash) ctx.setLineDash([gap * 0.16, gap * 0.11]);
     ctx.beginPath(); ctx.arc(hx, hy, Math.max(9, gap * 0.44), 0, Math.PI * 2); ctx.stroke();
     if (ctx.setLineDash) ctx.setLineDash([]);
+    // ★ 悬停已展开棋子时，最后一颗（悬停点）本身就带手数 —— 不再叠一层紫色数字，只留虚线圈。
     var hb = (gpv && gpv.length) ? '' : String(PV_HOVER.seq || '');
     if (hb) {
       ctx.font = '700 ' + Math.max(8.5, gap * 0.30) + 'px "Segoe UI",system-ui,sans-serif';
@@ -1654,10 +1668,16 @@ function paint() {
     var isStage2 = G.ana.marks.some(function (mk) { return String(mk.badge) === '4'; });
     if (G.moves.length >= (isStage2 ? 5 : 3)) balHide = true;
   }
+  // ★ 2026-10-22 分析计算的新标记圈（最多 4 个）：细圆环 + 半透明填充，
+  //   上半圆胜率、下半圆分数（分数=引擎评估），最佳点圆环稍粗。
   if (aiDecorOn()) {
     var lm = G.ana.marks.filter(function (m) { return m && m.live; });
     if (lm.length) drawLiveMarks(ctx, lm, pad, gap);
   }
+  // ★ 2026-10-22（用户：「扫描防守……第一等级是一个较大的圆环，里面有半透明的填充……」）：
+  //   扫描防守按五档样式画在棋盘上（1~4 档圆环 + 半透明填充、逐档变小变淡；5 档只剩数字）。
+  //   注意：判据只看 defCells，**不看 kind** —— 用户要求「停止扫描后最后一帧保留在棋盘上」，
+  //   停止时 kind 已被清空，标记必须继续画，直到落子 / 清除计算把 defCells 置空。
   if (aiDecorOn() && G.ana.defCells && G.ana.defCells.length)
     drawDefendMarks(ctx, G.ana.defCells, pad, gap);
   if (G.ana.marks.length && (aiDecorOn() || G.ana.kind === 'bal' || G.ana.kind === 'bal1') && !balHide) {
@@ -1768,17 +1788,28 @@ function paint() {
 
 function aiDecorOn() { return !RV_MODE && !G.review; }
 
-
+// ★ 2026-10-22：分析计算标记圈 ——
+//   · 数量 = 「分析点数」（`S.nbest` 1~8，最多就画这么多个），rank 0 是最佳点：圆环稍粗；
+//   · 外面一圈细圆环，里面半透明填充（颜色按名次）；
+//   · 上半圆写胜率（数字稍大），下半圆写引擎分数；文字带暗色描边，深浅棋盘都清楚。
+/* ★ 2026-10-22（用户：「蓝绿——绿——黄绿（其他颜色不要出现了）」）：
+   标记圈只允许这三档颜色；第 4 名沿用黄绿、略淡一档，不再出现橙/红。
+   ★ 2026-10-25（用户：「分析点数对应分析计算」）：点数放到 1~8，第 5~8 名继续沿用黄绿，
+   只把不透明度逐档压低（越靠后越淡），**仍然不引入橙/红**（用户定的配色硬约束）。 */
 var LIVE_MARK_PAL = [
-  { fill: 'rgba(0,194,201,.34)',  ring: 'rgba(0,210,218,.98)' },
-  { fill: 'rgba(96,200,120,.30)', ring: 'rgba(110,214,134,.96)' },
-  { fill: 'rgba(196,216,86,.30)', ring: 'rgba(212,228,104,.96)' },
-  { fill: 'rgba(196,216,86,.20)', ring: 'rgba(212,228,104,.80)' },
-  { fill: 'rgba(196,216,86,.17)', ring: 'rgba(212,228,104,.70)' },
-  { fill: 'rgba(196,216,86,.15)', ring: 'rgba(212,228,104,.62)' },
-  { fill: 'rgba(196,216,86,.13)', ring: 'rgba(212,228,104,.55)' },
-  { fill: 'rgba(196,216,86,.11)', ring: 'rgba(212,228,104,.48)' },
+  { fill: 'rgba(0,194,201,.34)',  ring: 'rgba(0,210,218,.98)' },   // 蓝绿
+  { fill: 'rgba(96,200,120,.30)', ring: 'rgba(110,214,134,.96)' }, // 绿
+  { fill: 'rgba(196,216,86,.30)', ring: 'rgba(212,228,104,.96)' },// 黄绿
+  { fill: 'rgba(196,216,86,.20)', ring: 'rgba(212,228,104,.80)' },// 黄绿（第 4 名稍淡）
+  { fill: 'rgba(196,216,86,.17)', ring: 'rgba(212,228,104,.70)' },// 第 5 名
+  { fill: 'rgba(196,216,86,.15)', ring: 'rgba(212,228,104,.62)' },// 第 6 名
+  { fill: 'rgba(196,216,86,.13)', ring: 'rgba(212,228,104,.55)' },// 第 7 名
+  { fill: 'rgba(196,216,86,.11)', ring: 'rgba(212,228,104,.48)' },// 第 8 名
 ];
+// 圆环内的两行字：上半胜率 / 下半分数。
+// ★ 2026-10-22（用户：「百分比和下面的分数字号再大一点点，就是不超过圆环就行」）：
+//   字号基数从 gap*.235 / .185 提到 r*.56 / r*.44（约 +12%），并加宽度上限：
+//   文字一旦超过环内宽度（r*1.8）就自动缩，始终不压到圆环。
 function drawRingLabels(ctx, px, py, r, topTxt, botTxt, fsScale, fitF) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
   var sc = fsScale || 1;
@@ -1811,10 +1842,12 @@ function drawLiveMarks(ctx, marks, pad, gap) {
     var r = Math.max(9, gap * 0.47);
     var best = (mk.rank === 0);
     var pal = LIVE_MARK_PAL[Math.max(0, Math.min(LIVE_MARK_PAL.length - 1, mk.rank | 0))];
+    // 半透明填充 + 细圆环（最佳点圆环稍粗）
     ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
     ctx.fillStyle = pal.fill; ctx.fill();
     ctx.lineWidth = best ? Math.max(2.2, gap * 0.072) : Math.max(1.1, gap * 0.038);
     ctx.strokeStyle = pal.ring; ctx.stroke();
+    // 上半圆：胜率；下半圆：分数
     drawRingLabels(ctx, px, py, r,
       Math.round((typeof mk.wr === 'number' ? mk.wr : 0.5) * 100) + '%',
       String(mk.ev || ''));
@@ -2080,13 +2113,464 @@ function mustAnswer(b, cc, cands, op, of, myFour) {
   return null;                                                           
 }
 
+// ★ 2026-10-23 清理：nearStoneDist / nearStoneGuard / crossCheckMove / crossCheckPick
+//   是 4.39 之前「JS 战术覆盖 AI 落点」的遗留死代码（无任何调用点，注释里也早已声明删除），
+//   一并移除，避免再被误接回落子链。
 
+// 引擎通信（2026-10-19 重建）：宿主单实例 Rapfi「极速版」。
+//   页面只发 ask / stop / caps / config 四种 op；协议编排与解析 100% 在 C++
+//   （desktop-connect/src/engine_host.cpp）。页面里不再有 Worker、不再有协议文本解析、
+//   不再有车道（main/sub/fwd）、不再有 /engine/* HTTP 拦截与轮询。
+//   宿主推回：{"type":"engineAck","id":N,"op":"ask","ok":bool,["err":..,]"res":{...}}
+//             {"type":"engineAsk","id":N,"phase":"tick","res":{...}}  ← 中间过程
+//   返回口径与旧 engine-ai.js 的 done 结果兼容：{candidates[{x,y,eval,depth,speed,
+//   nodes,winrate,line}], best, timeout, elapsed, nodeCount, superseded, error}。
+var LocalAI = (function () {
+  var seq = 0, liveSeq = 0;
+  var pend = {};                        // id -> job（在途 ask）
+  var capWait = {};                     // caps 的 id -> resolve
+  var cur = null, wait = null;          // 单实例：同时只允许一个 ask 在途（宿主只有一个引擎）
+  var cfgT = 0, cfgKB = 0;              // 线程数 / 哈希 KB
+  var capsCache = null;                 // 最近一次 caps
+
+  function post(o) {
+    if (!HOST) return false;
+    try { tellHost(o); return true; } catch (e) { return false; }
+  }
+  function emptyRes(sup, err) {
+    return { candidates: [], best: null, timeout: false, elapsed: 0, nodeCount: 0,
+             superseded: !!sup, error: err || '' };
+  }
+  function mapRes(r) {
+    r = r || {};
+    var cands = (r.candidates || []).map(function (c) {
+      var wr = (typeof c.winrateBp === 'number' && c.winrateBp >= 0 && c.winrateBp <= 10000)
+                 ? c.winrateBp / 10000 : 0.5;
+      // ★ 2026-10-19（用户：「节点和速度不会差十倍」）：面板口径统一 ——
+      //   speed 一直是全局口径（INFO SPEED = 全线程总节点 / 耗时），节点必须同源用
+      //   全局 TOTALNODES（r.nodes）。以前这里配的是**单手指子树** INFO NODES，
+      //   两者差 ≈ 线程数倍（实测 297731 vs 2702466 ≈ 9.08x），看着就像「幻觉」。
+      return { x: c.x, y: c.y, winrate: wr, eval: c.eval || '', depth: c.depth || 0,
+               speed: r.speed || 0, nodes: r.nodes || 0,
+               line: (c.pv || []).map(function (p) { return [p[0], p[1]]; }) };
+    });
+    var best = (r.bestX >= 0 && r.bestY >= 0) ? [r.bestX, r.bestY]
+                                              : (cands.length ? [cands[0].x, cands[0].y] : null);
+    return { candidates: cands, best: best, timeout: !r.finished && !r.bestEval,
+             elapsed: r.timeMs || 0, nodeCount: r.nodes || 0,
+             depth: r.depth || 0, superseded: !!r.superseded, error: r.err || '' };
+  }
+  // 宿主 tick 的结构化 res → 旧 live 口径（paintLiveDash / G.ana 的实时面板）
+  function liveOf(job, r) {
+    r = r || {};
+    var pvs = (r.candidates || []).map(function (c) {
+      // 同 mapRes：节点用全局 TOTALNODES，与 speed 同口径（PV 列不显示单手指节点）。
+      return { x: c.x, y: c.y, eval: c.eval || '', depth: c.depth || 0,
+               speed: r.speed || 0, nodes: r.nodes || 0,
+               line: (c.pv || []).map(function (p) { return [p[0], p[1]]; }) };
+    });
+    return { searching: true, t0: job.t0, cid: job.cid, lane: 'main', tag: job.tag,
+             speed: r.speed || 0, nodes: r.nodes || 0, depth: r.depth || 0,
+             eval: (pvs[0] && pvs[0].eval) || '', best: (pvs[0] ? [pvs[0].x, pvs[0].y] : null),
+             pvs: pvs };
+  }
+  function emitLive(job, r) {
+    if (job.liveId == null) return;
+    try { onEngineLive(liveOf(job, r)); } catch (e) {}
+  }
+  function startJob(job) {
+    cur = job;
+    job.t0 = Date.now();
+    pend[job.id] = job;
+    // ★ 2026-10-22：常驻分析 live 没有 JS 侧超时 —— 它由用户落子 / 停止分析 / 新 ask 抢占来结束。
+    if (job.op !== 'live') {
+      job.timer = setTimeout(function () {
+        if (cur === job) cur = null;
+        delete pend[job.id];
+        if (job.op === 'balance') job.res({ moves: [], eval: null, swap: false, error: 'timeout' });
+        else job.rej(new Error('timeout'));
+        pump();
+      }, job.timeoutMs);
+    }
+    if (!post({ engine: 1, op: job.op || 'ask', id: job.id, q: job.q })) {
+      clearTimeout(job.timer); delete pend[job.id]; cur = null;
+      if (job.op === 'balance') job.res({ moves: [], eval: null, swap: false, error: 'engine unavailable' });
+      else if (job.onEnd) { try { job.onEnd({ error: 'engine unavailable', stopped: true }); } catch (e) {} }
+      else job.rej(new Error('engine unavailable'));
+      pump();
+    }
+  }
+  // live 作业结束（被抢占 / 主动停止 / 引擎异常）统一从这里回调，不再依赖 Promise。
+  function endJob(job, res) {
+    if (!job) return;
+    if (job.onEnd) { try { job.onEnd(res || {}); } catch (e) {} return; }
+    try { job.res(res); } catch (e) {}
+  }
+  function stopLiveJob(job) {
+    if (!job) return;
+    if (wait === job) { wait = null; endJob(job, { stopped: true }); return; }
+    // ★ 2026-10-22：只有「真的在跑」的 live 才发 STOP —— 引擎忙时被退回（busy）的 live 从未下发，
+    //   它残留在 LIVE_AN.handle 里再被 stop 会把别人（AI 落子 / 提示）正在跑的搜索打断。
+    var running = (cur === job);
+    if (job.id != null && pend[job.id]) { delete pend[job.id]; clearTimeout(job.timer); running = true; }
+    if (cur === job) cur = null;
+    if (running) { try { post({ engine: 1, op: 'stop', id: ++seq, q: {} }); } catch (e) {} }
+    endJob(job, { stopped: true });
+    pump();
+  }
+  function pump() {
+    if (cur || !wait) return;
+    var j = wait; wait = null; startJob(j);
+  }
+  function makeJob(body, timeoutMs, res, rej, op) {
+    var b = body || {};
+    var q = { board: b.board,
+              side: (b.side === 1 || b.side === 2) ? b.side : 0,
+              rule: b.rule | 0,
+              budgetMs: Math.max(200, b.turnMs | 0),
+              key: b.key || 0 };            // ★ 真实盘面指纹（此前硬编码 0）
+    if (op === 'balance') {
+      q.topN = 1; q.pondering = false;
+      q.mode = (b.mode === 'two') ? 'two' : 'one';
+      q.bias = b.bias | 0;
+    } else {
+      q.topN = Math.max(1, Math.min(8, b.topN | 0));
+      q.pondering = !b.noPonder;
+      // ★ 2026-10-22：扫描防守走宿主的 mode=3（YXSEARCHDEFEND，全点 multipv）。
+      if (b.scan) q.mode = 3;
+    }
+    if (op === 'live') { q.live = true; q.pondering = false; }
+    return { id: ++seq, timer: null, res: res, rej: rej, op: op || 'ask',
+             liveId: (b.liveId == null ? null : b.liveId), tag: b.tag || '', cid: b.cid || '',
+             exclusive: !!b.exclusive, timeoutMs: timeoutMs || 20000, t0: Date.now(), q: q };
+  }
+  // 页面侧串行（宿主只有一个引擎）：同时只跑一个 ask。新的「要落子」请求
+  // （exclusive）可抢占在途的辅助请求（实时面板 / 换位评估）；其余请求排队，
+  // 且只保留最新的一个排队项（更旧的就地作废，避免拿旧盘面把预算跑满）。
+  function submit(job) {
+    // ★ 2026-10-22：常驻分析（live）是**最低优先级**——
+    //   引擎忙（提示 / 教练 / 评估 / AI 落子…）时它不排队、不占 wait 槽，直接退回让页面稍后重试；
+    //   反之任何常规请求都可以立刻抢占 live（否则 live 会一直占着引擎，把其它功能饿死）。
+    if (job.op === 'live') {
+      if (cur) { endJob(job, { busy: true, stopped: true }); return; }
+      startJob(job);
+      return;
+    }
+    if (wait) { endJob(wait, emptyRes(true)); wait = null; }
+    if (cur && cur.op === 'live') {
+      var oldL = cur; cur = null; delete pend[oldL.id]; clearTimeout(oldL.timer);
+      try { post({ engine: 1, op: 'stop', id: ++seq, q: {} }); } catch (e) {}
+      endJob(oldL, emptyRes(true));
+      startJob(job);
+      return;
+    }
+    if (!cur) { startJob(job); return; }
+    if (job.exclusive && !cur.exclusive) {
+      var old = cur; cur = null; delete pend[old.id];
+      clearTimeout(old.timer);
+      try { post({ engine: 1, op: 'stop', id: ++seq, q: {} }); } catch (e) {}
+      endJob(old, emptyRes(true));
+      startJob(job);
+      return;
+    }
+    wait = job;
+  }
+  function ask(body, timeoutMs) {
+    return new Promise(function (res, rej) { submit(makeJob(body, timeoutMs, res, rej, 'ask')); });
+  }
+  // 官方平衡点（宿主 YXBALANCEONE / YXBALANCETWO，一次性算完即停）。
+  // 返回 { moves:[[x,y]…], eval:num|null, swap, error }。
+  function balance(body, timeoutMs) {
+    return new Promise(function (res, rej) { submit(makeJob(body, timeoutMs, res, rej, 'balance')); });
+  }
+  function caps() {
+    return new Promise(function (resolve) {
+      var id = ++seq;
+      capWait[id] = resolve;
+      if (!post({ engine: 1, op: 'caps', id: id, q: {} })) { delete capWait[id]; resolve(null); return; }
+      // ★ 2026-10-24（用户：「引擎变体不可选」）：宿主首次 caps 要等引擎探测+冒烟，
+      //   3 秒经常不够 ⇒ 页面收到 null，下拉只剩「自动」。放宽到 8 秒。
+      setTimeout(function () {
+        if (capWait[id]) { delete capWait[id]; resolve(capsCache); }
+      }, 8000);
+    });
+  }
+  // 宿主 balance 结果 → { moves:[[x,y]…], eval:num|null, swap, error }
+  function balanceResOf(r) {
+    r = r || {};
+    var pts = (r.pts || []).map(function (p) { return [p[0], p[1]]; });
+    var ev = r.bestEval, num = null;
+    if (typeof ev === 'string' && ev) {
+      if (/^[+-]?M/.test(ev)) num = (ev.charAt(0) === '-') ? -1000 : 1000;
+      else { var n = parseInt(ev, 10); num = isNaN(n) ? null : n; }
+    }
+    return { moves: pts, eval: num, swap: !!r.swap, error: r.err || '' };
+  }
+  function onAck(m) {
+    if (!m || !m.id) return;
+    if (m.op === 'caps') {
+      var cw = capWait[m.id];
+      if (cw) { delete capWait[m.id]; capsCache = m.res || null; cw(capsCache); }
+      return;
+    }
+    var job = pend[m.id];
+    if (!job) return;
+    delete pend[m.id];
+    clearTimeout(job.timer);
+    if (cur && cur.id === m.id) cur = null;
+    if (job.op === 'balance') {
+      var br = balanceResOf(m.res);
+      if (m.ok === false && m.err) br.error = String(m.err);
+      job.res(br);
+      pump();
+      return;
+    }
+    if (job.liveId != null) {
+      try { onEngineLive({ lane: 'main', tag: job.tag, searching: false }); } catch (e) {}
+    }
+    if (m.ok === false) {
+      var er = String(m.err || 'engine error');
+      if (job.op === 'live' || job.onEnd) {
+        endJob(job, { superseded: (er === 'superseded'), stopped: true, error: er });
+      } else if (er === 'superseded') job.res(emptyRes(true));
+      else if (er === 'search timeout') {
+        // ★ 2026-10-23（用户：「引擎的调用又出问题了，智力层大有下降」）：
+        //   宿主超时前会发 STOP，m.res 里通常已经带着**当前最优候选**。旧代码直接
+        //   emptyRes 丢掉它们 → aiMove 拿不到落点、界面显示离线，看起来就是「突然变笨」。
+        //   有候选就照常返回（只标记 timeout），真的空才按超时处理。
+        var tr = (m.res && (m.res.candidates || []).length) ? mapRes(m.res)
+                                                            : emptyRes(false, 'search timeout');
+        tr.timeout = true;
+        job.res(tr);
+      }
+      else job.rej(new Error(er));
+    } else if (job.op === 'live' || job.onEnd) {
+      endJob(job, mapRes(m.res));
+    } else {
+      job.res(mapRes(m.res));
+    }
+    pump();
+  }
+  function onTickMsg(m) {
+    if (!m || m.phase !== 'tick' || !m.id) return;
+    var job = pend[m.id];
+    if (!job) return;
+    if (m.res) {
+      job.last = m.res;
+      // ★ 常驻分析的 tick 也走 mapRes（winrateBp→winrate、depth/节点口径统一），
+      //   否则标记圈里的胜率会全部回落成 50%。
+      if (job.onTick) { try { job.onTick(mapRes(m.res)); } catch (e) {} }
+    }
+    emitLive(job, m.res);
+  }
+  function failAll(err) {
+    if (cur) {
+      clearTimeout(cur.timer); delete pend[cur.id];
+      if (cur.onEnd) { try { cur.onEnd({ stopped: true, error: String(err) }); } catch (e) {} }
+      else { try { cur.rej(err); } catch (e) {} }
+      cur = null;
+    }
+    for (var k in pend) {
+      clearTimeout(pend[k].timer);
+      if (pend[k].onEnd) { try { pend[k].onEnd({ stopped: true, error: String(err) }); } catch (e) {} }
+      else { try { pend[k].rej(err); } catch (e) {} }
+    }
+    pend = {};
+    if (wait) {
+      var w = wait; wait = null;
+      if (w.onEnd) { try { w.onEnd({ stopped: true, error: String(err) }); } catch (e) {} }
+      else { try { w.rej(err); } catch (e) {} }
+    }
+  }
+  return {
+    boot: function () { caps(); return HOST; },
+    isReady: function () { return !!(capsCache && capsCache.available) || HOST; },
+    nextLiveId: function () { return ++liveSeq; },
+    analyze: function (body, ms) {
+      if (window.__GB_TEST__) return Promise.reject(new Error('stub: no engine in test'));
+      if (!HOST) return Promise.reject(new Error('engine unavailable'));
+      return ask(body, Math.max(9000, ms || 20000));
+    },
+    // ★ 2026-10-22 常驻分析：一次 ask 持续加深（宿主 TIMEOUT_TURN 放到 1 小时），
+    //   onTick 每次引擎 INFO 刷新都会回调；handle.stop() 结束本次搜索。
+    live: function (body, onTick, onEnd) {
+      if (window.__GB_TEST__ || !HOST) {
+        if (onEnd) { try { onEnd({ error: 'engine unavailable', stopped: true }); } catch (e) {} }
+        return { stop: function () {} };
+      }
+      var job = makeJob(body, 0, function () {}, function () {}, 'live');
+      job.onTick = onTick || null; job.onEnd = onEnd || null;
+      submit(job);
+      return { stop: function () { stopLiveJob(job); } };
+    },
+    // 平衡点通道：走宿主 IPC 的官方 YXBALANCEONE/TWO（一次性算完即停）。
+    balance: function (body, ms) {
+      if (window.__GB_TEST__) return Promise.reject(new Error('stub: no engine in test'));
+      if (!HOST) return Promise.reject(new Error('engine unavailable'));
+      return balance(body, Math.max(9000, ms || 20000));
+    },
+    config: function (threads, hashMB, weights, extra) {
+      cfgT = threads || 0; cfgKB = (hashMB || 0) * 1024;
+      extra = extra || {};
+      post({ engine: 1, op: 'config', id: ++seq,
+             q: { threads: cfgT, hashMB: Math.round(cfgKB / 1024), weights: weights || '',
+                  caution: extra.caution, maxDepth: extra.maxDepth, maxNodes: extra.maxNodes,
+                  variant: extra.variant || '' } });
+    },
+    restart: function () {
+      post({ engine: 1, op: 'stop', id: ++seq, q: {} });
+      failAll(new Error('engine reconnecting'));
+    },
+    stopLane: function (lane) {
+      post({ engine: 1, op: 'stop', id: ++seq, q: {} });
+    },
+    relay: function (m) {
+      if (!m) return;
+      if (m.type === 'engineAck') onAck(m);
+      else if (m.type === 'engineAsk') onTickMsg(m);
+    },
+  };
+})();
+
+// 平衡通道：走页面内 worker 的原生 YXBALANCEONE/TWO（纯 C++ 硬链接），
+// 不再有 :8964 HTTP。返回 { mode, n, bias, swap, moves, elapsed, rule }。
+function apiBalance(body, ms) {
+  if (window.__GB_TEST__) return Promise.reject(new Error('stub: no engine in test'));
+  return LocalAI.balance(body, ms);
+}
+var RAPFI_MATE = 30000;          
+var RAPFI_MATE_MAX_PLY = 500;    
+var RAPFI_EVAL_MAX = 6000;       
+
+var RIF_OPENINGS = [
+  
+  { w: [8, 7], b: [6, 7] }, { w: [8, 7], b: [7, 9] }, { w: [8, 7], b: [6, 6] },
+  { w: [8, 7], b: [6, 8] }, { w: [8, 7], b: [9, 5] }, { w: [8, 7], b: [7, 6] },
+  { w: [8, 7], b: [8, 6] }, { w: [8, 7], b: [6, 9] }, { w: [8, 7], b: [5, 8] },
+  { w: [8, 7], b: [9, 8] }, { w: [8, 7], b: [5, 7] }, { w: [8, 7], b: [8, 9] },
+  { w: [8, 7], b: [5, 5] },
+  
+  { w: [8, 8], b: [6, 7] }, { w: [8, 8], b: [6, 8] }, { w: [8, 8], b: [9, 6] },
+  { w: [8, 8], b: [6, 6] }, { w: [8, 8], b: [9, 9] }, { w: [8, 8], b: [10, 7] },
+  { w: [8, 8], b: [7, 6] }, { w: [8, 8], b: [8, 5] }, { w: [8, 8], b: [10, 10] },
+  { w: [8, 8], b: [5, 8] }, { w: [8, 8], b: [6, 9] }, { w: [8, 8], b: [8, 9] },
+  { w: [8, 8], b: [5, 6] }
+];
+function evalNum(ev) {
+  if (ev === null || ev === undefined) return NaN;
+  var s = String(ev).trim();
+  if (!s || /^(VAL_NONE|VAL_INF|-VAL_INF)$/i.test(s)) return NaN;
+  var m = /^([+-]?)M(\d+|\*)$/i.exec(s);
+  if (m) {
+    var ply = (m[2] === '*') ? RAPFI_MATE_MAX_PLY
+                             : Math.max(1, Math.min(RAPFI_MATE_MAX_PLY, parseInt(m[2], 10)));
+    var mv = RAPFI_MATE - ply;
+    return (m[1] === '-') ? -mv : mv;
+  }
+  var v = parseFloat(s.replace('+', ''));
+  if (isNaN(v)) return NaN;
+  return Math.max(-RAPFI_EVAL_MAX, Math.min(RAPFI_EVAL_MAX, v));
+}
+
+function boardFp() {
+  var n = G.moves.length, l = n ? G.moves[n - 1] : null;
+  return n + ':' + (l ? l.x + ',' + l.y : '-');
+}
+
+function fmtEval(ev) {
+  var s = String(ev == null ? '' : ev).trim();
+  if (!s) return '';
+  var m = /^([+-]?)M(\d+)$/i.exec(s);
+  if (m) return (m[1] === '-' ? '-' : '+') + 'M' + m[2];
+  var n = parseFloat(s.replace('+', ''));
+  if (isNaN(n)) return s.slice(0, 5);
+  return (n > 0 ? '+' : '') + Math.round(n);
+}
+function pushCurve(ply, vFromMover, moverIsBlack) {
+  var b = moverIsBlack ? vFromMover : -vFromMover;
+  G.curve = G.curve.filter(function (p) { return p.i !== ply; });
+  G.curve.push({ i: ply, b: b, w: -b });
+  G.curve.sort(function (a, c) { return a.i - c.i; });
+  
+  if (linkSessionOn()) {
+    try { tellHost({ type: 'linkEval', curve: G.curve.map(function (p) {
+      return { i: p.i, b: Math.max(-999, Math.min(999, Math.round(p.b))) }; }) }); } catch (e) {}
+  }
+}
+
+function engineRule() {
+  var r = +S.rule;
+  if (r === 6 || r === 7 || r === 8) return 2;
+  return (r === 0 || r === 1 || r === 2 || r === 5) ? r : 0;
+}
+
+async function analyze(turnMs, topN, lane, side, tag, opt) {
+  
+  if (linkSessionOn()) return Promise.reject(new Error('link session: main analyze paused'));
+  // ★ 2026-10-23（用户：「任何一项计算分析功能都自动关掉后台思考」）：
+  //   一次性请求（AI 落子 / 计算 / 评估 / 教练 / 热力…）要独占引擎，后台思考先收工。
+  try { bgThinkStop(); } catch (eBG) {}
+  var ply = G.moves.length;
+  // ★ 2026-10-22：记录这次搜索属于哪一方 —— 「路线」点击预览要按黑白交替铺子，
+  //   不能等到 place() 之后再取 curColor()（那时已经轮到对手了）。
+  var effSide = (side === 1 || side === 2) ? side : curColor();
+  try {
+    var r = await LocalAI.analyze({
+      
+      board: (opt && opt.board) || G.board, moveList: [],
+      matchMs: 600000, turnMs: turnMs, timeUsedMs: 0,
+      topN: topN, rule: engineRule(), cid: 'calc-' + ply + (lane ? '-' + lane : ''),
+      lane: lane || 'main', side: (side === 1 || side === 2) ? side : 0,
+      liveId: LocalAI.nextLiveId(), tag: tag || '',
+      
+      exclusive: !!(opt && opt.exclusive),
+      
+      urgent: (opt && opt.user) ? 'user' : !!(opt && opt.urgent),
+      // ★★ 2026-10-25（用户：「后台思考这个选项开启可能会干扰准度，要参考整合包的逻辑」）：
+      //   对齐 gomoku-calculator：**只有 AI 自己落子那一次请求**才允许留后台思考
+      //   （引擎落子后自动在「对手回合」继续深算 = 算对手优势点 + 我方应对）。
+      //   其余一切一次性请求（计算评估 / 多点 / 教练 / 热力 / 扫描 / 连线）默认都关，
+      //   否则每次分析完引擎都继续 ponder，白烧 CPU 还会和下一次正式搜索抢线程。
+      noPonder: (opt && opt.noPonder !== undefined) ? !!opt.noPonder : true,
+    }, Math.max(9000, turnMs + 9000));
+    if (r && r.candidates) r.candidates.forEach(function (c) { if (c) c.side = effSide; });
+    if (G.engineOffline) { G.engineOffline = false; G.retryLeft = null; refreshUI(); }   
+    return r;
+  } catch (e) {
+    
+    if (!RV_MODE && !G.review) noteEngineDown();
+    throw e;
+  }
+}
+
+// ★★ 2026-10-18（用户：「我设置的是 2 秒，它居然算了 4 秒」「没有充分去计算，还是会内耗」）：
+//   **预算严格等于用户设置**，一分不加。旧实现按威胁翻倍（对手成五点 ×1.5、活四 ×1.25、
+//   自己有四点 ×0.8），再叠上重算的 ×1.5 —— 用户设 2 秒，实际可能跑 3~4.5 秒，
+//   而他看到的「思考时间」就已经和设置对不上了，自然会觉得「软件在乱算」。
+//   威胁判断本身仍然保留（mustAnswer 必应逻辑要用），但**不再影响时间预算**。
+function aiTurnBudget() {
+  return Math.max(300, S.turnMs || 2000);
+}
+
+function heatBudget() {
+  var base = (S.turnMs || 2000) * 0.5;
+  return Math.max(900, Math.min(4000, Math.round(base)));
+}
+
+var HEAT_PAL = [
+  ['rgba(0,191,165,.66)', 'rgba(120,200,80,.50)'],
+  ['rgba(0,191,165,.66)', 'rgba(120,200,80,.50)', 'rgba(255,179,193,.55)'],
+  ['rgba(0,191,165,.60)', 'rgba(120,200,80,.55)', 'rgba(255,179,193,.55)', 'rgba(255,200,215,.42)'],
+];
+
+/* ★ 2026-10-22（用户：「蓝绿——绿——黄绿（其他颜色不要出现了）」）：
+   多点分析 / 列表名次徽标同步收敛到这三档颜色，不再用橙 / 红。 */
 var ANA_PAL = [
-  { badge: 'rgba(0,170,178,.95)',  ring: 'rgba(255,255,255,.95)' },
-  { badge: 'rgba(70,168,96,.95)',   ring: 'rgba(255,255,255,.95)' },
-  { badge: 'rgba(150,172,40,.95)',  ring: 'rgba(255,255,255,.95)' },
-  { badge: 'rgba(150,172,40,.95)',  ring: 'rgba(255,255,255,.95)' },
-  { badge: 'rgba(150,172,40,.95)',  ring: 'rgba(255,255,255,.95)' },
+  { badge: 'rgba(0,170,178,.95)',  ring: 'rgba(255,255,255,.95)' },   // 蓝绿
+  { badge: 'rgba(70,168,96,.95)',   ring: 'rgba(255,255,255,.95)' },   // 绿
+  { badge: 'rgba(150,172,40,.95)',  ring: 'rgba(255,255,255,.95)' },  // 黄绿
+  { badge: 'rgba(150,172,40,.95)',  ring: 'rgba(255,255,255,.95)' },  // 黄绿
+  { badge: 'rgba(150,172,40,.95)',  ring: 'rgba(255,255,255,.95)' },  // 黄绿
 ];
 var ANA_BAL = { badge: 'rgba(124,77,255,.95)', ring: 'rgba(255,255,255,.95)' };
 
@@ -2159,6 +2643,13 @@ async function refreshCoach() {
   var got = await coachPass(gen, fp, HEAT_FAST_MS);
   if (gen !== G.coachGen) return;
   if (got) paint();
+  // ★★ 2026-10-18（用户：「2 秒内会重新评估多次，没有充分思考，很多都是失误点；要把内耗
+  //   换成能算得更准落点的能力」）：**同一盘面最多两轮，第二轮之后不再重搜**。
+  //   旧实现是 while 逐轮加倍（260 → heatBudget → ×2 → ×2 …，上限 8000ms）—— 教练标记
+  //   （S.coach 常开）时，同一个盘面会被连续重搜 5 轮以上，每次 YXBOARD 都让 Rapfi 从浅层
+  //   重走一遍迭代加深；AI 落子到达还要抢占这个循环，用户设 2 秒拿不到 2 秒的连续搜索。
+  //   现在：第一轮 260ms 先把标记摆出来（体感不变），第二轮按该盘面正常预算定型，然后退出；
+  //   盘面变了由下一次 refreshCoach 重新来（不再自己循环）。
   if (gen !== G.coachGen || fp !== boardFp()) return;
   if (S.coach && !G.busy && !G.over && !isAiColor(curColor())) {
     var got2 = await coachPass(gen, fp, heatBudget());
@@ -2170,6 +2661,8 @@ async function refreshCoach() {
 var gAiGen = 0;
 async function aiMove() {
   if (G.busy) return;
+  // ★ 2026-10-24（用户：「用户选 AI 执黑时，开局在主棋盘下天元位置」）：
+  //   空盘第一手直接占天元，不走引擎 —— 既符合棋理，也省掉一次毫无信息量的 2 秒搜索。
   if (G.moves.length === 0 && curColor() === 1) {
     var cx = Math.floor(G.size / 2), cy = Math.floor(G.size / 2);
     place(cx, cy, false, true);
@@ -2186,8 +2679,19 @@ async function aiMove() {
     
     var budget = aiTurnBudget();
     var wasRecon = !!G.reconBoost;                 
-    if (wasRecon) { G.reconBoost = false; }
+    if (wasRecon) { G.reconBoost = false; }   // 重算不再加时（预算严格 = 用户设置）
+    // ★★ 2026-10-19（用户：「去掉 JS 战术覆盖，完全信任引擎」）：练习器与连线统一口径 ——
+    //   AI 落点 = 引擎首选，零 JS 改写。已删除 VCF/VCT 前置搜索、必应兜底、近点护栏、二次校核。
+    // ★ 2026-10-23（用户：「利用…优化并行，优化引擎的计算质量」）：双 AI 自对弈时关掉 pondering。
+    //   一方落子后 220ms 对手就要搜 —— 后台思考（ponder 对手应手）根本来不及产出任何东西，
+    //   却要和下一手的正式搜索抢同一批线程。关掉它，整机 CPU 全给正在下棋的那一方。
     var r = await analyze(budget, 1, null, curColor(), T('tagAiMove'),
+                          // ★★ 2026-10-25：后台思考**只由这一个请求开启**（对齐 gomoku-calculator）。
+                          //   引擎回吐落点时会自动把它落到内部盘面（sendActionAndUpdateBoard），
+                          //   随后 INFO PONDERING 1 让它在这个「对手回合」的局面里继续加深 —— 也就是
+                          //   用户说的「算对手可能下的优势点，再算我们该落在哪」。你一落子，
+                          //   下一轮 TURN/整盘请求直接复用这张热置换表。
+                          //   开关关 / AI 对打 ⇒ noPonder，引擎落子后立刻收工（省 CPU、降温度）。
                           { exclusive: true, urgent: true, noPonder: !S.bgThink || aiVsAi() });
     
     if (myGen !== gAiGen) { G.think = []; G.busy = false; refreshUI(); return; }
@@ -2197,7 +2701,7 @@ async function aiMove() {
     if (!cs.length) { setStat(null, T('offline')); G.busy = false; refreshUI(); return; }
     var c0 = cs[0];
     c0.timeMs = Date.now() - t0;                
-    var best = r.best || [c0.x, c0.y];
+    var best = r.best || [c0.x, c0.y];          // 引擎首选，零 JS 改写
     G.lastStat = c0;
     var moverIsBlack = (G.moves.length % 2 === 0);
     pushCurve(G.moves.length, evalNum(c0.eval), moverIsBlack);
@@ -2261,7 +2765,7 @@ async function aiAssistOnce() {
     if (!cs.length) { setStat(null, T('offline')); G.busy = false; refreshUI(); return; }
     var c0 = cs[0];
     c0.timeMs = Date.now() - t0;
-    var best = r.best || [c0.x, c0.y];
+    var best = r.best || [c0.x, c0.y];          // 引擎首选，零 JS 改写              
     G.lastStat = c0;
     var moverIsBlack = (G.moves.length % 2 === 0);
     pushCurve(G.moves.length, evalNum(c0.eval), moverIsBlack);
@@ -2289,7 +2793,10 @@ function place(x, y, fromRedo, byAI) {
   var c = (S.mode === 'endgame' && !S.egSeq) ? (S.egColor || 1) : curColor();
   G.board[y][x] = c;
   G.moves.push({ x: x, y: y, c: c });
-  PV_PREVIEW = null;
+  PV_PREVIEW = null;                  // ★ 盘面变了：收起「路线」点击预览
+  // ★ 2026-10-22（用户：「如果用户落子了，时间重新开始统计」）：
+  //   仪表盘「用时」不再跨轮累加 —— 任何一手真正落下都归零，
+  //   随后 liveAnaStart() 按新盘面重开时重新起算（用户 / AI / 悔棋重做都适用）。
   LIVE_AN.t0 = 0;
   
   G.heat = G.heat.filter(function (h) { return !G.board[h.y][h.x]; });
@@ -2312,8 +2819,9 @@ function place(x, y, fromRedo, byAI) {
     G.ana.busy = false; G.ana.kind = '';
     anaReset();
   }
+  // ★ 盘面已变：立刻停掉常驻分析、清掉旧标记，再按新盘面重开（落子/悔棋/重做都走这里）。
   liveAnaBoardChanged();
-  bgThinkKick(140);
+  bgThinkKick(140);                    // ★ 后台思考按新盘面接力（轮 AI 时自动让路）
   paint();
   
   if (G.fwd && G.fwd.on && !G.fwd.hold) fwdQueue();
@@ -2345,6 +2853,8 @@ function onBoardClick(ev) {
   var hit = cellAt(px, py);
   if (!hit) return;
   var x = hit.x, y = hit.y;
+  // ★ 用户点了棋盘：不论这一下能不能落子，都立刻停算并让标记立刻消失；
+  //   随后 place() 会按新盘面重开（若只是点到空处/非法点，就按当前盘面重开）。
   liveAnaTouch();
 
   if (G.review && G.review.kind === 'recite') { reciteStep(x, y); return; }
@@ -2420,6 +2930,10 @@ function afterMove() {
     paint(); return;
   }   
   
+  // ★ 2026-10-23（用户：「智力降低的因素是速度变得很慢了」）：
+  //   轮 AI 走时不再自动重开扫描 —— 刚起一条全点深算就被 AI 的 ask 抢占 STOP，
+  //   白烧一次 93 点 × 全线程的启动，还让 AI 的搜索多等一轮收尾。等 AI 落子后
+  //   轮到人才续扫（与 liveAnaWanted() 同一口径）。
   if (G.ana.autoDefend && !G.ana.busy && !G.over && !boardDecided() &&
       !isAiColor(curColor())) { try { anaDefend(true); } catch (e) {} }
   if (isAiColor(curColor())) aiMove();        
@@ -2782,14 +3296,21 @@ async function balCallTen() {
   t.balBusy = true;
   openHint(); paint();
   try {
+    // ★ 绝不让引擎在**空盘**上叫平衡点：Rapfi 在 ply=0 时把候选区限死在
+    //   expandCandidateHalfBoard()（棋盘左下 9×9），返回的是角上的点。开局第一手
+    //   （黑 1）固定天元；空盘时先在假设盘上落好天元，轮次顺延给白方。
     var balBoard = G.board.map(function (r) { return r.slice(); });
     var balSide = curColor();
     if (!G.moves.length) {
       var c0 = (N - 1) >> 1;
       if (!balBoard[c0][c0]) { balBoard[c0][c0] = 1; balSide = 2; }
     }
+    // 不锁中心区（禁手 / 无禁手的区别交给 rule 参数，引擎自己剔禁手点）。
+    // 成对取点：need ≥ 2 用 YXBALANCETWO（一次给 2 手，两手联合平衡），否则单点 ONE。
     var j = await apiBalance({
       board: balBoard, moveList: [], n: Math.max(1, Math.ceil(need / 2)),
+      // ★ 2026-10-13：一律 'two'。单点 ONE 在近乎空盘上评估 −350~−470（实测），
+      //   报出来就是「差距过大」；成对搜索才是官方口径的「平」。
       mode: 'two', rule: engineRule(),
       turnMs: turnMs, lane: 'main', cid: 'calc-baltar-' + G.moves.length, side: balSide,
     }, need * turnMs + 30000);
@@ -2880,6 +3401,10 @@ function paintLiveDash() {
   els.st_speed.textContent = fmtSpeed(a.speed);
   els.st_nodes.textContent = fmtNodes(a.nodes);
   
+  // ★ 2026-10-23（用户：「AI 同时执黑白时评估/数据没反应过来」）：用时必须跟「节点/速度」同源
+  //   —— 都取自同一个在跑的车道。以前 LIVE_AN.t0 无条件优先，双 AI 每 2 秒换一手时
+  //   LIVE_AN.t0 刚被 place() 重置，于是出现「节点 150189 / 速度 13.6M / 用时 0.09s」
+  //   这种三对数互相对不上的画面（0.09s 走 150K 节点只有 1.6M nps）。
   var tShow = a.t0 || (LIVE_AN.on ? LIVE_AN.t0 : 0) || Date.now();
   els.st_time.textContent = ((Date.now() - tShow) / 1000).toFixed(1) + ' s';
   if (a.tag) engMsgAdd(T('calcOn') + ' · ' + a.tag);
@@ -2892,8 +3417,17 @@ function paintLiveDash() {
   }
 }
 
-
-
+/* ★ 消息框（2026-10-16 重新设计，用户要求）：评估曲线上方那个「固定 4 行高的虚线框」里的消息。
+   此前所有消息都直接写 els.st_line.textContent —— 谁后写谁把前一条顶掉（引擎状态 / 最佳着法 /
+   提示互相覆盖，看不到上下文）。现在统一走 engMsgAdd()：
+     · 与上一行完全相同 → 不重复占行（paintLiveDash 每次刷新都在报「计算中 · tag」）；
+     · 只保留最近 ENG_MSG_MAX 条（新的在底部，旧的自动挤掉）并自动滚到底；
+     · 空 / null → 不动（空消息不该清空历史），要清空请显式调 engMsgClear()。
+   外框 #engMsg 的高度由 CSS 钉死 ⇒ 消息增减都不改变卡片高度，评估曲线不再上下抖动。
+   #st_line 仍是这些行的容器（既有读法 el.textContent 只是拿到多行拼接）。 */
+/* ★ 2026-10-22（用户：「各种文字讯息例如计算评估里面的讯息等，同样也展现同步到这个框中」）：
+   消息框改成**滚动日志**（最多 200 条，框内滚动，滚动条与「局面代码框」同款 8px），
+   renderAna() 的状态文案也会同步写进来，所以调大上限；不再只留 4 条。 */
 var ENG_MSG_MAX = 200;
 function engMsgAdd(msg) {
   var box = els.st_line;
@@ -2903,6 +3437,8 @@ function engMsgAdd(msg) {
   var last = box.lastElementChild;
   if (last && last.textContent === msg) return;
   var wrap = box.parentNode;
+  // ★ 2026-10-22（用户：「配合滑动条移动」）：用户往上翻看历史时不再强制跳到底，
+  //   只有原本就在底部（跟随实时）才自动跟随新消息。
   var atBottom = true;
   if (wrap) atBottom = (wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 28);
   var d = document.createElement('div');
@@ -2915,12 +3451,18 @@ function engMsgAdd(msg) {
 }
 function engMsgClear() { if (els.st_line) els.st_line.innerHTML = ''; }
 
+// ★ 2026-10-22：仪表盘「路线」小框（消息框滚动内容的一部分）+ 悬停指示 + 点击展开预览。
+//   PV_HOVER   = 鼠标正指着的那一手（只画指示圈）；
+//   PV_PREVIEW = 点击某一手后展开的黑白交替半透明棋子快照 —— **只画，不向引擎要算力**；
+//   PV_SIDE    = 这条路线属于哪一方先走（决定预览子色）。
+//   刷新节流：引擎 INFO 可达每秒数百条，PV 条最多每 260ms 重排一次；内容没变直接跳过。
 var PV_HOVER = null, PV_SIDE = 0, PV_PREVIEW = null;
 var PV_RENDER = [], PV_KEY = '', PV_TMR = 0, PV_LAST = 0, PV_PENDING = null;
 var PV_MIN_MS = 260;
 
 function pvPreviewClear() { PV_PREVIEW = null; }
 
+// 把当前展开预览的最后一手在代码条上标出来（sel）
 function pvMarkSel(box) {
   var kids = box.querySelectorAll('.pv-mv');
   for (var i = 0; i < kids.length; i++) kids[i].classList.remove('sel');
@@ -2947,6 +3489,8 @@ function pvDrawNow() {
   }).join('');
   pvMarkSel(box);
   bindPvBox(box);
+  // ★ 2026-10-22：PV 刷新会重建代码节点，悬停本身不会重放 —— 按坐标把 PV_HOVER 重新钉到
+  //   新下标；对不上（这条线已被新搜索换掉）就撤掉悬停预览，避免指到别的点上。
   if (PV_HOVER) {
     var hj = -1;
     for (var hk = 0; hk < PV_RENDER.length; hk++)
@@ -2954,6 +3498,7 @@ function pvDrawNow() {
     if (hj < 0) { PV_HOVER = null; paint(); }
     else if (hj !== PV_HOVER.i) { PV_HOVER.i = hj; PV_HOVER.seq = hj + 1; paint(); }
   }
+  // 用户原本就在底部（跟随实时）→ 内容长高后继续跟到底；否则不动滚动位置
   var wrap = box.parentNode;
   if (wrap && wrap.classList && wrap.classList.contains('eng-msg') &&
       wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 28)
@@ -2975,6 +3520,8 @@ function bindPvBox(box) {
     PV_HOVER = null;
     paint();
   });
+  // 点击代码：把这条路线从当前局面按黑白交替展开到该手（半透明预览，再点同手收起）。
+  // 纯前端绘制，不触发任何引擎请求 —— 不占用搜算力。
   box.addEventListener('click', function (e) {
     var t = e.target && e.target.closest ? e.target.closest('.pv-mv') : null;
     if (!t) return;
@@ -3002,18 +3549,18 @@ function setPvLine(line, side) {
   PV_PENDING = arr;
   var box = els.pvBox;
   if (!box) return;
-  if (!arr.length) {
+  if (!arr.length) {                      // 清空（换局面 / 停止 / 无路线）立即生效
     if (PV_TMR) { clearTimeout(PV_TMR); PV_TMR = 0; }
     PV_LAST = Date.now();
     var hadPv = !!PV_PREVIEW, hadHover = !!PV_HOVER;
-    PV_HOVER = null;
+    PV_HOVER = null;                     // ★ 路线清空时悬停展开的棋子也必须撤掉
     pvPreviewClear();
     pvDrawNow();
-    if (hadPv || hadHover) paint();
+    if (hadPv || hadHover) paint();       // 把画布上的半透明预览一并擦掉
     return;
   }
   var key = arr.map(function (p) { return p[0] + ',' + p[1]; }).join(' ');
-  if (key === PV_KEY && !box.hidden) return;
+  if (key === PV_KEY && !box.hidden) return;   // 内容没变：不重排 DOM
   var wait = PV_MIN_MS - (Date.now() - PV_LAST);
   if (wait <= 0) {
     PV_LAST = Date.now();
@@ -3023,6 +3570,10 @@ function setPvLine(line, side) {
   }
 }
 
+// ★ 2026-10-23（用户：「仪表盘显示的胜率有错误」）：引擎的 EVAL / WINRATE 都是
+//   **行棋方视角**；仪表「评估」与评估曲线此前一个按行棋方、一个按黑方折算，
+//   同一局面会出现「评估 -128」与曲线 +120 并存的矛盾。现在统一成**黑方视角**
+//   （正值 = 黑优，与曲线一致），白方的原始分在曲线下的「黑白信息框」里单独给出。
 function evalBlack(c0) {
   var v = evalNum(c0 && c0.eval);
   if (!isFinite(v)) return null;
@@ -3036,17 +3587,29 @@ function scoreTxt(v) {
   }
   return (v > 0 ? '+' : '') + Math.round(v);
 }
+// 分数 → 胜率：Rapfi 的 ScalingFactor=200 ⇒ 胜率 = sigmoid(评估/200)。
 function scoreWin(v) {
   if (v == null || !isFinite(v)) return null;
   if (Math.abs(v) > RAPFI_EVAL_MAX) return v > 0 ? 1 : 0;
   return 1 / (1 + Math.exp(-v / 200));
 }
 
-
+/* ★★ 2026-10-23（用户：「「评估」要展示 ai 执子的哪一方，当前有反转的偏差」）
+   —— 仪表盘「评估」从此只有一个口径：
+     ① 引擎 INFO EVAL 是 **行棋方视角**，先经 evalBlack() 折成黑方视角（正 = 黑优）；
+     ② 再按「谁在执子」翻成那个人的视角（正 = 他有利）。
+   以前一直按黑方视角显示，AI 执白时「黑优」看着像「白优」，这就是用户说的反转偏差；
+   执子方写在标题后缀上（评估·黑 / 评估·白）。
+   ⚠ `myColor()` 是**人类**执子方（见 winTextFor），别拿它当 AI 方 —— 上一版就是这么反的。
+   ★★ 17:04 再修（用户：「AI 同时执黑子和白子的时候，评估的分数没有反应过来」）：
+   双 AI 自对弈时两个都是 AI，固定的黑方视角就「不动」了 —— 改成**跟随当前行棋方**，
+   轮到谁就把数字换成谁的视角（后缀同步换成 ·黑 / ·白），一眼能看出这手棋对谁好。 */
 function evalViewColor(sideMove) {
+  // ★ 双 AI：跟随**这次评估所属的行棋方**（不是 curColor() —— aiMove 是先 place 再 setStat，
+  //   那时 curColor 已经翻给对手了，用它会把这手棋的评估反过来显示，正是「没反应过来」）。
   if (aiVsAi()) return (sideMove === 1 || sideMove === 2) ? sideMove : curColor();
-  if (!!S.aiB === !!S.aiW) return 0;
-  return S.aiB ? 1 : 2;
+  if (!!S.aiB === !!S.aiW) return 0;     // 人人对：固定黑方视角
+  return S.aiB ? 1 : 2;                  // AI 执黑 / AI 执白
 }
 function evalToView(ev, sideMove, c) {
   var b = evalBlack({ eval: ev, side: sideMove });
@@ -3066,6 +3629,7 @@ function dashEvalSet(ev, sideMove) {
     els.t_eval.title = (c === 0) ? '' : (who + '执' + (c === 1 ? '黑' : '白') + '（正值 = 该方有利）');
   }
 }
+// 执子方变化（切 AI 黑白 / 换模式）后立刻按新口径重画一次，不必等下一次引擎 tick。
 function dashEvalRefresh() {
   var st = G.lastStat;
   if (st && st.eval != null) dashEvalSet(st.eval, st.side);
@@ -3084,6 +3648,8 @@ function setStat(c0, msg) {
     dashEvalSet(c0.eval, c0.side);
     els.st_best.textContent = (c0.x != null) ? coordName(c0.x, c0.y) : '-';
     setPvLine(c0.line || [], (c0.side === 1 || c0.side === 2) ? c0.side : 0);
+    // ★ 2026-10-22（用户：「旧的代码历史不再展示了」）：路线只显示在「路线」小框里，
+    //   不再逐条追加坐标文本到消息框 —— 那个框只保留实时的状态消息。
     
     if (linkSessionOn()) {
       tellHost({ type: 'linkStats',
@@ -3181,7 +3747,7 @@ function refreshUI() {
     if (els.inp_code.value !== codeTxt) els.inp_code.value = codeTxt;
   }
   drawCurve();
-  bgThinkKick(200);
+  bgThinkKick(200);                    // ★ 后台思考：状态变化后按需续上（幂等，同盘面不重开）
 }
 
 var CURVE_TIERS = [
@@ -3287,6 +3853,13 @@ function drawCurve() {
     return;
   }
 
+  // ★ 2026-10-13（用户：「在引擎仪表盘上面的评估曲线上带上子数的横坐标小数字」）：
+  //   横轴一直是**按手数线性铺**的（plot 里 x = x0 + (x1-x0) * p.i/maxPly），但轴上没有任何
+  //   刻度数字 —— 只能靠最右端那条「第 N 手」，看不出中间每个点是第几手。
+  //   这里补「子数刻度」：短刻度线 + 小号数字（9px，与纵轴字号一致）。
+  //   · 步长按可用宽度自动选（1/2/5/10/20/25/50 手），保证相邻标签至少隔 22px，不糊成一片；
+  //   · 首尾两个标签会按文字宽度夹回画布内，避免被裁半个字；
+  //   · 画在**滚动画布 #curve 上**（不是在左侧纵轴条上）⇒ 跟数据一起横向滚动、坐标永远对齐。
   (function drawPlyAxis() {
     if (maxPly <= 0 || x1 <= x0) return;
     var pxPerPly = (x1 - x0) / maxPly;
@@ -3308,6 +3881,7 @@ function drawCurve() {
     }
     var lastP = 0;
     for (var pp = 1; pp <= maxPly; pp += plyStep) { plyTick(pp); lastP = pp; }
+    // 末手若不是刻度点、且离上一个标签够远，就补一条 —— 让总手数一眼可见
     if (maxPly !== lastP && (maxPly - lastP) * pxPerPly >= 12) plyTick(maxPly);
   })();
 
@@ -3396,7 +3970,10 @@ function drawCurve() {
   drawCurveInfo();
 }
 
-
+/* ★ 2026-10-23（用户：「鼠标悬停到曲线的某一个位置……显示黑和白的分数和胜率；
+   不悬停时展示最新一手的分数和胜率」）：
+   悬停 → 取最近的曲线数据点、在滚动画布内画一条细的纵轴虚线、两个信息框显示该手；
+   移出 → 去掉虚线、信息框回到最新一手。 */
 var CURVE_GEO = null, CURVE_HOVER = null;
 
 function curveLastPoint() {
@@ -3433,7 +4010,7 @@ function drawCurveInfo() {
   var hover = (CURVE_HOVER != null);
   var p = hover ? curvePointAt(CURVE_HOVER) : curveLastPoint();
   var b = p ? p.b : null;
-  curveHoverLine(hover ? p : null);
+  curveHoverLine(hover ? p : null);   // 虚线只在悬停时出现
   if (b == null) {
     if (els.ci_b_score) els.ci_b_score.textContent = '-';
     if (els.ci_b_win) els.ci_b_win.textContent = '-';
@@ -3449,6 +4026,8 @@ function drawCurveInfo() {
   if (els.ci_w_win) els.ci_w_win.textContent = Math.round((1 - wb) * 100) + '%';
   paintCiBar(els.ci_b_win, wb); paintCiBar(els.ci_w_win, 1 - wb);
 }
+// ★ 2026-10-24：把胜率写进所在信息条的 `--wr`，驱动那层「从左往右由深到透明」的渐变。
+//   0 或非法值 = 不铺色（清空态）；clamp 到 0~1，避免越界把渐变拉出条外。
 function paintCiBar(node, ratio) {
   if (!node || !node.parentNode || !node.parentNode.parentNode) return;
   var row = node.parentNode.parentNode;      // .v → .cir → .ci
@@ -3907,14 +4486,19 @@ function openUpdatePage() {
 function escHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+// ★ 2026-10-19：关于面板的文案里有历史遗留的 **加粗** 标记（escHtml 之后会原样显示星号）。
+//   这里统一把成对的 ** 去掉再转义 —— 面板本来就用颜色/字号分层，不需要行内加粗标记。
 function abEsc(t) { return escHtml(String(t == null ? '' : t).replace(/\*\*/g, '')); }
+var AB_BUILT = false;   // 关于面板是否已渲染（决定 sysMem 走就地刷新还是首次构建）
 function renderAbout() {
   if (!els.about || !els.ab_body) return;
   var h = '';
   h += '<div class="ab-app">' + escHtml(T('aboutApp')) + '</div>';
   h += '<div class="ab-ver">' + escHtml(T('aboutVer')) + ' <b>v' + escHtml(APP_VERSION) + '</b></div>';
-  
-  h += renderAboutSys();
+  // ★ 2026-10-27：系统信息（含内存可用量）单独装在一个 #abSys 里。host 每 3 s 推一条 sysMem，
+  //   以前是「整块 innerHTML 重写」⇒ 正读着的时候滚动位置每 3 s 被重建一次，表现为缓慢自动移动。
+  //   现在只有这个小块会被就地替换，正文与滚动位置一律不动（见 refreshAboutSys）。
+  h += '<div id="abSys">' + renderAboutSys() + '</div>';
 
   h += '<div class="ab-h2">' + escHtml(T('aboutGuide')) + '</div>';
   (T('aboutGuideList') || []).forEach(function (sec) {
@@ -3939,13 +4523,39 @@ function renderAbout() {
   h += '<div class="ab-h2">' + escHtml(T('aboutLic')) + '</div>';
   h += '<div class="ab-lic">' + abEsc(T('aboutLicText')) + '</div>';
 
-  h += '<div class="ab-h2">' + escHtml(T('aboutUpdates')) + '</div><ul class="ab-ul ab-news">';
-  (T('aboutUpdateList') || []).forEach(function (x) { h += '<li>' + abEsc(x) + '</li>'; });
-  h += '</ul>';
+  // 最近更新：按版本分段（每段一个 vX.YY 标签 + 该版条目），只保留最近两版。
+  h += '<div class="ab-h2">' + escHtml(T('aboutUpdates')) + '</div>';
+  (T('aboutUpdateList') || []).forEach(function (sec) {
+    var items = (sec && sec.items) || [];
+    if (!items.length) return;
+    if (sec.v) h += '<div class="ab-vtag">v' + escHtml(sec.v) + '</div>';
+    h += '<ul class="ab-ul ab-news">';
+    items.forEach(function (x) { h += '<li>' + abEsc(x) + '</li>'; });
+    h += '</ul>';
+  });
+  var keep = AB_BUILT ? els.ab_body.scrollTop : 0;   // 切语言重绘时不要把读者甩回顶部
   els.ab_body.innerHTML = h;
-  
+  AB_BUILT = true;
+  if (keep) els.ab_body.scrollTop = keep;
 }
-function openAbout() { renderAbout(); if (els.about) els.about.hidden = false; }
+
+// 只刷新「系统信息」那一小块（内存数字每 3 s 会变），不碰正文、不碰滚动条。
+function refreshAboutSys() {
+  if (!AB_BUILT || !els.about || els.about.hidden || !els.ab_body) return;
+  var host = els.ab_body.querySelector('#abSys');
+  if (!host) { renderAbout(); return; }
+  var html = renderAboutSys();
+  if (host.__last === html) return;                  // 内容没变：DOM 都不碰
+  host.__last = html;
+  var st = els.ab_body.scrollTop;
+  host.innerHTML = html;
+  els.ab_body.scrollTop = st;                        // 高度即便变了也不让读者被顶走
+}
+
+function openAbout() {
+  renderAbout();
+  if (els.about) { els.about.hidden = false; els.ab_body.scrollTop = 0; }
+}
 function closeAbout() { if (els.about) els.about.hidden = true; }
 function wireAbout() {
   if (els.btn_about) els.btn_about.onclick = openAbout;
@@ -4119,10 +4729,12 @@ var VIS = { list: [], idx: 0, busy: false, result: null, seq: 0, queued: false, 
             sel: null, anchor: -1, edit: false, pick: null, delPts: [], swapSel: null,
             ghosts: [], saveTmr: 0, addOpen: false, undoStack: [], kb: -1,
             vc: false, gateBad: false,
-            wd: 0, retry: 0 };
+            wd: 0, retry: 0 };   // ★ 2026-10-19：wd=识别看门狗，retry=本张图已自动重试次数
 
 function visSelSet() { if (!VIS.sel) VIS.sel = new Set(); return VIS.sel; }
 
+// ★ 2026-10-19：提示文字进「固定高度的虚线文本框」（calc.css 里 .vis-msg 已定高），
+//   这里不再因为文案换行而改变整列高度 —— 拖动识别参数时界面不抖。
 function visMsg(t) {
   if (els.visMsg) els.visMsg.textContent = t || '';
   visLayout();
@@ -4158,9 +4770,11 @@ function visShowMoves(mv) {
 function visUpdateCode() {
   if (!els.visCodeBar || !els.visCode) return;
   var has = !!(G.moves && G.moves.length);
+  // ★ 2026-10-19（用户：「打开『识别参数』的时候，自动隐藏棋盘代码框」）：
+  //   参数面板展开 ⇒ 代码框让位（它只占高度、对调参没用）；收起/确定/取消后自动回来。
   els.visCodeBar.hidden = !has || visRc.on;
   if (has) els.visCode.value = movesToCode(G.moves);
-  visLayout();
+  visLayout();                                  // 代码框出现/消失都会改变可用高度
 }
 
 function visShowResult(r) {
@@ -4169,7 +4783,7 @@ function visShowResult(r) {
 
 function visRefreshView() {
   var has = VIS.list.length > 0;
-  VIS.retry = 0;
+  VIS.retry = 0;                               // 换图 ⇒ 自动重试额度重新计数
   var it = VIS.list[VIS.idx];
   var isImg = !!it && it.t === 'img';
   els.visImg.hidden = !isImg;
@@ -4212,6 +4826,21 @@ function visAutoRecognize() {
   }, 200);
 }
 
+// ★★ 2026-10-19（用户：「识图这个界面上也添加一个识别参数，放到重新识别右面，把保存到历史这个
+//   功能键给取代掉……」→ 随后补充：「点击识别参数后该键自己也消失、下面的棋盘代码框也消失」、
+//   「拖动和改变这 5 个识别参数的参数值，并没有任何变化」、「识别效果要随着滑动条的滑动动态改变」、
+//   「下面添加『取消，确定』功能键（与『通用』是一行的）」）：
+//   识图「识别参数」面板 —— 与连线窗同一套同步识别阈值里的 **5 项（不含 interval/时间）**：
+//   灰度偏差 / 黑色偏差 / 黑色占比 / 白色偏差 / 白色占比。每项一个小虚线框：上行「名称 + 数字框」、
+//   下行细滑动条；底部一行「通用 / 取消 / 确定」三个键。
+//   · 打开面板**不再隐藏任何功能键**（识别参数键自己保留作开关，其余键照常可见）——原先那套
+//     `hidden = (btns[i] !== els.btn_vis_rc)` 一旦 btn_vis_rc 取不到就会把整行（含本键）全藏掉，
+//     正是「点击识别参数，这个按键也消失」的成因；
+//   · 拖动滑动条 → 180ms 合并后 ① 落盘（单一权威，关软件再打开不回退默认）
+//     ② 立即按新阈值重识别当前图片 = 实时预览；
+//   · 「通用」回默认（50 / 96 / 96 / 33 / 33）；「取消」回到打开面板时那一组并重识别；
+//     「确定」收下当前值并收起面板；
+//   · 5 项随每次识别请求下发（见 visRecognize 的 recog 字段），宿主 → 视觉服务 algo=sync/forceSync。
 var VIS_RC_DEF = { gray_offset: 50, black_offset: 96, white_offset: 96,
                    black_percent: 33, white_percent: 33 };
 var VIS_RC_FIELDS = [
@@ -4240,6 +4869,7 @@ function visRcNum(k) {
   return v;
 }
 
+// 面板只在首次用到时构建（识图窗语言跟随启动时的设置，不做二次翻译 —— 与连线窗同口径）
 function visRcBuild() {
   if (!els.visRcBox || els.visRcBox.childElementCount) return;
   for (var k in VIS_RC_DEF) if (visRc.val[k] === undefined) visRc.val[k] = VIS_RC_DEF[k];
@@ -4280,6 +4910,7 @@ function visRcBuild() {
         if (inp) inp.value = String(v);
         visRcLive();
       });
+      // 数字框：只认数字；越界/非法则回退到当前值（与连线窗、颜色窗同一口径）
       inp.addEventListener('input', function () {
         var raw = String(inp.value).replace(/[^0-9]/g, '');
         var v = parseInt(raw, 10);
@@ -4301,6 +4932,7 @@ function visRcBuild() {
   }
 }
 
+// 回填（宿主在页面 ready 时把磁盘上正在生效的那份发下来）
 function visRcFill(o) {
   if (!o) return;
   for (var i = 0; i < VIS_RC_FIELDS.length; i++) {
@@ -4329,12 +4961,15 @@ function visRcSnapshot() {
   return o;
 }
 
+// ★★ 2026-10-19：拖动滑动条 = 实时预览。以前这里只把值写盘、不重识别，所以「拖动和改变这 5 个识别
+//   参数的参数值，并没有任何变化」。现在值一动（合并 180ms）就 ① 写盘（单一权威，关软件不回退）
+//   ② 按新阈值把当前图片重新识别一遍 —— 识别效果随滑动条动态改变。
 function visRcLive() {
   if (visRc.tmr) clearTimeout(visRc.tmr);
   visRc.tmr = setTimeout(function () {
     visRc.tmr = 0;
     visRcPersist();
-    if (visRc.on) visAutoRecognize();
+    if (visRc.on) visAutoRecognize();      // 实时预览
   }, 180);
 }
 
@@ -4353,12 +4988,14 @@ function visRcGeneral() {
   visMsg(T('visRcGeneralMsg'));
 }
 
+// 「确定」：把当前这组值收下来（拖动时已实时落盘 + 实时预览过）并收起面板
 function visRcOk() {
   visRcPersist();
   visRcClose(false);
   visMsg(T('visRcOkMsg'));
 }
 
+// 「取消」：整组回到打开面板时的那一份 —— 写盘 + 重识别，识别效果也一起回退
 function visRcCancel() {
   for (var i = 0; i < VIS_RC_FIELDS.length; i++) {
     var k = VIS_RC_FIELDS[i].k;
@@ -4369,39 +5006,52 @@ function visRcCancel() {
   visMsg(T('visRcCancelMsg'));
 }
 
+// 收起面板；revert=true 时按回退后的值重识别一次
 function visRcClose(revert) {
   visRc.on = false;
   if (visRc.tmr) { clearTimeout(visRc.tmr); visRc.tmr = 0; }
   visRcPersist();
   if (els.visRcBox) els.visRcBox.hidden = true;
-  visUpdateCode();
+  visUpdateCode();                 // 参数面板收起 ⇒ 棋盘代码框回到原位
   visLayout();
   if (revert) visAutoRecognize();
 }
 
 function visRcToggle() {
-  if (!els.visRcBox) return;
+  if (!els.visRcBox) return;                 // 兜底：面板容器缺失就什么都不做（绝不误隐藏功能键）
   if (visRc.on) { visRcClose(false); visMsg(T('visRcOff')); return; }
   visRc.on = true;
   visRcBuild();
+  // 记住打开面板时的那一组值 —— 「取消」要回到它
   for (var i = 0; i < VIS_RC_FIELDS.length; i++) {
     var k = VIS_RC_FIELDS[i].k;
     visRc.base[k] = visRcNum(k);
   }
   els.visRcBox.hidden = false;
   visRcPaint();
-  visUpdateCode();
+  visUpdateCode();                 // 参数面板展开 ⇒ 棋盘代码框自动隐藏
   visLayout();
   visMsg(T('visRcOn'));
 }
 
+// ★★ 2026-10-19：「点击识别参数后……下面的棋盘代码那一块框也消失掉」→ 之后追加「点击识别参数，
+//   不出现代码框和相关按键，要完整显示参数调整条」：
+//   照片框高度按「识图列可视高度 − 其余子项实测高度 − 间距」动态算，参数面板不再自带 max-height
+//   内部滚动（必须 5 项完整可见），因此「功能键行 / 参数面板 / 棋盘代码框 / 提示行」始终留在可视区。
 function visLayout() {
   if (!els.visBox || !els.visView) return;
+  // ★★ 2026-10-19（用户：「点击识别参数，不出现代码框和相关按键，要完整显示参数调整条」）：
+  //   照片框高度 = 识图列「可视高度 − 其余子项各自实测高度 − 各子项间距」。
+  //   以前是硬编码预留 330px，参数面板 + 棋盘代码框 + 提示行真实高度一旦超过这个数，整列就
+  //   顶出识图窗 —— 「棋盘代码」框与下方功能键就是这么消失的，而参数面板还自带内部滚动，
+  //   于是 5 项参数条又只露一半。现在改成逐项 offsetHeight 实测：参数条全高（无 max-height）
+  //   永远完整可见，照片框按剩余空间收窄，代码框 / 提示行永远留在可视区内。
+  //   `.vis-view` 本身还有 overflow-y:auto 兜底：窗口极矮时整列可滚动，不会有够不着的东西。
   var gapPx = 8;                                  // .vis-view gap:.5rem ≈ 8px
   var used = 0, n = 0, kids = els.visView.children;
   for (var i = 0; i < kids.length; i++) {
     var c = kids[i];
-    if (c === els.visBox) continue;
+    if (c === els.visBox) continue;               // 照片框自己由本函数定高，不参与求和
     if (c.hidden || c.offsetParent === null || !c.offsetHeight) continue;
     used += c.offsetHeight; n++;
   }
@@ -4409,7 +5059,7 @@ function visLayout() {
   var h;
   if (avail) h = avail - used - gapPx * (n + 1);
   else h = Math.round(((els.board ? els.board.clientHeight : 480) || 480) * 0.56);
-  if (visRc.on) { if (h < 88) h = 88; }
+  if (visRc.on) { if (h < 88) h = 88; }           // 参数面板展开：照片框可以更矮，保证其余项完整
   else { if (h < 170) h = 170; }
   if (h > 460) h = 460;
   els.visBox.style.height = h + 'px';
@@ -4864,6 +5514,12 @@ function visAddFiles(files) {
   });
 }
 
+// ★★ 2026-10-19（用户：「经常不会自动调用视觉引擎去识别，导致只识别了棋盘，而常常不会自动
+//   识别棋子」）：页面侧的**识别看门狗**。
+//   以前 VIS.busy = true 之后只等宿主回 visResult —— 一旦这条回包丢了（视觉进程没起、管道断了、
+//   WebView 重载、宿主正在切窗口……），busy 就永久卡住：此后换图、拖参数触发的一切「自动识别」
+//   都只把 VIS.queued 置真然后 return，**再也不发请求**。用户看到的正是「不会自动调用引擎」。
+//   现在每次请求都挂一条 12s 看门狗：超时就解除占用 + 自动重试一次（重试也走同一条通路）。
 var VIS_REC_TO = 12000;
 function visClearWatchdog() { if (VIS.wd) { clearTimeout(VIS.wd); VIS.wd = 0; } }
 function visArmWatchdog() {
@@ -4899,10 +5555,12 @@ function visRecognize() {
   VIS.busy = true;
   VIS.seq++;
   VIS.reqSeq = VIS.seq;
-  visArmWatchdog();
+  visArmWatchdog();                       // ★ 回包丢了也要能自愈（见 visArmWatchdog 注释）
   if (els.btn_vis_rec) els.btn_vis_rec.disabled = true;
   visMsg(T('visWorking'));
 
+  // ★ 2026-10-19：把「识别参数」那 5 项随识别请求一起下发 —— 服务端按 algo=sync 走同步读子，
+  //   所以拖动阈值能真正改变识别结果（实时预览就是靠这条通路）。
   tellHost({ type: 'visRecognize', mode: 'image', data: it.d, seq: VIS.reqSeq,
              recog: visRcSnapshot() });
 }
@@ -4910,7 +5568,7 @@ function visRecognize() {
 function visRecognizeDone() {
   var was = VIS.busy;
   VIS.busy = false;
-  VIS.retry = 0;
+  VIS.retry = 0;                          // 有回包了 ⇒ 自动重试额度复位
   visClearWatchdog();
   if (els.btn_vis_rec) els.btn_vis_rec.disabled = false;
   if (was && VIS.queued) { VIS.queued = false; visAutoRecognize(); }
@@ -4923,6 +5581,8 @@ function visHandleResult(m) {
   if (!r.ok) { visMsg(T('visBad') + (r.err ? ' (' + r.err + ')' : '')); return; }
   var bl = r.black || [], wh = r.white || [];
   if (!bl.length && !wh.length) {
+    // ★ 2026-10-19：识别回「有盘无子」时，把上一张图**残留**的局面/棋盘代码清掉 ——
+    //   否则代码框还挂着上一次的着法，看上去像「棋盘识别到了、棋子没识别」，很难判断真相。
     if (VIS.result) { VIS.result = null; visShowMoves([]); }
     visMsg(T('visNoStones'));
     return;
@@ -5466,7 +6126,7 @@ function bootVis() {
     else if (m.type === 'visShotFail') visMsg(T('visShotFail'));
     else if (m.type === 'visShotCancel') visMsg('');
     else if (m.type === 'visResult') visHandleResult(m);
-    else if (m.type === 'visRecog') visRcFill(m.recog);
+    else if (m.type === 'visRecog') visRcFill(m.recog);   // 宿主回填磁盘上正在生效的识别参数
     else if (m.type === 'uiTheme') {
       S.theme = (m.theme === 'light') ? 'light' : 'dark';
       document.body.setAttribute('data-theme', S.theme);
@@ -5950,7 +6610,7 @@ function undoOne() {
   G.curve = G.curve.filter(function (p) { return p.i < G.moves.length; });
   G.heat = []; G.nums = [];
   recomputeOver(); persistGame();
-  anaReset();
+  anaReset();                      // ★ 盘面变了：停掉常驻评估并清标记
   liveAnaBoardChanged();
   paint(); refreshUI();
   refreshCoach();
@@ -5977,7 +6637,7 @@ function stepBack() {
   G.curve = G.curve.filter(function (p) { return p.i < G.moves.length; });
   G.heat = []; G.nums = [];
   recomputeOver(); persistGame();
-  anaReset();
+  anaReset();                      // ★ 盘面变了：停掉常驻评估并清标记
   liveAnaBoardChanged();
   paint(); refreshUI();
   refreshCoach();
@@ -6047,11 +6707,14 @@ function ingestExternal(text) {
 }
 
 var LAY_KEY = 'gbcalc.layout.v7';   
+// ★★ 2026-10-17（用户：「还有很多持久化做的不合理」）：布局也收口到**单键**。
+//   原来按 linkSessionOn() 分叉成 gbcalc.layout.v7 / .link.v1 —— 在连线窗拖好的卡片顺序，
+//   回主窗（或下次启动）读的是另一套，表现就是「布局没保存」。
 function layKey() { return 'gbcalc.layout.v8'; }   
 function loadLayout() {
   try {
     var raw = localStorage.getItem(layKey());
-    if (!raw) {
+    if (!raw) {   // 一次性迁移：v7（主窗）优先，其次 link 键
       var cands = ['gbcalc.layout.v7', 'gbcalc.layout.link.v1'];
       for (var i = 0; i < cands.length; i++) {
         var sv = localStorage.getItem(cands[i]);
@@ -6250,7 +6913,10 @@ function applyLang() {
     var el = els['t_' + k];
     if (el) el.textContent = d[k];
   });
+  // ★ 2026-10-23：上面会把 t_eval 重置成纯「评估」，把执子方后缀（·黑 / ·白）冲掉 —— 立刻补回。
   try { dashEvalRefresh(); } catch (eEV) {}
+  // 同理：bgThinkHint 被重置回原文，把「已自动暂停」的状态标记补回去。
+  // （先清掉 data-base —— 切语言后原文已换，缓存的那份是旧语言的。）
   try { if (els.t_bgThinkHint) els.t_bgThinkHint.removeAttribute('data-base'); } catch (eBH1) {}
   try { bgThinkHintSync(); } catch (eBH2) {}
   els.btn_reset.textContent = d.reset;
@@ -6343,10 +7009,13 @@ function applyLang() {
     if (els.multiPvHint) els.multiPvHint.textContent = d.multiPvHint;
     if (els.candRangeHint) els.candRangeHint.textContent = d.candRangeHint || '';
     if (els.sel_candRange) els.sel_candRange.title = d.candRangeHint || '';
+    // ★ 2026-10-25（用户截图：「不限」没适应英文）：占位符/提示原来写死在 HTML 里，
+    //   切英文仍是中文。改成随语言重设，空值才显示（有值时浏览器不显示占位符）。
     if (els.inp_maxDepth) { els.inp_maxDepth.placeholder = d.phNone || ''; els.inp_maxDepth.title = d.phDepth || ''; }
     if (els.inp_maxNodes) { els.inp_maxNodes.placeholder = d.phNone || ''; els.inp_maxNodes.title = d.phNodes || ''; }
     if (els.sel_maxDepth) els.sel_maxDepth.title = d.phDepth || '';
     if (els.sel_maxNodes) els.sel_maxNodes.title = d.phNodes || '';
+    // 多主变下拉的单位文案随语言变（中文「个点」/ 英文「pts」）—— 重渲染保住当前选中值。
     if (els.sel_multiPv) {
       var mpSel = Math.max(1, Math.min(8, Math.round(+S.nbest || 3)));
       var mpHtml = [];
@@ -6499,6 +7168,10 @@ function applyTheme() {
   
   if (HOST) tellHost({ type: 'uiTheme', theme: themeKey(), bg: pageBgHex(), lang: S.lang, cssVars: S.cssVars });
 }
+// ★★ 2026-10-18（用户：「线程多于核心…要齐心协力，而不是相互打架」）：
+//   宿主 host 消息到达时的线程拓扑校正。接线窗不走 boot()（不调 buildSelects），
+//   主界面 boot() 又需要同一套判定 ⇒ 收敏到一个入口，两边都调（幂等，标记只写一次）。
+//   触发条件收窄到 10~12（旧上限 12 与常见中间值 10）：用户自选的 2~9 / 13+ 一律不动。
 window.GB_onHost = function (m) {
   if (!m) return;
   try {
@@ -6509,11 +7182,12 @@ window.GB_onHost = function (m) {
     G.host.physCores = m.physCores | 0;
     G.host.userThreads = m.userThreads | 0;
     G.host.userHashMB = m.userHashMB | 0;
+    // ★ 2026-10-24：CPU 指令集能力随 host 握手到达（比 engine caps 早且稳）
     if (typeof m.avx2 === 'boolean') {
       G.host.sse = !!m.sse; G.host.avx2 = !!m.avx2; G.host.avx512 = !!m.avx512;
       G.host.avx512vnni = !!m.avx512vnni; G.host.avxvnni = !!m.avxvnni;
       G.host.variant = m.variant || '';
-      G.host.variantBench = m.variantBench || '';
+      G.host.variantBench = m.variantBench || '';   // 本机实测最快（下拉说明用）
       try { fillVariantSelect(); } catch (eV) {}
     }
   } catch (e0) {}
@@ -6529,6 +7203,11 @@ window.GB_onHost = function (m) {
   try { applyEngineConfig(); } catch (e3) {}
   try { console.log('[threads] topo migrate ' + _old + ' -> ' + maxT); } catch (e4) {}
 };
+// ★ 2026-10-24（用户：「引擎变体也让用户选，默认配置最好的，不支持的别显示」）：
+//   先渲染「自动」，等 caps 回来再按本机 CPU 能力补上真正可用的档位（不可用的一律不显示）。
+// ★★ 二次修复（用户：「引擎变体选择中仍然没有可选项」第 3 次反馈后定位）：
+//   mk() 原来只认引擎 caps 旧格式（hasAVX2/…），而 host 握手与 GB_onHost 落的是线上格式
+//   （avx2/sse/…）⇒ 档位判定全 undefined，下拉永远只剩「自动」。这里统一归一化两种形态。
 function variantCapsNorm(x) {
   x = x || {};
   return {
@@ -6544,6 +7223,8 @@ function fillVariantSelect() {
   if (!el) return;
   var cur = variantPrefGet();
   S.variant = cur;
+  // ★ 2026-10-24（用户：「每一个引擎附上简单说明」）：每个选项带 title 悬浮说明，
+  //   下拉下方 hint 常驻显示当前选择的说明；自动档还附「本机实测最快」结果。
   var vHint = function (val) {
     var h = els.variantHint;
     if (!h) return;
@@ -6579,9 +7260,12 @@ function fillVariantSelect() {
   var html0 = '<option value=""' + (cur ? '' : ' selected') + '>' + T('vAuto') + '</option>';
   if (el.innerHTML !== html0) el.innerHTML = html0;
 
+  // ① 首选 host 握手（页面 ready 后立刻到，最可信）
   var h = G.host || {};
   if (typeof h.avx2 === 'boolean' || typeof h.hasAVX2 === 'boolean') { mk(h); return; }
+  // ② 其次 caps 缓存（boot 时可能已经请求过）
   if (G.capsCache2) { mk(G.capsCache2); return; }
+  // ③ 最后才发 caps 请求（要等引擎探测，慢）
   try {
     LocalAI.caps().then(function (c) {
       c = c || {};
@@ -6593,6 +7277,10 @@ function fillVariantSelect() {
   } catch (e) {}
 }
 
+// ★ 2026-10-24（用户：「下拉栏里面设计一个输入框」→ 三次修订：「恢复之前的逻辑，
+//   用户自己输入时下拉按键显示相应的数字」）配套助手：
+//   输入框提交的自定义值不在预设里时，往 select 追加一项**直接显示该数字**并选中
+//   （如输入 96 → 下拉显示 96；输入 12.5M → 下拉显示 12.5M），预设与自定义同列表可选。
 function selSyncCustom(el, v, fmt) {
   if (!el) return;
   var has = false;
@@ -6626,8 +7314,11 @@ function applyEngineConfig() {
              variant: extra.variant });
 }
 
+// ★ 2026-10-23：机器兜底权重档。没有 AVX2 的老 CPU 用纯传统估值（NNUE 每节点开销太大，
+//   同样时间搜得浅，精度收益抵不过深度损失）；其余一律 NNUE（官方推荐、评估最准）。
 function defaultWeightsMode() {
   var h = G.host || {};
+  // 2026-10-24：host 握手（avx2）与引擎 caps（hasAVX2）两种形态都认 —— 缺 AVX2 的老机兜底传统估值
   if (h.hasAVX2 === false || h.avx2 === false) return 'classic';
   return 'nnue';
 }
@@ -6946,14 +7637,27 @@ function wireColors() {
 var CARD_IDS = ['setup', 'analysis', 'engine'];   
 var DEFAULT_CARDS = { setup: 0, analysis: 0, engine: 1 };   
 
+// ★★ 2026-10-17（用户：「线程数选择 1 就保存不了」「固定变 × 后再开又显示固定」）：
+//   用户偏好统一收口到一个**全局键**，不再依赖会被整体覆盖的 S 快照。
+//   病根：S 在 gbcalc.settings.v1 与 gbcalc.settings.link.v1 两套存档之间来回覆盖；
+//   且 save() 里「另一个键不存在就 return」—— 只在连线窗里改过的偏好永远落不到主键，
+//   下次启动读到的还是旧值（线程选 1 被写回 12 就是这条链路）。
+// ★★ 2026-10-17（用户：「把可选线程数最小改成 2」）：线程 1 会让引擎 + worker 反复重启、
+//   与各处的「最小 2」夹取互相打架（表现就是一串莫名其妙的 bug）。下拉从 2 起，
+//   旧存档里的 1 在启动时自动抬到 2 —— 只此一处定义，宿主 C++ 同口径。
 var MIN_THREADS = 2;
 var PREFS_KEY = 'gbcalc.prefs.v1';
 // cores / hashMB were removed from this generic pref table: the main / link / replay / vision
 // windows each have their own S, and any window's save() re-wrote them to the shared key, so a
 // stale window overwrote the value the user had just changed. They now live in ENGINE_PREF_KEY
 // and are only written on an explicit change.
+// ★★ 2026-10-18（回归修复）：「cores / hashMB 必须在这个表里」。它们是全局偏好里**最要紧**的两个
+//   字段，一旦漏掉，`gbcalc.prefs.v1` 里的线程/哈希就永远不会被 prefsApplyToS() 应用到 S ——
+//   兜底整条失效，settings.v1 一被写坏就只能回落到下拉上限（用户「线程数改了又恢复」的复发路径）。
+//   由 `.workbuddy/tmp/test-prefs.js` 的「cores 在偏好字段里」断言守住。
 var PREF_FIELDS = ['cores', 'hashMB', 'turnMs', 'rule', 'lang', 'theme',
                    'cards', 'customBase', 'aiB', 'aiW', 'linkAuto', 'linkClicks',
+                   // ★ 2026-10-24（参考 gomoku-calculator）：选点范围 / 最大深度 / 最大节点
                    'candRange', 'maxDepth', 'maxNodes'];
 function prefsAll() {
   var o = null;
@@ -6976,6 +7680,7 @@ function prefsSyncFromS() {
     var o = prefsAll(), ch = false;
     PREF_FIELDS.forEach(function (k) {
       if (S[k] === undefined) return;
+      // ★ 线程/哈希的 0 不是用户选择，是「还没初始化」——写进偏好会把用户值永久抹掉
       if (k === 'cores' && !(S[k] >= MIN_THREADS)) return;
       if (k === 'hashMB' && !(S[k] >= 1)) return;
       var a = S[k], b = o[k];
@@ -6985,6 +7690,9 @@ function prefsSyncFromS() {
     if (ch) localStorage.setItem(PREFS_KEY, JSON.stringify(o));
   } catch (e) {}
 }
+// ★★ 2026-10-17 修正：prefs **只兜底、不覆盖**。
+//   第一版写成「prefs 优先」，结果 prefs 里的旧值（3）会把用户刚选的 10 盖掉 ——
+//   又一次变成「改了又恢复」。settings 才是最后写入者，prefs 只在字段缺失/非法时补。
 function prefsApplyToS() {
   try {
     var o = prefsAll();
@@ -7028,8 +7736,12 @@ function enginePrefSet(cores, hashMB) {
   try { localStorage.setItem(ENGINE_PREF_KEY, JSON.stringify(o)); } catch (e) {}
 }
 
-
+/* ★ 2026-10-23（用户：「对局设置里加引擎权重下拉，可选不同权重，不同电脑默认搭配最佳」）
+   权重档位单独一个键 `gbcalc.engine.weights`，**不往 enginePref 的结构里塞字段** ——
+   那个键被 save()/enginePrefApplyToS() 来回读写，加字段容易在别的窗口里被写丢。
+   值：'' 未选过（跟随机器的 defaultWeightsMode）| 'nnue' | 'classic' */
 var WEIGHTS_PREF_KEY = 'gbcalc.engine.weights';
+// ★ 2026-10-24：引擎变体（'' = 自动）。同样是独立键，别混进 enginePref。
 var VARIANT_PREF_KEY = 'gbcalc.engine.variant';
 function variantPrefGet() {
   try { var v = localStorage.getItem(VARIANT_PREF_KEY); return v || ''; } catch (e) { return ''; }
@@ -7070,11 +7782,13 @@ function enginePrefApplyToS() {
 
 function savePins() { prefSet('pins', CARD_PIN); }
 
+// ★★ 2026-10-17：固定状态（引擎卡为 ✕）必须跨启动保留 —— 原来 CARD_PIN 是纯内存
+//   对象，关掉软件就回到默认 {engine:true}，用户看到的就是「显示固定了」。
 var CARD_PIN = (function () {
   var p = prefGet('pins', null);
   if (p && typeof p === 'object') {
     var o = {};
-    for (var k in p) o[k] = !!p[k];
+    for (var k in p) o[k] = !!p[k];   // 保留 false：取消固定也要跨重启
     return o;
   }
   return { engine: true };
@@ -7206,6 +7920,7 @@ function anaCalcUI() {
   if (els.btn_an_nbest) {   
     els.btn_an_nbest.textContent = (busy && G.ana.kind === 'nbest') ? T('anStop') : T('anNbest');
   }
+  // ★ 2026-10-22（用户：「点击「扫描防守」按键文字变为「停止扫描」」）
   if (els.btn_an_defend) {
     els.btn_an_defend.textContent = (busy && G.ana.kind === 'defend') ? T('anStopScan') : T('anDefend');
   }
@@ -7244,9 +7959,16 @@ function cellScore(board, x, y, c) {
   cellLines(board, x, y, c).forEach(function (l) { total += anaLineScore(l.cnt, l.open); });
   return total;
 }
+// quietLog=true：只更新分析卡片的状态栏，不往引擎仪表盘的滚动日志里再写一条。
+// ★ 2026-10-23（用户：「不要频繁出现这个文案：选一个功能键开始计算…」）：
+//   anaReset / liveAnaWipeMarks 每落一手都会调到空闲文案；若照常写日志，
+//   它会夹在「计算中」等消息之间反复出现（engMsgAdd 只去重相邻重复）。
+//   空闲提示属于「状态栏」而不是「日志」，所以这些调用一律静默。
 function renderAna(msg, quietLog) {
   if (els.anStatus) {
     els.anStatus.textContent = msg || '';
+    // ★ 2026-10-13：文案栏支持**多行**（开局提示是多条短句、用 \n 分行）。
+    //   只在真的含换行时才切 pre-line，其它单行提示的排版一字不变。
     els.anStatus.style.whiteSpace = (typeof msg === 'string' && msg.indexOf('\n') >= 0) ? 'pre-line' : '';
   }
   if (!els.anList) return;
@@ -7258,12 +7980,16 @@ function renderAna(msg, quietLog) {
            '<span class="ev">' + escHtml(r.eval) + '</span>' +
            (r.pv ? '<span class="pv">' + escHtml(r.pv) + '</span>' : '') + '</div>';
   }).join('');
+  // ★ 2026-10-22（用户：「各种文字讯息……同样也展现同步到这个框中」）：
+  //   分析卡片的状态文案（计算评估 / 多点分析 / 分析计算…）同步到引擎仪表盘消息框。
   if (!quietLog) engMsgAdd(msg);
 }
 
 function anaReset() {
   G.ana.gen++;
   anaLiveStop();
+  // ★ 2026-10-22（用户：「只有用户再次在棋盘上落子……清除这些标记」）：
+  //   落子 / 清除计算 / 重开 → 停掉常驻扫描并丢掉最后一帧（defCells 置空后 paint 自然不画）。
   defLiveStop();
   G.ana.defCells = null;
   PV_HOVER = null;
@@ -7279,7 +8005,10 @@ function anaReset() {
   renderAna(T('anIdle'), true);
 }
 
-
+/* ★ 2026-10-22（用户：「这种长live同样适应计算评估的几个功能」）：
+   「计算评估 / 多点分析」不再按轮次 analyze(350·rd) 推倒重来 —— 改用与分析计算同一套
+   LocalAI.live：一次 YXNBEST 连续加深，宿主 tick 流式回传；落子（anaReset）/ 停止 / 被
+   其它引擎请求抢占时才结束。停止时**不清**已算出的标记与列表（保留最后一帧快照）。 */
 var ANA_LIVE = { handle: null };
 function anaLiveStop() {
   if (ANA_LIVE.handle) { try { ANA_LIVE.handle.stop(); } catch (e) {} ANA_LIVE.handle = null; }
@@ -7322,17 +8051,25 @@ function anaLiveRun(kind, topN, tagKey) {
     if (now - lastUi >= 280) {
       lastUi = now;
       if (depth) els.st_depth.textContent = String(depth);
+      // 与「评估曲线」同一口径：统一折成黑方视角（正值 = 黑优），再按 AI 执子方翻成 AI 视角。
+      // ★ 2026-10-23：`if (cs[0].eval)` 会把字符串 "0" / 空串一起判掉 ⇒ 计算分析有时不刷新，
+      //   用户看到「评估」一直停在上一轮的百分比。改为「有非空值就刷」。
       if (cs[0].eval != null && String(cs[0].eval) !== '') dashEvalSet(cs[0].eval, side);
       els.st_speed.textContent = fmtSpeed(res.speed || 0);
       els.st_nodes.textContent = fmtNodes(res.nodes || 0);
       els.st_time.textContent = ((now - t0) / 1000).toFixed(1) + ' s';
       renderAna(T(kind === 'calc' ? 'anCalcRun' : 'anNbestRun').replace('{d}', String(depth || 0)));
     }
+    // ★ 引擎流式 INFO 可达每秒数百次：画布最多 ~8fps 重绘，别让「展示路线」抢 CPU。
+    // ★ 2026-10-23（用户：「提升并行计算能力，当前速度和深度都很浅很慢」）：
+    //   整盘重绘（15×15 网格 + 225 格 + 标记）实测单次 10~25ms，8fps 就要吃掉 10~20% 的
+    //   一个核 —— 和引擎抢 CPU 会直接反映成「nps 掉、深度上不去」。分析期压到 5fps。
     if (now - lastPaint >= 200) { lastPaint = now; paint(); }
   }, function (ev) {
     ended = true;
     if (gen !== G.ana.gen) return;
     ANA_LIVE.handle = null;
+    // 引擎正被 AI 落子 / 提示等请求占用：保持「评估中」，稍后自动重试，不打断别人。
     if (ev && ev.busy) {
       setTimeout(function () {
         if (gen === G.ana.gen && G.ana.busy) anaLiveRun(kind, topN, tagKey);
@@ -7361,6 +8098,8 @@ function anaDeferClear() {
 }
 function anaGuard(minStones) {
   if (RV_MODE || G.review) return false;
+  // ★ 2026-10-23（用户：「开启任何一项计算分析功能就直接自动关掉后台思考」）：
+  //   计算评估卡的所有入口都从这里进 —— 在这里让路，后台思考立刻收工，别和它抢引擎。
   bgThinkYield();
   if (LIVE_AN.on) liveAnaToggle();          
   if (G.ana.deferTmr) { clearTimeout(G.ana.deferTmr); G.ana.deferTmr = null; }  
@@ -7368,6 +8107,7 @@ function anaGuard(minStones) {
   if (G.moves.length < (minStones || 0)) { renderAna(T('anEmpty')); return false; }
   return true;
 }
+// 多主变下限放到 1（= 只回最优一点），与官方 multi-pv 的取值范围一致。
 function anaIp() { return Math.max(1, Math.min(8, Math.round(+S.nbest || 3))); }
 
 async function anaCalc() {
@@ -7379,27 +8119,40 @@ async function anaCalc() {
   setPvLine([]);
   anaMark(els.btn_an_stop);
   renderAna(T('anCalcRun').replace('{d}', '0'));
-  anaLiveRun('calc', 1, 'tagCalc');
+  anaLiveRun('calc', 1, 'tagCalc');            // ★ 常驻深算：不再按轮次重启
 }
 
-
+/* ★★ 2026-10-22（用户：「扫描防守功能完全按照这个整合包里面的算法」）：
+   不再用本地启发式 defendLWR / defendMateAt 逐点估威胁，改走引擎原生
+   `YXSEARCHDEFEND`（Rapfi command/gomocup.cpp: searchDefend ⇒ multiPV = 全盘合法点）。
+   宿主先补一手 PASS 把行棋方让给对手，于是每个候选的 WINRATE 就是
+   「对手下在这里」的胜率 = 该点危险度（与整合包扫描同一口径）。
+   页面用一条常驻 live 搜索持续加深（越算越准），停止时保留最后一帧。 */
 var DEF_LIVE = { handle: null, gen: 0 };
 function defLiveStop() {
   DEF_LIVE.gen++;
   if (DEF_LIVE.handle) { try { DEF_LIVE.handle.stop(); } catch (e) {} DEF_LIVE.handle = null; }
 }
+// 五档优先级样式（用户：第 1 档大圆环，2/3/4 依次缩小、透明度升高，
+// 最小圆环半径 = 最大的一半；文字缩小幅度更低；第 5 档 = 数字 + 更细的小环）。
 var DEF_TIERS = [
-  { rf: 1.00, ff: 1.00, ring: 0.98, fill: 0.30, lw: 1.00 },
-  { rf: 0.84, ff: 0.93, ring: 0.82, fill: 0.23, lw: 0.82 },
-  { rf: 0.68, ff: 0.86, ring: 0.64, fill: 0.17, lw: 0.68 },
-  { rf: 0.50, ff: 0.78, ring: 0.46, fill: 0.11, lw: 0.56 }
+  { rf: 1.00, ff: 1.00, ring: 0.98, fill: 0.30, lw: 1.00 },  // 1 档
+  { rf: 0.84, ff: 0.93, ring: 0.82, fill: 0.23, lw: 0.82 },  // 2 档
+  { rf: 0.68, ff: 0.86, ring: 0.64, fill: 0.17, lw: 0.68 },  // 3 档
+  { rf: 0.50, ff: 0.78, ring: 0.46, fill: 0.11, lw: 0.56 }   // 4 档（半径 = 1 档的一半）
 ];
+// ★ 2026-10-23（用户：「有时，2，3，4 等级也不止 2-3 个点，详细参考 Rapfi 整合包的方法」）：
+//   档位按**胜率绝对值**分档（高低危由实时胜率决定，不按名次切固定份数）。
+// ★ 2026-10-23 二次调整（用户：「有时候胜率都挺高的，导致几乎都是大圆环；前三档集中
+//   在 85% 左右，第五档范围更大一点，第四档范围也不小」）：
+//   1~3 档收紧到 85~100（5 个百分点一档），4 档 70~85，5 档 <70 铺纯数字 ——
+//   普通局面下 80% 左右的点不再画成最大圆环；只有真正的必防点（≥95%）才用最大环。
 function defendTierOf(pct) {
   if (pct >= 95) return 1;
   if (pct >= 90) return 2;
   if (pct >= 85) return 3;
   if (pct >= 70) return 4;
-  return 5;
+  return 5;                                                   // <70%：低位 / 弱危点，纯数字铺开
 }
 function anaDefendStop() {
   if (G.ana.kind !== 'defend') return;
@@ -7437,6 +8190,9 @@ function anaDefend(renew) {
       return c && c.x >= 0 && c.y >= 0 && !(G.board[c.y] && G.board[c.y][c.x]);
     });
     if (!cs.length) return;
+    // ★ 2026-10-23（用户：「有的点都重叠了」）：同一坐标只保留一条（取胜率更高的）。
+    //   引擎每轮重发全点 PV，宿主在 NUMPV 变少时会残留旧尾巴 —— 两条同坐标叠画，
+    //   看起来就是一个点被画了两遍、数字互相压。
     var seen = {}, cells = [];
     cs.forEach(function (c) {
       var pct = Math.round((typeof c.winrate === 'number' ? c.winrate : 0.5) * 100);
@@ -7462,21 +8218,30 @@ function anaDefend(renew) {
       els.st_speed.textContent = fmtSpeed(res.speed || 0);
       els.st_nodes.textContent = fmtNodes(res.nodes || 0);
       els.st_time.textContent = ((now - t0) / 1000).toFixed(1) + ' s';
+      // ★ 2026-10-23（用户：「『评估』点扫描防守也要动态显示」）：以前这里写的是最高危点的
+      //   防守百分比（截图里那个 100%），跟「评估」这个字段名不符。现在给真实的引擎评估分：
+      //   扫描防守先补了一手 PASS 把行棋方让给对手，所以引擎 EVAL 是「对手视角」，
+      //   折算用的行棋方必须是 PASS 之后的 `3 - curColor()`（原来的写法漏了这一翻转）。
       var scSide = 3 - curColor();
       if (cells[0] && cells[0].evalTxt) dashEvalSet(cells[0].evalTxt, scSide);
       els.st_best.textContent = cells[0] ? coordName(cells[0].x, cells[0].y) : '-';
     }
+    // 列表 / 消息框 ~1s 刷一次（engMsgAdd 只在上一条不同时才追加，深度不变就不刷屏）
     if (now - lastAna >= 1000) {
       lastAna = now;
       renderAna(T('anScanRun').replace('{d}', String(depth || 0)).replace('{c}', String(cells.length)));
     }
+    // ★ 2026-10-23（用户：「速度和深度都很浅很慢」）：扫描防守一帧要画 90+ 个圆环 + 描边数字，
+    //   单次重绘 20~35ms；120ms 一次等于常年占掉 1/4 个核，和引擎抢 CPU。压到 3fps 足够看。
     if (now - lastPaint >= 320) { lastPaint = now; paint(); }
   }, function (ev) {
     ended = true;
-    if (gen !== G.ana.gen) return;
+    if (gen !== G.ana.gen) return;                 // 落子 / 停止 / 重开：由 anaReset 收尾
     DEF_LIVE.handle = null;
-    if (ev && ev.busy) {
+    if (ev && ev.busy) {                           // 引擎被 AI 落子等占用：稍后自动续扫
       setTimeout(function () {
+        // ★ 注意：anaGuard 见到 busy 会直接拒绝，所以续扫前先把本轮状态收回；
+        //   否则扫描会永远停在「停止扫描」状态却再也没跑起来。
         if (gen === G.ana.gen && G.ana.busy && G.ana.kind === 'defend') {
           G.ana.busy = false; G.ana.kind = '';
           anaDefend();
@@ -7485,6 +8250,7 @@ function anaDefend(renew) {
       return;
     }
     if (!G.ana.busy || G.ana.kind !== 'defend') return;
+    // 引擎侧异常结束：保留最后一帧（不擦标记），按钮复位。
     G.ana.busy = false; G.ana.kind = ''; G.ana.autoDefend = false;
     anaMark(null);
     renderAna(ev && ev.error ? T('offline')
@@ -7494,6 +8260,8 @@ function anaDefend(renew) {
   if (!ended && gen === G.ana.gen) DEF_LIVE.handle = h;
 }
 
+// ★ 2026-10-23（用户：「扫描防守由原来的红色系列渐变变成稍偏白天蓝色系列渐变」）：
+//   统一到天蓝色系：高危 = 更深的晴蓝，低危 = 偏白的浅天蓝（不再出现红 / 橙 / 黄）。
 function defendColor(pct) {
   var B = [[90, 'hsl(214,72%,52%)'], [80, 'hsl(211,72%,54%)'], [70, 'hsl(208,71%,56%)'],
            [60, 'hsl(205,70%,58%)'], [50, 'hsl(202,68%,60%)'], [40, 'hsl(199,66%,62%)'],
@@ -7505,6 +8273,7 @@ function defendColor(pct) {
 
 function renderDefendMarks(cells) {
   G.ana.defCells = cells;
+  // 盘面标记由 drawDefendMarks() 统一绘制；G.ana.marks 留空避免叠旧徽标。
   G.ana.marks = [];
   G.ana.rows = cells.slice(0, 8).map(function (c, i) {
     return { i: i, badge: String(i + 1),
@@ -7514,11 +8283,21 @@ function renderDefendMarks(cells) {
   });
 }
 
+// 扫描防守的棋盘标记（五级）：
+//   1~4 档 = 由大到小的圆环 + 半透明填充，透明度随档次升高；
+//   5 档 = 边角/低危点，数字外只套一圈更细的小环（扫盘式，几乎全覆盖）。
 function defendAlpha(col, a) {
   return String(col).replace(/^hsl\((.*)\)$/, 'hsla($1,' + a.toFixed(2) + ')');
 }
 function drawDefendMarks(ctx, cells, pad, gap) {
+  // ★ 2026-10-23（用户：「最大的圆圈要小一点，应该和大小棋子相等」）：
+  //   棋子半径是 gap*0.47；圆环外沿 = r + 线宽/2，所以 r0 收到 gap*0.43，
+  //   外沿约 0.45*gap —— 视觉上与棋子等大（不再比棋子大一整圈）。
   var r0 = Math.max(8, gap * 0.43);
+  // ★ 2026-10-23（用户：「第4、5档的数字大小应该和第三档是一样的，当前字号有点大」）：
+  //   4/5 档字号不再单独按 gap*0.225 放大，而是**直接复用第 3 档的算法**
+  //   （r3 = r0*rf[3档]、fs = r3*0.56*ff/rf，与 drawRingLabels 内完全同一公式），
+  //   这样同一盘面下 4/5 档与 3 档的数字严格同高，且随盘面尺寸同比缩放。
   var r3 = Math.max(8, r0 * DEF_TIERS[2].rf);
   var fs5 = Math.max(9, r3 * 0.56 * (DEF_TIERS[2].ff / DEF_TIERS[2].rf));
   var by = [[], [], [], [], []];
@@ -7529,6 +8308,9 @@ function drawDefendMarks(ctx, cells, pad, gap) {
       var pct = Math.max(0, Math.min(100, Math.round(c.pct || 0)));
       var col = defendColor(pct);
       if (t >= 3) {
+        // ★ 2026-10-23（用户：「第四档和第五档的数字大小是一样的，并且都不是透明的」）：
+        //   4 / 5 档共用同一套绘制：**同字号、同字重、完全不透明**的纯数字，外围一圈
+        //   同尺寸细环（4 档略粗、5 档更细）。4 档不再画半透明填充，避免低危点也像大圆环。
         ctx.save();
         ctx.beginPath();
         ctx.arc(px, py, r0 * DEF_TIERS[3].rf, 0, Math.PI * 2);
@@ -7549,13 +8331,28 @@ function drawDefendMarks(ctx, cells, pad, gap) {
       var r = Math.max(8, r0 * ti.rf);
       ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
       ctx.fillStyle = defendAlpha(col, ti.fill); ctx.fill();
+      // ★ 2026-10-23（用户：「圆环再稍细一点，仅次于比第二个等级粗一点点」）：
+      //   1 档线宽 gap*0.044（原 gap*0.072），2 档 gap*0.031 —— 只粗约四成。
       ctx.lineWidth = (t === 0 ? Math.max(1.6, gap * 0.044) : Math.max(1, gap * 0.038 * ti.lw));
       ctx.strokeStyle = defendAlpha(col, ti.ring); ctx.stroke();
+      // 字号缩小幅度低于圆环（ff/rf > 1），小环里也看得清；
+      // ★ 2026-10-23：1~3 档只占总盘面 15 个百分点的窄带，保留百分比 + 由大到小的圆环；
+      //   4/5 档才用纯数字（见上）。
       drawRingLabels(ctx, px, py, r, pct + '%', '', ti.ff / ti.rf, 2.0 + t * 0.1);
     });
   }
 }
 
+// ★★ 2026-10-22（用户：「开启计算分析这个按键的时候，引擎总是会思考打断，导致一遍遍再重新计算，
+//   错失了很多真正的优势点……要持续计算，不能打断」）：
+//   旧实现的 LIVE_AN 是「按轮次」的：每轮 analyze(roundMs) 到点收官 → 再重发 YXBOARD 重开，
+//   预算还会 ×1.3 逐轮放大。每一轮都把上一轮的迭代加深成果丢掉，深搜优势点根本来不及长出来。
+//   现在改成**一条常驻搜索**：宿主 op=live 把 TIMEOUT_TURN 放到 1 小时、不设截止时间，
+//   引擎在同一个盘面上一直加深，tick 以 ~120ms 的节奏把 INFO 流回页面。
+//   只有三种情况会结束这条搜索：
+//     ① 用户在棋盘上点击（立刻 STOP、标记立刻消失，随后按新盘面重开）；
+//     ② 点「停止分析」（冻结此刻的标记 / 胜率 / 分数 / 深度，不再改）；
+//     ③ AI 落子抢占（盘面必然变化，等同 ①）。
 var LIVE_AN = {
   on: false, gen: 0, handle: null, items: [], picked: [], depth: 0,
   timer: 0, key: '', t0: 0, frozen: false, lastUi: 0,
@@ -7563,7 +8360,7 @@ var LIVE_AN = {
 
 function liveAnaWanted() {
   if (linkSessionOn()) return false;
-  if (S.mode === 'pve' && isAiColor(curColor())) return false;
+  if (S.mode === 'pve' && isAiColor(curColor())) return false;   // 轮 AI 走：等它落子后再说
   return LIVE_AN.on && !RV_MODE && !G.review && !G.over && aiDecorOn() && !aiVsAi();
 }
 
@@ -7612,19 +8409,33 @@ function liveAnaToggle() {
   liveAnaUI();
   if (LIVE_AN.on) {
     aiStandDown();
-    bgThinkStop();
-    anaLiveStop();
-    liveAnaWipeMarks();
+    bgThinkStop();               // ★ 后台思考让位给「分析计算」（同一局面，live 直接接管）
+    anaLiveStop();               // ★ 若「计算评估 / 多点分析」的常驻搜索还在跑，先停它
+    liveAnaWipeMarks();          // 重新开始：清掉上一次（含冻结快照）的标记
     LIVE_AN.frozen = false;
     LIVE_AN.t0 = 0; LIVE_AN.depth = 0;
     liveAnaStart();
   } else {
-    liveAnaFreeze();
+    liveAnaFreeze();             // 停止：保留此刻的标记 / 胜率 / 分数 / 深度
   }
 }
 
+// —— 分析计算：按「分析点数」（S.nbest，1~8）收点；只收「跟最佳点足够接近」的候选 ——
+// ★ 2026-10-25（用户：「分析点数对应棋盘下面的分析计算」）：原来这里硬卡 4 个、
+//   liveAnaStart 里还写死 topN: 4，导致对局设置的「分析点数」对分析计算完全无效。
+//   现在上限 = anaIp()：引擎按 YXNBEST N 回 N 个点，这里再按接近度**最多**取 N 个。
+//   门槛阶梯：前 3 名 8%/5%/3%（与旧行为完全一致），第 4 名起每多一名放宽 2 个百分点
+//   —— 否则点名次越靠后越难通过，用户把点数调到 6/8 却只出 2~3 个，设置形同虚设。
+//   比较加 EPS：胜率差正好压线时（0.030000000000000027 这种浮点尾巴）别被 strict > 挡掉。
 var LIVE_PICK_LIM = [0.08, 0.05, 0.03, 0.05, 0.07, 0.09, 0.11];
 
+// ★★ 2026-10-25（用户：「分析的点数，有的是同一点…如果重合，去掉评分低的那个」
+//   随后：「只是引擎里面这样做」）：
+//   候选去重**只在引擎回执层做**（desktop-connect/src/engine_host.cpp 的 ResJson：
+//   按 (x,y) 保序去重，同名点保留名次/评分更高的那条）。页面不再重复实现一遍 ——
+//   两个 UI（连线版 / 练习器）读同一份回执，逻辑集中一处，也不会出现「页面去重了、
+//   练习器没去重」这种两边不一致。
+//   所以下面两条链路（anaLiveRun / liveAnaApply）直接吃 res.candidates 就是去重过的。
 
 function liveAnaPick(cs, n) {
   if (!cs || !cs.length) return [];
@@ -7646,9 +8457,10 @@ function liveAnaApply(res) {
   });
   LIVE_AN.items = cs;
   LIVE_AN.picked = liveAnaPick(cs, anaIp());
+  // 仪表盘「路线」小框跟随实时最佳路线（此前 map 时把 line 丢了 → 路线框一直是空的）
   setPvLine((cs[0] && cs[0].line) || [], liveAnaSide());
   if (LIVE_AN.picked.some(function (c) { return /^[+-]?M\d+$/i.test(String(c.ev)); }))
-    LIVE_AN.mate = true;
+    LIVE_AN.mate = true;               // 已算出必杀/必败：不再重开，保留这条终局结果
   var d = (res && res.depth) || 0;
   if (d > LIVE_AN.depth) LIVE_AN.depth = d;
   G.ana.marks = LIVE_AN.picked.map(function (c, i) {
@@ -7660,6 +8472,7 @@ function liveAnaApply(res) {
     liveAnaRows();
     renderAna(T('liveAnaRun').replace('{d}', String(LIVE_AN.depth || 0)));
   }
+  // ★ 引擎流式 INFO 可达每秒数百次：画布最多 ~8fps 重绘，别让「展示路线」抢 CPU。
   if (now - (LIVE_AN.lastPaint || 0) >= 120) { LIVE_AN.lastPaint = now; paint(); }
 }
 function liveAnaRows() {
@@ -7672,7 +8485,7 @@ function liveAnaRows() {
 
 function liveAnaStart() {
   if (!LIVE_AN.on) return;
-  if (!liveAnaWanted()) return;
+  if (!liveAnaWanted()) return;              // 轮 AI / 已结束 / 复盘 / 连线：不重开，等盘面变化再拉
   var gen = ++LIVE_AN.gen;
   liveAnaStopJob();
   var mvN = G.moves.length;
@@ -7682,6 +8495,7 @@ function liveAnaStart() {
   if (!LIVE_AN.t0) LIVE_AN.t0 = Date.now();
   G.ana.busy = true; G.ana.kind = 'live';
   renderAna(T('liveAnaRun').replace('{d}', String(LIVE_AN.depth || 0)));
+  // ★ 引擎忙时 LocalAI 会**同步**回调 onEnd（busy）——用 ended 兜住，别把已结束的 handle 存回去。
   var ended = false;
   var h = LocalAI.live({
     board: G.board, moveList: [], matchMs: 600000, turnMs: 3600000, timeUsedMs: 0,
@@ -7706,6 +8520,7 @@ function liveAnaScheduleRetry(ms) {
   LIVE_AN.timer = setTimeout(function () { LIVE_AN.timer = 0; liveAnaStart(); }, ms || 350);
 }
 
+// 停止分析：**不做排名筛选、不重排**，原样保留停止那一刻计算出来的标记 / 胜率 / 分数 / 深度。
 function liveAnaFreeze() {
   LIVE_AN.on = false;
   LIVE_AN.gen++;
@@ -7722,9 +8537,10 @@ function liveAnaFreeze() {
   });
   renderAna(T('liveAnaStopped').replace('{d}', String(LIVE_AN.depth || 0)));
   paint();
-  bgThinkSchedule(300);
+  bgThinkSchedule(300);          // ★ 后台思考接着跑（冻结的标记不受影响）
 }
 
+// 用户点了棋盘：立刻停算 + 立刻清标记，然后按当前盘面重新计算（点空位没落子也要重开）。
 function liveAnaTouch(restartMs) {
   if (!LIVE_AN.on && !LIVE_AN.frozen) return false;
   LIVE_AN.gen++;
@@ -7740,26 +8556,40 @@ function liveAnaTouch(restartMs) {
   return true;
 }
 
+// 盘面变化（落子 / 悔棋 / 重做 / AI 落子）：停算清标记后按新盘面重开。
 function liveAnaBoardChanged() {
   liveAnaTouch(120);
 }
 
-
+/* ★ 2026-10-22（用户：「在对局设置中的对局，添加一个后台思考的选择键，参考这个网站，
+   五子棋计算器的预热算法」）：
+   gomocalc 的「后台思考」= 空闲时引擎也不停（速度/节点持续上涨），关掉就只在轮到引擎时算。
+   这里用**最低优先级**的常驻 live 搜索（topN 1、无截止）养热置换表；不画任何棋盘标记、
+   不写「路线」框，只把速度/节点/深度实时喂给仪表盘。任何真正的 ask（AI 落子 / 计算评估 /
+   多点分析 / 平衡 / 防守 / 教练 / 前瞻）都会把它抢占，结束后自动续上 —— 不与主功能抢车道。
+   轮 AI 时它让路：AI 自己按「思考时间」算，算完再由这里接管。 */
 var BG_AN = { gen: 0, handle: null, key: '', timer: 0 };
 
+// 后台思考「为什么必须让路」的原因码（空串 = 没被占用，可以跑）
+// ★★ 2026-10-23（用户：「如果检测用户开启任何一项计算分析功能，以及 AI 黑白同时开（AI 对打），
+//   直接自动关掉后台思考；后台思考算法对齐 gomocalc」）：
+//   后台思考与所有分析功能共用同一个引擎实例（LocalAI 单实例 + exclusive 抢占），
+//   同时跑只会互相打断 —— 严格成「任何计算一开，后台思考立刻收工」。
 function bgThinkBusyBy() {
-  if (aiVsAi()) return 'ai';
-  if (LIVE_AN.on) return 'an';
-  if (G.ana && G.ana.busy) return 'an';
-  if (G.fwd && G.fwd.busy) return 'fwd';
+  if (aiVsAi()) return 'ai';                 // AI 对打：两个 AI 轮流占引擎，后台思考无处可用
+  if (LIVE_AN.on) return 'an';               // 分析计算（常驻深算）
+  if (G.ana && G.ana.busy) return 'an';      // 计算评估卡：计算 / 多点 / 平衡 / 扫描防守
+  if (G.fwd && G.fwd.busy) return 'fwd';     // 前瞻 · VCF · VCT
   return '';
 }
+// 「让路」：立刻停掉正在跑的后台思考（连排队中的定时器一起清），并把状态写到开关下面那行提示。
 function bgThinkYield() {
   if (bgThinkBusyBy() || !bgThinkWanted()) {
     if (BG_AN.handle || BG_AN.timer) bgThinkStop();
   }
   bgThinkHintSync();
 }
+// 开关下方的动态状态：有计算在跑 / AI 对打时，明确写出「已自动暂停」，避免用户以为算法卡住了。
 function bgThinkHintSync() {
   var h = els.t_bgThinkHint;
   if (!h) return;
@@ -7769,11 +8599,15 @@ function bgThinkHintSync() {
   var tag = '';
   if (why === 'ai') tag = T('bgThinkOffAi');
   else if (why) tag = T('bgThinkOffBusy');
+  // base 现在是空的（说明文案已从开关下面移走）⇒ 有状态时只显示那一句，不补前导点号。
   var want = tag ? (base ? (base + ' · ' + tag) : tag) : base;
-  if (h.textContent !== want) h.textContent = want;
+  if (h.textContent !== want) h.textContent = want;   // 只在真的变了才写，避免 refreshUI 高频触发重排
   h.classList.toggle('bg-off', !!tag);
 }
 
+// ★ 2026-10-23（用户：「不要一上来就显示，去掉灯泡，只有打开后台思考才展示一次」）：
+//   只在**用户主动开启后台思考**时往 log 栏写一次说明（sessionStorage = 每次启动最多一次），
+//   平时不占任何版面。
 function bgThinkIntroOnce() {
   try {
     if (sessionStorage.getItem('gb.bgThinkIntro')) return;
@@ -7783,12 +8617,15 @@ function bgThinkIntroOnce() {
 }
 
 function bgThinkWanted() {
-  if (!S.bgThink || G.engineOffline || bgThinkBusyBy()) return false;
+  if (!S.bgThink || G.engineOffline || bgThinkBusyBy()) return false;   // 任何分析在跑 ⇒ 让路
+  // ★★ 2026-10-24（用户：「关闭 AI 执黑和执白后引擎应该休息；现在 CPU 常年 90%+，内耗把质量拖低了」）：
+  //   双方都不是 AI ⇒ 这一路搜索**没有任何 AI 会用到它的置换表**，纯烧 CPU，还会和识别/UI 抢核。
+  //   这就是「虚高的占用」最直接的那一块。
   if (!S.aiB && !S.aiW) return false;
   if (S.mode !== 'pve' || S.paused) return false;
   if (linkSessionOn() || LINK_MODE || VIS_MODE || RV_MODE || G.review || G.over || G.busy) return false;
   if (openActive()) return false;
-  if (isAiColor(curColor())) return false;
+  if (isAiColor(curColor())) return false;           // 轮 AI：让它自己算
   return true;
 }
 function bgThinkKeyNow() { return G.moves.length + ':' + curColor() + ':' + boardFp(); }
@@ -7813,10 +8650,28 @@ function bgThinkKick(ms) {
   BG_AN.key = key;
   bgThinkSchedule(ms == null ? 200 : ms);
 }
+// ★★ 2026-10-25（用户：「调研 gomoku-calculator 的后台思考逻辑，我们的是错的；应该是计算对手
+//   可能下的优势点，并在此基础上算我们最好落在哪；现在打开后台思考可能影响准度」）：
 //
+//   旧实现：这里用 `LocalAI.live` 起一条**常驻 live 搜索**（turnMs=3600000，每 120ms 吐 INFO
+//   回页面）来充当「后台思考」。问题有三：
+//     ① 它把引擎原生 pondering 顶掉了（同一实例，live 请求会 STOP + 整盘重发），
+//        等于每落一子都重新 newGame 一次，board 历史与热置换表都白攒；
+//     ② 引擎在 ponder 模式下**本来就不打印**任何 INFO（searchoutput.cpp: inPonder 静默），
+//        旧实现却让它每秒回吐上百行 tick —— 宿主解析 + WebView2 消息泵白吃 CPU，
+//        和引擎抢物理核（8 线程已经吃满 8 个物理核）；
+//     ③ 与 gomoku-calculator 的语义不一致：那边是 INFO PONDERING 1，引擎落子后
+//        **自己**在「对手回合」的局面继续加深，界面一个字都不收。
 //
-function bgThinkStart() {  }
+//   新实现：后台思考 = 引擎原生 pondering。开启路径只有一条 —— aiMove 的请求带
+//   pondering=true（见 analyze 调用处）。落子后引擎自动 board->move() 并 startThinking(ponder)，
+//   在「对手（人）该走」的局面里持续加深 = 算对手优势点 + 我方应对；
+//   人一落子，宿主的 TURN/整盘请求直接复用这张置换表。
+//   所以这里不再需要启动任何搜索：保留函数只为兼容既有调用点（bgThinkKick/Schedule）。
+function bgThinkStart() { /* 原生 pondering：无需页面侧搜索，见上方说明 */ }
 
+// 关掉开关 / 让路时让引擎立刻收工：原生 pondering 不会自己停（inPonder 屏蔽所有时限），
+// 只有新命令或 STOP 才会结束它。正在算 AI 自己那一手 / 有分析在跑时不要插嘴。
 function bgThinkHaltEngine() {
   if (G.busy) return;
   if (G.ana && G.ana.busy) return;
@@ -8691,6 +9546,9 @@ function evalQuietAi() {
   if (G.busy) gAiGen++;                       
 }
 
+// ★★ 2026-10-17（用户口径）：「AI 落子（人机/自我对弈）占满车道；用户点计算分析、扫描防守
+//   这类功能时，那个功能也占满车道 —— 但 AI 落子这条先停掉，AI 不用再落子，自动关闭黑白 AI 执子。」
+//   所以这里做两件事：① 关执子 + 作废当前这一手；② 让 worker 对三条车道发 STOP，把引擎整条让出来。
 function aiStandDown() {
   evalQuietAi();
   try { LocalAI.stopLane('main'); } catch (e) {}
@@ -9052,7 +9910,7 @@ function fwdCommit() {
 
 function anaStop() {
   G.ana.gen++;
-  anaLiveStop();
+  anaLiveStop();                 // ★ 停引擎，但**不清**最后一帧标记 / 列表 / 路线
   if (G.ana.defTimer) { clearTimeout(G.ana.defTimer); G.ana.defTimer = null; }
   G.ana.defWinUntil = 0; G.ana.defRefining = false;
   G.ana.busy = false; G.ana.kind = '';
@@ -9073,9 +9931,20 @@ async function anaNbest() {
   setPvLine([]);
   anaMark(els.btn_an_nbest);
   renderAna(T('anNbestRun').replace('{d}', '0'));
-  anaLiveRun('nbest', N, 'tagNbest');
+  anaLiveRun('nbest', N, 'tagNbest');          // ★ 常驻深算：一次 YXNBEST 连续加深
 }
 
+// 平衡定式表（**黑 1 固定天元型**）—— 同时充当「无禁手公式」与「有禁手公式」：
+//   两张公式在「黑 1 天元」这个走法下收敛到同一批三手（白 2 走斜 I9(8,8) 或直 H9(7,8)，
+//   黑 3 按官方表取点）。逐条引擎实测（RapfiEngine-avx512vnni，YXBALANCETWO 取
+//   「白这一手＋黑应手」这一对最接近 0 的分，≤ 50 = 官方 balanceWindow 内的「平」）：
+//     · 无禁手（rule 0）：|评估| 1~44 → 26/26 平衡
+//     · 有禁手（rule 2）：|评估| 1~17 → 26/26 平衡
+//   ⇒ 只保留平衡定式，**必胜定式一条都不加**（用户：「无禁手公式+有禁手公式，
+//     只利用里面的平衡定式，必胜定式不可添加」）。
+//   注：连线版（bridge.js）那边不走「黑 1 天元」固定式，而是整组三手直接用，所以它
+//   用的是**分开的两张表**：无禁手 = 官方 Swap2 三手 9 组（实测 9/9 平衡）、
+//   禁手 = 下面这张 RIF 26。两条线路各按各的走法取表，不混用。
 var BAL_OPEN_TJ = [
   [[7, 7], [8, 8], [9, 9]],
   [[7, 7], [8, 8], [9, 8]],
@@ -9104,6 +9973,11 @@ var BAL_OPEN_TJ = [
   [[7, 7], [7, 8], [8, 6]],
   [[7, 7], [7, 8], [9, 5]],
 ];
+// ★ 2026-10-13 已**停用**（保留仅为对照，勿再调用）：这是「从对弈引擎的候选里挑
+//   |评估| 最小的一个」的老口径。它的问题是把**对弈引擎的分**当平衡点的分用 ——
+//   实测禁手盘面 YXNBEST 8 给 +546（无禁手同盘才 +12），挂到「平衡点」名下就是
+//   用户报的「接近 1000 分的误差」。现在的口径：平衡点只认平衡引擎（YXBALANCETWO），
+//   拿不到就如实报 anBalNoEngine，绝不用对弈引擎顶替。
 function balClosestToZero(cands, nearC, nearR) {
   if (!cands || !cands.length) return null;
   var scope = cands;
@@ -9122,6 +9996,20 @@ function balClosestToZero(cands, nearC, nearR) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 开局三平衡点 = 黑 1 固定天元 + 引擎原生平衡搜索**成对**给出的（白 2, 黑 3）。
+//   「哪一点最平」**完全交给引擎**：Rapfi 的 balance 模式内部按
+//   balancedValue(v,bias) = -|v-bias|+bias 排序（bias = 0 ⇒ 取 |评估| 最小，即最接近
+//   和棋的那一手），并用 balanceWindow(50) 判定够不够平。页面只做「合法性复核 +
+//   把引擎给的评估分如实报出来」，不自造打分、不碰平衡算法本身。
+// ★★ 2026-10-13 **撤掉中心区间锁**（上一轮锁 3×3 / 5×5 是错的）。用户：
+//   「一定要分清有禁手和无禁手，有时候这三个平衡点不仅仅只在中心那几个位置，光靠中心
+//     那几个位置很难做出真正的平衡点，一直使用的是有禁手模式的平衡点」。
+//   实测（黑 1 天元后一次 YXBALANCETWO，1.5s/手）：
+//     不锁（本轮）        无禁手 |评估| 14~44 / 禁手 25~43   ← 平衡对的第 2 点常在 d=3
+//     锁中心 3×3 / 5×5    禁手 |评估| = M4（锁完直接算出杀棋！）← 锁死 = 把平衡点挤没了
+//     逐手单点 ONE（更早） 无禁手 486 / 禁手 297               ← 那才是「一眼看出谁占优」
+//   禁手 / 无禁手的区别不再靠「锁区间」体现，而是靠**传给引擎的 rule**：禁手规则下
+//   引擎的着法生成会自动剔掉黑方禁手点，无禁手不会 —— 那才是规则真正该管的事。
 function balLegalAt(board, x, y, side) {
   if (!board[y] || board[y][x]) return false;
   if (side === 1 && renjuRule() && vcxForbidden(board, x, y)) return false;
@@ -9129,6 +10017,16 @@ function balLegalAt(board, x, y, side) {
 }
 
 var _balCidSeq = 0;
+// 开局平衡点的**退化通道**：一次 YXBALANCETWO 拿不到成对答案时才走这里。
+//   (1) 原生 **YXBALANCETWO**（成对）—— 只取这一对的第 1 手（联合平衡的那一手）。
+//       不再用单点 YXBALANCEONE：实测它在近乎空盘上评估 −350~−470，报出来就是
+//       「评估差距过大」；成对搜索才把分差压回 0 附近。
+//   (2) 再来一轮 n=2（引擎内部逐轮 YXBLOCK 掉上一手 ⇒ 依次给出次优平衡点），
+//       只为兜住偶发超时 / 禁手点 / 已被占用的点。
+//   ★ 绝不退回 analyze()（= 对弈引擎 YXNBEST）：那样开局点就变成「对弈引擎算出来的
+//     最好一手」而不是「平衡搜索给出的最平一手」，正是用户报的
+//     「开局还是调用的原对弈引擎而不是平衡引擎」。拿不到就交回 null，
+//     由 openBalChain → anaBalPoints 走**官方定式**兜底（仍是黑 1 天元开局）。
 async function balBalancedPick(board, side, rule, turnMs, gen, lane) {
   var qMs = Math.max(600, Math.min(1500, Math.round((turnMs || 2000) * 0.6)));
   var cid = 'calc-openbal-' + side + '-' + (++_balCidSeq);
@@ -9156,15 +10054,28 @@ async function balBalancedPick(board, side, rule, turnMs, gen, lane) {
   return null;
 }
 
+// 开局三手：黑 1 = 天元（固定），白 2 / 黑 3 用**一次 YXBALANCETWO 成对取出**。
+//   Rapfi 的 BALANCE_TWO 会在根节点枚举「白 2 + 黑 3」这两手的所有组合，按
+//   balancedValue(v,bias) = -|v-bias|+bias（bias=0 ⇒ |评估| 最小）取最接近和棋的一对。
+//   ★★ **成对才平**：单点 YXBALANCEONE 是按「白 2 自己最小 |分|」挑的，抵消不了
+//     「黑 2 子 vs 白 1 子」的先天优势。实测（黑 1 天元后，1.5s/手）：
+//       ONE → -486（无禁手）/ -297（禁手）       ← 就是用户看到的「一眼看出谁占优」
+//       TWO →  +14（无禁手）/ +25~43（禁手）     ← 官方 balanceWindow(50) 内才算「平」
+//     （ScalingFactor = 200 ⇒ 胜率 = sigmoid(V/200)：50 ⇒ 56%，120 ⇒ 65%）
+//   ★★ **不加中心区间锁**：实测把白 2 锁进天元 3×3 之后，禁手侧直接算出杀棋
+//     （|评估| = M4）—— 锁死等于把平衡点挤没了。禁手 / 无禁手的区别靠 rule 参数
+//     （引擎的着法生成会自己剔掉黑方禁手点），不靠锁区间。
+// 返回 [{x,y,color,seq}]，长度 1~3（引擎不可用时会短于 3，上层退官方定式）。
 async function openBalChain(rule, turnMs, gen) {
   var c = (N - 1) >> 1;
   var board = G.board.map(function (r) { return r.slice(); });
   var out = [], stones = 0;
   for (var y = 0; y < N; y++) for (var x = 0; x < N; x++) if (board[y][x]) stones++;
   if (!stones) { board[c][c] = 1; stones = 1; out.push({ x: c, y: c, color: 'b', seq: '1' }); }
-  if (out.length !== 1) return out;
+  if (out.length !== 1) return out;                 // 盘上已有子 ⇒ 不属于「开局三手」
   var qMs = Math.max(600, Math.min(2000, Math.round((turnMs || 2000) * 0.8)));
   G.ana.balEval = null; G.ana.balMode = null;
+  // (1) 首选：一次 YXBALANCETWO ——（白 2, 黑 3）成对平衡
   var j2 = null;
   try {
     j2 = await apiBalance({
@@ -9186,6 +10097,7 @@ async function openBalChain(rule, turnMs, gen) {
     }
     board[pair[0][1]][pair[0][0]] = 0;
   }
+  // (2) 退化：成对拿不到 / 落点非法 ⇒ 单点 ONE 逐手取（同样不锁中心区）
   var sides = [2, 1], lanes = ['sub', 'sub'];
   for (var i = 0; i < sides.length && out.length < 3; i++) {
     var p = null;
@@ -9200,18 +10112,28 @@ async function openBalChain(rule, turnMs, gen) {
   return out;
 }
 
+// 平衡点完成提示：把引擎给的**评估分**一并报出来 —— 用户要的判据就是
+// 「分差应该在 0 附近才可以」，光给坐标看不出平不平。|ev| ≤ 50（官方 balanceWindow）
+// 是「平」，越大越不平（ScalingFactor=200 ⇒ 50→56% 胜率，486→91%）。
 function balDoneMsg(n, names, ev) {
   var base = T('anBalDone').replace('{n}', String(n)).replace('{list}', names.join(', '));
   if (ev == null || isNaN(+ev)) return base;
   return base + T('anBalEval').replace('{v}', String(Math.abs(Math.round(+ev))));
 }
 
+// ★ 2026-10-13（用户）：「如果用户想在开局的时候定平衡点的话，应该要评估几个才合理」。
+//   开局 = 官方指定开局那三手之内（黑1 天元 / 白2 / 黑3，即盘上 ≤ 3 子）。此时补一句
+//   「开局评估几个才合理」的提示；出了开局阶段就不显示（那时点数由用户按中盘需要自选）。
+//   依据：中国五子棋竞赛规则(2025) 第 11 条「指定开局」/ RIF —— 官方开局只有三手。
+//   ★ 2026-10-13（用户）：「这个提示文案是多条的，是灵活多变的，不应该只是一个大段话」：
+//     改为从 anBalOpenHints 短句池里**随机抽 1~2 条**（不重复），每条单独一行（用 \n 分行，
+//     renderAna 见到 \n 会切 white-space:pre-line）—— 同一个局面多点几次看到的角度不同。
 function balOpenHintTxt() {
   if (G.moves.length > 3) return '';
   var pool = T('anBalOpenHints');
   if (!pool || !pool.length || typeof pool === 'string') return '';
   var left = pool.slice();
-  var n = Math.min(left.length, 1 + Math.floor(Math.random() * 2));
+  var n = Math.min(left.length, 1 + Math.floor(Math.random() * 2));   // 每次 1~2 条
   var out = [];
   for (var i = 0; i < n && left.length; i++) {
     out.push(left.splice(Math.floor(Math.random() * left.length), 1)[0]);
@@ -9231,11 +10153,25 @@ async function anaBalPoints() {
   var need = empty ? 3 : Math.max(1, Math.min(6, balPN()));
   try {
     if (!empty) {
+      // (1) 官方平衡搜索（原生硬链接）：**成对**取点 —— 每次 YXBALANCETWO 给出 2 手，
+      //     这两手是引擎按 balancedValue(v,bias) = -|v-bias|+bias 联合挑出来的
+      //     「连着下都不吃亏」的组合。逐手单点（ONE）是各取自己最小的 |分|，实测会漂：
+      //     同一个中盘（无禁手）ONE 收在 |评估| 132，成对只有 9。
+      //     非空局面没有官方开局区间，不传 zoneR（中心锁只属于禁手开局前 3 手）。
       var bmB = G.board.map(function (r) { return r.slice(); });
       var plyB = G.moves.length;
       var marksArr = [], namesB = [], evB = null;
       var qMs = Math.max(600, Math.min(1800, turnMs));
       while (marksArr.length < need) {
+        // ★ 2026-10-13 二次修正（用户：「当前有禁手模式，平衡点评估经常差距过大」
+        //   「分数差应该在 0 附近才可以」）：**收尾那手也一律走成对 YXBALANCETWO**。
+        //   原来剩 1 手时用单点 YXBALANCEONE，引擎实测（白方待走）：
+        //     空盘+黑1天元  ONE 无禁手 −468 / 标准 −463 / 禁手 −352   ← 差得离谱
+        //     同一局面 TWO 无禁手 +12 / 标准 +21 / 禁手 +17            ← 都在 balanceWindow(50) 内
+        //   原因：ONE 是「单点取最接近 0」，白只下一手时根本抵消不掉黑天元那一子的固有优势；
+        //   TWO 搜的是「白这一手 + 黑应手」的**对**，两手联合才能把分差压回 0。
+        //   成对里只取第 1 手即可（它就是「下完仍保持平衡」的那一手，第 2 手是对方的最优应手），
+        //   报出的评估分也用这一对的分 —— 不再出现单点那种 −350 的假「不平衡」。
         var modeB = 'two';
         var qi = marksArr.length;
         var curB = ((plyB + qi) % 2 === 0);
@@ -9262,12 +10198,13 @@ async function anaBalPoints() {
           namesB.push(coordName(ptsQ[pk][0], ptsQ[pk][1]));
           addedQ++;
         }
-        if (!addedQ) break;
+        if (!addedQ) break;                 // 防「全是已占点」时空转
       }
       if (marksArr.length) {
         renderBalMarks(marksArr, balDoneMsg(marksArr.length, namesB, evB) + balOpenHintTxt());
         return;
       }
+      // (2) 连线版页内面板桥（bridge.js 打开时）：同一条原生平衡通道
       if (typeof window.GB_BAL_POINTS === 'function') {
         marksArr = []; namesB = [];
         try {
@@ -9284,6 +10221,16 @@ async function anaBalPoints() {
           return;
         }
       }
+      // (3) ★★ 2026-10-13 **删掉「用对弈引擎顶替平衡点」的兜底**。
+      //   用户：「当前有禁手的模式，连线器以及主界面的平衡点评估仍然有巨大误差，
+      //   接近 1000 分的误差」。实测（用户实际盘面 b(9,10)(7,7)/w(6,7)，1.5s/手）：
+      //     · 对弈引擎 YXNBEST 8（analyze） rule 2 → **+546**（同盘 rule 0 只 +12）
+      //     · 平衡引擎 YXBALANCETWO          rule 2 → **+21**  ← 这才是平衡口径
+      //     · 平衡引擎 YXBALANCEONE（单点）  rule 2 → +165
+      //   原来这里退到 `analyze()` + balClosestToZero：「离 0 最近的对弈引擎候选」在禁手
+      //   局面里仍然是几百上千分。那既不是平衡点、又把 ~1000 分的对弈评估挂在「平衡点」
+      //   名下 → 正是用户报的「巨大误差」。现在改为：**再给平衡引擎一次机会**（换 sub 车道、
+      //   加时间），拿不到就如实报「平衡子不可用」，绝不拿对弈引擎的数冒充平衡分。
       var retry = null;
       try {
         retry = await apiBalance({
@@ -9315,9 +10262,21 @@ async function anaBalPoints() {
       return;
     }
     if (empty) {
+      // ★ 开局三平衡点 —— 2026-10-13 二次重写。用户：「评定得仍不好，一定要分清有禁手和
+      //   无禁手，有时候这三个平衡点不仅仅只在中心那几个位置，光靠中心那几个位置很难
+      //   做出真正的平衡点，一直使用的是有禁手模式的平衡点，到后面两手评判得不太好，
+      //   分数相差得非常巨大了」「分数差应该在 0 附近才可以」：
+      //   · 黑 1 = 天元（固定）
+      //   · 白 2 / 黑 3 由 **一次 YXBALANCETWO** 成对取出（理由见 openBalChain 注释）
+      //   · **不加中心区间锁** —— 上一轮锁 3×3 / 5×5 之后禁手侧直接算出杀棋（|评估| = M4），
+      //     无禁手真正的平衡手也常在中心区之外。禁手 / 无禁手的区别靠 rule 传给引擎。
+      //   实测（黑 1 天元后，引擎 1.5s/手，|评估| ≤ 50 为官方 balanceWindow 内的「平」）：
+      //     无禁手：ONE 486 ✗ → TWO 14~44 ✓（平衡对第 2 点常在 d=3）
+      //     禁手  ：ONE 297 ✗ → TWO 25~43 ✓
       var ruleE = engineRule();
       var marksE = await openBalChain(ruleE, Math.max(2000, S.turnMs || 2000), gen);
       if (gen !== G.ana.gen) return;
+      // 引擎完全不可用（三点没凑齐）：退到官方平衡定式（全部以天元作黑 1、无必胜线）
       if (marksE.length < 3) {
         var cyB = (N - 1) >> 1;
         marksE = [{ x: cyB, y: cyB, color: 'b', seq: '1' }];
@@ -9330,6 +10289,10 @@ async function anaBalPoints() {
       renderBalMarks(marksE, balDoneMsg(marksE.length, namesE, G.ana.balEval) + balOpenHintTxt());
       return;
     }
+    // ★ 2026-10-13：这里原本还有一段 `analyze()` + 「取 |评估| 最小的候选」的死兜底
+    //   （对弈引擎 YXNBEST）。它在禁手局面里报出来的就是 +546 那种「对弈分」，
+    //   挂在「平衡点」名下正是用户说的「接近 1000 分的误差」。已整体删除：
+    //   平衡点的评估**只能**来自平衡引擎，拿不到就如实说拿不到（见上面的 anBalNoEngine）。
     renderAna(T('anBalNoEngine'));
   } catch (e) {
     if (gen === G.ana.gen) renderAna(T('offline'));
@@ -9399,6 +10362,8 @@ function wireAnalysis() {
     fwdStep(e.key === 'ArrowLeft' ? -1 : 1);
     e.preventDefault();
   });
+  // ★ 2026-10-22（用户：「点击「扫描防守」按键文字变为「停止扫描」，然后又点击「停止扫描」后，
+  //   最后一帧的扫描状态保留到棋盘上」）：同一个键二态 —— 扫 / 停。
   els.btn_an_defend.onclick = function () {
     if (G.ana.busy && G.ana.kind === 'defend') { anaDefendStop(); return; }
     aiStandDown(); anaDefend(true);
@@ -9411,6 +10376,7 @@ function wireAnalysis() {
     toast(T('anBalnSet').replace('{n}', String(n)));
   };
   els.num_nbest.onchange = function () {
+    // 与分析面板同步（下限 1，与官方 multi-pv 一致；默认 3）
     S.nbest = Math.max(1, Math.min(8, Math.round(+els.num_nbest.value || 3)));
     els.num_nbest.value = String(S.nbest);
     if (els.sel_multiPv) els.sel_multiPv.value = String(S.nbest);
@@ -9444,6 +10410,9 @@ function sysInfoCards() {
   var isaMain = ['AVX2 ' + (isa.avx2 ? '✓' : '✗'),
                  'AVX-512 ' + (isa.avx512 ? '✓' : '✗'),
                  'VNNI ' + ((isa.avxvnni || isa.avx512vnni) ? '✓' : '✗')].join(' · ');
+  // ★ 2026-10-24（用户：「用户选择什么引擎，就在指令集卡片动态更新展示」）：
+  //   variant 随 sysInfo 推送实时刷新（config 变更 / auto-bench 热切换后宿主立刻重推）；
+  //   实测最快（auto-bench 缓存命中当前变体）时追加「实测最快」标注。
   var isaSub = T('abSysEngine') + ' ' +
     (s.native ? (s.variant || T('sysNative')) + '（' + T('sysNative') +
                 (s.variantBench && s.variantBench === s.variant ? ' · ' + T('sysBench') : '') + '）'
@@ -9495,6 +10464,8 @@ var HASH_FLOOR_MB = 64;
 function renderHashInfo() {
   var el = els.hashInfo;
   if (!el) return;
+  // ★ 2026-10-15：展示**生效值**（本机装得下的档位）——偏好被本机上限折衷时，
+  //   这里如实显示折衷后的数字；偏好本身仍持久化，换大机器自动恢复。
   var fullMB = (G.hashEffMB || S.hashMB) | 0;
   var h = '<div class="si-r"><span class="si-k">' + escHtml(T('hmExcl')) +
           '</span><span class="si-v">' + escHtml(T('hmExclVal').replace('{m}', fullMB)) +
@@ -9529,27 +10500,68 @@ function buildSelects() {
   if (host.userThreads >= MIN_THREADS) S.cores = host.userThreads;
   if (host.userHashMB >= 1) S.hashMB = host.userHashMB;
   if (host.userThreads >= MIN_THREADS || host.userHashMB >= 1) enginePrefSet(S.cores, S.hashMB);
+  // ★★ 2026-10-17：宿主 sysinfo 未到达时 threadsMax 缺失 ⇒ maxT 会退化成 1，
+  //   后面的「超上限就重置」逻辑会把用户选好的 12 线程**永久写成 1**
+  //   （= 「线程数改了、重启又变回去」的根因之一）。host 未就绪一律不动偏好。
   if (!(host.threadsMax >= 1)) return;
   renderSysInfo();
   var maxT = Math.max(1, host.threadsMax || 1);
+  // ★★ 2026-10-18（用户：「线程多于核心…要齐心协力，而不是相互打架」）：线程拓扑迁移（一次性）。
+  //   旧上限 = 逻辑核-4（本机 12），存档多停在 10~12。实测这段区间是最差组合：
+  //   比物理核多、又没多到占满 SMT ⇒ Windows 把两个线程塞进同一个物理核的
+  //   两个兄弟（本机兄弟相邻编号），抢同一组执行单元。同盘面 2000ms：
   //     t=10 2879K nps / d22  ·  t=12 3567K / d29  ·  t=14~16 4.0M+ / d30
+  //   这里把 10~12 抬到新上限；用户之后自己改的值不会被再动（标记已写）。
+  // ★★ 2026-10-23（用户：「提升并行计算能力，当前速度和深度都很浅很慢」）：
+  //   本机存档里一直停着 **6 线程**（远低于物理核 8），是历史上一次测试留下的旧默认值。
+  //   同盘面同预算实测（均势开局，RapfiEngine-avx512vnni）：
+  //     6s：T6 depth 21 / 1.54M nps   vs   T14 depth 24 / 3.14M nps   （差 3 层）
   //     10s：T4 depth 23 / 0.73M      vs   T14 depth 22 / 2.36M
+  //   加上 2026-10-18 那组 2s 实测（t10 d22 / t14 d30），趋势一致：线程数越接近上限，
+  //   同样时间里迭代加深越快。**低于物理核**的存档值几乎必然是旧版本的默认档，
+  //   一次性抬到上限（用户之后自己改的值不会再被动 —— 标记已写）。
   var physC = Math.max(0, host.physCores | 0);
   var lowCores = (physC > 1) ? (S.cores < physC) : (S.cores >= 10 && S.cores <= 12);
   if (lowCores && maxT > S.cores && !migFlag('threadsTopo4')) {
     var _oldCores = S.cores;
     S.cores = maxT;
+    // ★★ 2026-10-22（用户：「引擎调用上还有提升智力的空间吗」）：
+    //   threadsTopo2 那次迁移**从未真正生效** —— 这里只写了 save()，而 save() 第一行
+    //   enginePrefApplyToS()、本函数末尾的 applyEngineConfig() 都会把 S.cores 从专用键
+    //   gbcalc.engine.v1 读回旧值（本机一直停在 12）。先写专用键再 save，才是真迁移。
+    //   同盘面等时实测（1.2s、4 次取吞吐）：T12 4.3~4.5M nps、T14 4.6~4.8M、T16 4.7~5.3M，
+    //   深度同为 34~35 层 ⇒ 抬到宿主上限 14 是纯增益（16 核留给识图 2 核，不抢视图）。
     try { enginePrefSet(S.cores, S.hashMB); } catch (eTT0) {}
     try { save(); } catch (eTT) {}
     try { console.log('[threads] topo migrate ' + _oldCores + ' -> ' + maxT); } catch (eTT2) {}
   }
   
+  // ★ 2026-10-15（用户：「有的用户反映保存线程数为 1 的时候……保存不了更改。增强适应
+  //   能力和持久化的适应能力」）：S.cores / S.hashMB 是**用户偏好**，永不因本机能力被
+  //   改写（老逻辑会把超上限的哈希降档后 save()、把换机后的线程数重置为最大值——偏好
+  //   就这样被永久抹掉了）。本机装不下的部分只在「生效值」里折衷：下拉按生效值选中、
+  //   engineConfig 下发生效值；换到大内存/多核机器后，用户偏好自动完整恢复。
+  //   线程数=1 现在全程生效（宿主 C++ CalcFullThreads / 本下拉都原样尊重 1）。
+  // ★★ 2026-10-16（用户：「速度和深度远不如 4.39」/「智力不算高」）——根因就在这里。
+  //   v4.39 的口径是**首启默认 = 下拉上限**（buildSelects 里 `S.cores = maxT`），本机 16 逻辑核
+  //   ⇒ maxT = 12 ⇒ 主车道满 12 线程搜索。后来一段版本把工厂默认写成 half(maxT)=6，且被
+  //   save() 固化进 localStorage ⇒ **所有老用户**都只跑一半线程：引擎明明加载成功（用户看到
+  //   的「引擎加载成功了」），nps / 深度 / 出分速度却只有 4.39 的一半，「迟迟没有评估」正是它。
+  //   现在：默认 = host.threadsDefault（宿主 ThreadsMax 同口径），并做一次性迁移 —— marker
+  //   缺失时把「恰好等于 halfT 的偏好」抬回上限（= 那一版自动写进去的值）。用户手选的其他值
+  //   一律不动（2026-10-15 用户反馈过「线程数=1 保存不了更改」，绝不能因为本机能力改写偏好）。
+  //   maxT<4 的机器上 halfT 会是 1 或 2，可能撞上用户的真实选择 ⇒ 那种小机器不迁移。
   var factoryT = (host.threadsDefault >= 1 && host.threadsDefault <= maxT) ? host.threadsDefault : maxT;
   if (factoryT < MIN_THREADS) factoryT = Math.min(maxT, MIN_THREADS);
+  // ★★ 2026-10-17：**删除**「恰好一半就抬回上限」的迁移 —— 它按 maxT 推算，
+  //   在 maxT 偏小的机器上会把用户真实的选择抬走（用户报过两次「改了又恢复」）。
+  //   现在只有一种自动行为：小于最小可选值时抬到 factoryT（= 下拉上限）。
   if (!(S.cores >= MIN_THREADS)) { S.cores = factoryT; enginePrefSet(S.cores, S.hashMB); save(); }
+  // ★ 偏好永不因本机能力被改写：换到小机器只夹「生效值」，S.cores 保留用户原值，
+  //   换回大机器自动恢复（与 2026-10-15 的约定一致；老代码这里 save() 过，等于抹掉偏好）。
   var effT = Math.max(Math.min(MIN_THREADS, maxT), Math.min(S.cores, maxT));
   var html = '';
-  for (var t = Math.min(MIN_THREADS, maxT); t <= maxT; t++) {
+  for (var t = Math.min(MIN_THREADS, maxT); t <= maxT; t++) {   // 最小 2
     html += '<option value="' + t + '"' + (t === effT ? ' selected' : '') + '>' + t + '</option>';
   }
   els.sel_cores.innerHTML = html;
@@ -9572,13 +10584,21 @@ function buildSelects() {
     var byRes = Math.max(0, memMB - 2048);
     capMB = Math.min(maxH, byPct, byRes);
   }
+  // ★ 2026-10-15：哈希偏好**永不改写**（去掉「超上限 → 降档 → save()」的破坏性回写）。
+  //   生效值 effH = 本机装得下的最大档：下拉按生效值选中、超上限档 disabled 照旧；
+  //   engineConfig 照发用户偏好，宿主 C++ CalcHashFullKB 按 min(80% RAM, RAM-2GB, 6GB)
+  //   自适应 —— 小内存机器不炸、换大机器后用户偏好自动完整恢复。
   var effH = (S.hashMB && hs.indexOf(S.hashMB) >= 0 && S.hashMB <= capMB)
     ? S.hashMB
     : (hs.filter(function (h) { return h <= capMB; }).pop() || 512);
-  if (!migFlag('hash1024')) {
+  if (!migFlag('hash1024')) {                        // 一次性历史默认迁移（1024 → 512）
     if (S.hashMB === 1024) { S.hashMB = 512; enginePrefSet(S.cores, S.hashMB); save(); effH = 512; }
   }
-  if (!S.hashMB) { S.hashMB = 2048; enginePrefSet(S.cores, S.hashMB); save(); effH = 2048; }
+  if (!S.hashMB) { S.hashMB = 2048; enginePrefSet(S.cores, S.hashMB); save(); effH = 2048; } // factory default: 2048MB（对齐整合包）
+  // ★ 2026-10-25（用户：「以 Rapfi整合包250615 为蓝本进行优化」）：整合包实测在用的哈希是
+  //   **2048 MB**（settings.txt），我们之前默认 512 / 历史迁移到 512。密集盘面越往后置换表越吃紧，
+  //   2048 能明显减少覆盖重算（同档 8 线程下是纯增益，代价只是内存）。只拨一次：
+  //   把「未调过的历史值」(512/768/1024/1536) 抬到 2048；已经是 2048 或更高的不动。
   if (!migFlag('hash2048') && S.hashMB >= 256 && S.hashMB < 2048) {
     S.hashMB = 2048;
     enginePrefSet(S.cores, S.hashMB);
@@ -9590,11 +10610,15 @@ function buildSelects() {
     return '<option value="' + h + '"' + (h === effH ? ' selected' : '') +
            (off ? ' disabled' : '') + '>' + h + ' MB</option>';
   }).join('');
-  G.hashEffMB = effH;
+  G.hashEffMB = effH;                                // 生效值给 renderHashInfo / 引擎口径展示
 
   if (S.hashMul !== undefined) { delete S.hashMul; save(); }
   renderHashInfo();
 
+  // ★ 2026-10-23（用户：「对局设置里加引擎权重下拉，不同电脑默认搭配最佳权重」）：
+  //   两档：NNUE（mix9svq 权重，评估更准）/ 传统估值（只加载 classical，评估快 → 同时间更深）。
+  //   没选过时按机器兜底：没有 AVX2 的老 CPU 一律走传统估值（NNUE 每节点太贵，深度损失大于精度收益），
+  //   其余走 NNUE（官方推荐）。
   fillVariantSelect();
   var wOpt = weightsPrefGet() || defaultWeightsMode();
   if (els.sel_weights) {
@@ -9603,6 +10627,13 @@ function buildSelects() {
       '<option value="classic"' + (wOpt === 'classic' ? ' selected' : '') + '>' + T('wClassic') + '</option>';
   }
 
+  // ★ 2026-10-24（用户：「参考 gomoku-calculator 加选点范围 / 最大深度 / 最大节点」）：
+  //   选点范围 6 档 = INFO CAUTION_FACTOR；默认 3（三圈半，官方推荐）。
+  //   最大深度默认 72（官方推荐值，2 秒内到不了，纯兜底）；最大节点默认不限。
+  // ★ 2026-10-25（用户：「对局设置加 style（谨慎度）与多主变，默认选最好」）：
+  //   style 就是这个 CAUTION_FACTOR —— Yixin 整合包 settings.txt 的 `3 ;style (rash 0~5 cautious)`
+  //   与我们的 3 是同一个值，档位语义按官方 CandidateRange 写（见 Rapfi core/pos.h）。
+  //   多主变 = YXNBEST N 的 N，唯一存储字段仍是 S.nbest（分析面板的「分析点数」同一个值）。
   var CR_LABELS = ['cr2', 'cr2l3', 'cr3', 'cr3l4', 'cr4', 'crFull'];
   var crNow = (S.candRange >= 0 && S.candRange <= 5) ? S.candRange : 3;
   S.candRange = crNow;
@@ -9613,6 +10644,8 @@ function buildSelects() {
     els.sel_candRange.title = T('candRangeHint');
   }
   if (els.multiPvHint) els.multiPvHint.textContent = T('multiPvHint');
+  // ★ 2026-10-25 一次性迁移：多主变的旧默认是 4（分析面板独有），整合包是 3。
+  //   只拨这一次；用户自己设过 1/2/5~8 的值原样保留（migFlag 检查即写）。
   if (!migFlag('multiPv3') && (S.nbest === undefined || S.nbest === 4)) { S.nbest = 3; save(); }
   var mpNow = Math.max(1, Math.min(8, Math.round(+S.nbest || 3)));
   S.nbest = mpNow;
@@ -9623,6 +10656,14 @@ function buildSelects() {
     }
     els.sel_multiPv.innerHTML = mpOpts.join('');
   }
+  // ★ 2026-10-24 二次修订（用户：「去掉数字输入框，在下拉栏里面设计一个输入框」）：
+  //   预设仍由 select 提供；嵌入输入框负责显示/自定义。自定义合法值（深度 4~128、
+  //   节点 0.1~256M）不再被强制收敛回预设 —— 只有非法值才回默认（72 / 不限）。
+  //   0 = 不限，两种途径都合法。
+  // ★ 2026-10-25（用户：「以 Rapfi整合包250615 为蓝本进行优化」）：对齐整合包的 settings.txt
+  //   （实用参数：8 线程 / 2048MB 哈希 / 2000ms / 最大深度 100 / 最大节点 1e9 / style 3 / 后台思考关）。
+  //   深度档位补 88/100（旧版最大 72 —— 长预算或无限分析时会先摸到 72 层天花板，
+  //   引擎到顶就自停，反而像「重新算」）。0 = 不限。
   var MD_OPTS = [0, 24, 32, 40, 48, 56, 64, 72, 88, 100];
   var mdNow = S.maxDepth;
   if (!(mdNow === 0 || (mdNow >= 4 && mdNow <= 128))) mdNow = 100;
@@ -9660,6 +10701,8 @@ function boot() {
   try {
     var st = JSON.parse(localStorage.getItem(settingsKey()) || '{}');
     for (var k in st) if (S.hasOwnProperty(k)) S[k] = st[k];
+    // ★ 2026-10-13（用户：「在用户选择规则的时候，一定要正确链接」）：规则以专属键为准 ——
+    //   这样「上次在连线窗里选的规则」在下次开主界面时同样生效，反之亦然。
     var rgBoot = loadRuleGlobal();
     if (rgBoot != null) S.rule = rgBoot;
     
@@ -9680,7 +10723,7 @@ function boot() {
   prefsApplyToS();       // remaining global prefs as fallback
   initPanels();
   applyLayout();
-  try { syncPinKeys(); } catch (e) {}
+  try { syncPinKeys(); } catch (e) {}   // ★ 固定状态按存档重画（✕ / 固定）
   
   wireColors();
   wireCards();
@@ -9876,6 +10919,9 @@ function boot() {
     var wOn = (key === 'w') ? !S.aiW : S.aiW;
     setAiSides(bOn, wOn);
     
+    // ★ 2026-10-17：执子状态必须落盘。原来只在 mode 变化时 save()，而 mode 早就是
+    //   'pve' 时（绝大多数情况）S.aiB/aiW 的改动根本没写进 localStorage ⇒ 重启后
+    //   AI 执子又回到旧状态。这是「其他持久化做得不好」里最直观的一条。
     if (S.mode !== 'pve') S.mode = 'pve';
     save();
     S.paused = false;
@@ -9951,6 +10997,12 @@ function boot() {
   els.sel_rule.onchange = function () {
     var prev = +S.rule;
     S.rule = +els.sel_rule.value; save(); applyRuleHint();
+    // ★ 2026-10-13（用户：「有禁手和无禁手的平衡点它都是不一样的，在用户选择规则的时候，
+    //   一定要正确链接」）：**写全局规则键 + 每次改规则都推给连线窗**。
+    //   原来这行 tellHost 写在本 handler 的**外面**（只在本页启动时执行一次），
+    //   所以主界面把规则从「无禁手」改成「有禁手」时，连线窗完全不知道 ——
+    //   连线器的「交换平衡点 / 交换评估 / 自动落子」照旧按旧规则（无禁手）算，
+    //   于是禁手局面拿到的是无禁手的平衡点。放在 onchange 里之后，两边永远同步。
     saveRuleGlobal(S.rule);
     if (linkSessionOn()) tellHost({ type: 'linkCfgSync', rule: +S.rule });
     if (+S.rule === prev) { refreshUI(); return; }
@@ -9970,6 +11022,8 @@ function boot() {
     resetGame(false); openStart(); refreshUI();   
   };
   
+  // 启动时若连线会话已开（比如本页是重开的），先把当前规则推一次；之后每次改规则由
+  // sel_rule.onchange 里的同名语句负责（见上）。
   if (linkSessionOn()) tellHost({ type: 'linkCfgSync', rule: +S.rule });
   els.sel_cores.onchange = function () {
     S.cores = Math.max(MIN_THREADS, +els.sel_cores.value | 0);
@@ -9983,30 +11037,38 @@ function boot() {
     
     renderHashInfo();
   };
+  // ★ 2026-10-23（用户：「引擎权重下拉，不同电脑默认搭配最佳权重」）：
+  //   显式选择写进专用引擎键（'nnue' / 'classic'）；宿主收到变化会重启引擎进程并按
+  //   config-classic.toml 切换评估器。只清 TT 不丢盘面。
   if (els.sel_variant) els.sel_variant.onchange = function () {
     S.variant = els.sel_variant.value || '';
     variantPrefSet(S.variant);
-    try { fillVariantSelect(); } catch (eV) {}
-    applyEngineConfig();
+    try { fillVariantSelect(); } catch (eV) {}   // 重渲染下拉（title 说明）+ 刷新下方 hint
+    applyEngineConfig();          // 宿主收到变体变化会重启引擎并重新探测
   };
   if (els.sel_candRange) els.sel_candRange.onchange = function () {
     S.candRange = +els.sel_candRange.value; save(); applyEngineConfig();
   };
+  // 多主变：与「分析点数」是同一个字段（S.nbest），任一端改动都把另一端同步过去，
+  // 避免出现「设置里说 3、分析面板说 4」这种两个真相。引擎侧就是 YXNBEST <N>。
   if (els.sel_multiPv) els.sel_multiPv.onchange = function () {
     S.nbest = Math.max(1, Math.min(8, Math.round(+els.sel_multiPv.value || 3)));
     els.sel_multiPv.value = String(S.nbest);
     if (els.num_nbest) els.num_nbest.value = String(S.nbest);
     save();
   };
+  // ★ 2026-10-24 二次修订（用户：「去掉数字输入框，在下拉栏里面设计一个输入框」）：
+  //   嵌入输入框 = 显示 + 自定义（留空 = 不限）；select = 预设选择。
+  //   提交时机 = onchange/onblur；自定义值经 selSyncCustom 在下拉里补「自定义 N」项。
   if (els.inp_maxDepth) {
     els.inp_maxDepth.value = S.maxDepth ? String(S.maxDepth) : '';
     els.inp_maxDepth.onchange = els.inp_maxDepth.onblur = function () {
       var raw = String(els.inp_maxDepth.value || '').trim();
       var v;
-      if (raw === '' || raw === '0') v = 0;
+      if (raw === '' || raw === '0') v = 0;               // 留空 = 不限
       else {
         v = parseInt(raw, 10);
-        if (!isFinite(v)) v = 72;
+        if (!isFinite(v)) v = 72;                          // 乱填回默认档
         if (v > 0 && v < 4) v = 4;
         if (v > 128) v = 128;
       }
@@ -10021,12 +11083,12 @@ function boot() {
     els.inp_maxNodes.onchange = els.inp_maxNodes.onblur = function () {
       var raw = String(els.inp_maxNodes.value || '').trim();
       var m;
-      if (raw === '' || raw === '0') m = 0;
+      if (raw === '' || raw === '0') m = 0;              // 留空 = 不限
       else {
         m = parseFloat(raw);
         if (!isFinite(m) || m <= 0) m = 0.1;
         if (m > 256) m = 256;
-        m = Math.round(m * 10) / 10;
+        m = Math.round(m * 10) / 10;                     // 0.1 步进
       }
       els.inp_maxNodes.value = m ? String(m) : '';
       S.maxNodes = Math.round(m * 1000000);
@@ -10050,7 +11112,7 @@ function boot() {
     var v = els.sel_weights.value;
     if (v !== 'nnue' && v !== 'classic') return;
     S.weights = v;
-    weightsPrefSet(v);
+    weightsPrefSet(v);            // 显式选择写进独立键
     save(); applyEngineConfig();
   };
   
@@ -10061,6 +11123,9 @@ function boot() {
   };
   els.chk_num.onchange = function () { S.showNum = !!els.chk_num.checked; save(); paint(); };
   
+  // ★ 2026-10-24（用户：「后台思考由选择键变成像 AI 执黑一样的开关键」）：
+  //   checkbox → .tglbtn 滑动开关（与 AI 执黑/执白同组件）。语义不变：开 = 落子后台预思考，
+  //   关 = 停；开启瞬间才在 log 栏写一次说明（bgThinkIntroOnce）。
   els.btn_bgThink.onclick = function () {
     S.bgThink = !S.bgThink; save();
     if (els.btn_bgThink) {
@@ -10068,7 +11133,9 @@ function boot() {
       els.btn_bgThink.setAttribute('aria-pressed', S.bgThink ? 'true' : 'false');
     }
     bgThinkHintSync();
-    if (S.bgThink) { bgThinkIntroOnce(); }
+    // ★ 2026-10-25：开 = 下一次 AI 落子后引擎自动进入原生 pondering（无需页面侧搜索）；
+    //   关 = 立刻停掉正在跑的 pondering（它自己不收工，得发 STOP）。
+    if (S.bgThink) { bgThinkIntroOnce(); }   // 开启时才在 log 栏说明一次
     else { bgThinkStop(); bgThinkHaltEngine(); }
   };
   
@@ -10121,17 +11188,23 @@ function boot() {
         physCores: m.physCores || 0, memAvailMB: m.memAvailMB || 0,
         cpuName: m.cpuName || '', variant: m.variant || ''
       };
+      // ★★ 2026-10-24（用户：「引擎变体选择中仍然没有可选项」）根因：主窗口**不加载 bridge.js**
+      //   （它只在连线模式由 bootLink 动态注入），于是 window.GB_onHost 在主窗口永远没人调；
+      //   而这里原来把 G.host **整个替换**成不含 sse/avx2/… 的新对象 ⇒ fillVariantSelect 的
+      //   ①host 握手档永远判 false、③caps 请求又要等引擎就绪 ⇒ 变体下拉只剩「自动」。
+      //   修复：host 握手里的 CPU 能力位在 buildSelects() **之前**落进 G.host，
+      //   buildSelects → fillVariantSelect 首次渲染就能拿到完整档位。
       if (typeof m.avx2 === 'boolean') {
         G.host.sse = !!m.sse; G.host.avx2 = !!m.avx2; G.host.avx512 = !!m.avx512;
         G.host.avx512vnni = !!m.avx512vnni; G.host.avxvnni = !!m.avxvnni;
       }
-      G.host.variantBench = m.variantBench || '';
+      G.host.variantBench = m.variantBench || '';   // 本机实测最快变体（卡片/说明用）
       buildSelects();
     } else if (m.type === 'sysInfo') {
       
       G.sysInfo = m;
       renderSysInfo();
-      if (els.about && !els.about.hidden) renderAbout();
+      refreshAboutSys();   // 只刷系统信息小块，别整块重建（否则读着的时候会被顶走）
     } else if (m.type === 'sysMem') {
       
       if (G.sysInfo) {
@@ -10141,7 +11214,7 @@ function boot() {
       }
       renderSysInfo();
       renderHashInfo();                                   
-      if (els.about && !els.about.hidden) renderAbout();
+      refreshAboutSys();   // 只刷系统信息小块，别整块重建（否则读着的时候会被顶走）
     } else if (m.type === 'external') {
       ingestExternal(m.payload || '');
     } else if (m.type === 'linkPos') {
@@ -10395,7 +11468,7 @@ async function linkEvalSide(bd, side, canDrop) {
     return;
   }
   var c0 = cs[0];
-  var best = r.best || [c0.x, c0.y];
+  var best = r.best || [c0.x, c0.y];          // 引擎首选，零 JS 改写
   if (!(best && best.length === 2 && best[0] >= 0 && best[1] >= 0 &&
         best[0] < N && best[1] < N && !bd[best[1]][best[0]])) {
     best = null;
@@ -10420,6 +11493,9 @@ async function linkEvalSide(bd, side, canDrop) {
   }
 }
 
+// ★ 2026-10-23 清理：maybeAiForSide / maybeAiForSideRun 早已整体 `return;` 停用
+//   （主窗与连线窗已由 linkEvalSide / aiMove 两条独立链路接管），无任何外部调用点，
+//   删除以免日后误接。
 
 function noteEngineDown() {
   G.engineOffline = true;
@@ -10449,8 +11525,19 @@ function fitFont() {
 }
 
 function linkSessionOn() { return !!(G && G.linkOn); }
+// ★★ 2026-10-17（用户：「线程数改了又恢复」的真正根因）：设置**单键化**。
+//   原来按 linkSessionOn() 在 gbcalc.settings.v1 / .link.v1 之间来回切：在连线窗改的
+//   线程数写进 link 键，主窗读 v1 —— 两套快照互相覆盖，任何一次读错就把偏好改回旧值。
+//   两版（主窗/连线窗）本来就是同一份偏好，没有理由分开存。
 function settingsKey() { return 'gbcalc.settings.v1'; }
 
+// ★ 2026-10-13（用户：「有禁手和无禁手的平衡点它都是不一样的，在用户选择规则的时候，
+//   一定要正确链接」）：规则改用**一个专属键**做全局单一来源。
+//   主界面与连线窗来自同一个源（calc.html，只是连线窗多带 ?link=1），同源 ⇒ localStorage 共用，
+//   所以任意一方改了规则、写进这个键，另一方下次启动必然读到新值。
+//   为什么不用 gbcalc.settings.v1 / .link.v1：那两个键随「连线中 / 非连线」交替写入
+//   （见 save() 的 settingsKey()），没有先后信息、没法判断谁更新 —— 读错的那一次就会
+//   把「有禁手」的局面按「无禁手」算平衡点，正是用户说的「一定要正确链接」要避免的。
 function saveRuleGlobal(r) {
   try { localStorage.setItem('gbcalc.rule.v1', String(+r)); } catch (e) {}
 }
@@ -10465,6 +11552,10 @@ function loadRuleGlobal() {
 // engine key, and copying them between the two S objects was the propagation path.
 function GLOBAL_LOOK_KEYS() { return ['lang', 'theme', 'cssVars', 'customBase', 'rule']; }
 
+// ★★ 2026-10-17（用户：「线程数的更改，还有一些其他持久化做的不好」）：
+//   一次性迁移标记统一存**全局键**。原来放在 S 里，而 S 会在
+//   gbcalc.settings.v1 / gbcalc.settings.link.v1 两套存档之间来回覆盖 ——
+//   marker 跟着丢、迁移就重跑，每进一次连线窗都把用户手选的线程数/哈希再改一遍。
 var MIG_KEY = 'gbcalc.mig.v1';
 function migFlag(name) {
   var o = null;
@@ -10477,6 +11568,12 @@ function migFlag(name) {
 }
 
 function save() {
+  // ★ 2026-10-24（用户：「连线窗是否同步了主界面的后台思考」）：
+  //   连线窗**没有**后台思考开关，它那份 S.bgThink 只是主窗设置的一个镜像（默认 false）。
+  //   但 save() 写的是整份 S —— 连线窗任何一次保存（颜色 / 布局 / 领子…）都会把主窗
+  //   开着的「后台思考」冲成关。这里改成：连线窗保存时，bgThink / turnMs 一律取
+  //   bridge 真正在用的那份（window.GB_S），既不会冲掉主窗设置，也把连线窗改的思考
+  //   时间按同一口径写回去。主窗（LINK_MODE=false）不走这段。
   if (LINK_MODE) {
     try {
       var _bs = window.GB_S;
@@ -10489,6 +11586,7 @@ function save() {
   // Align the engine fields with the dedicated key before any window writes a save, so a stale
   // window can never write an old cores/hashMB again.
   enginePrefApplyToS();
+  // ★ 偏好先进全局键：本函数后面有 `if (!ost) return;`，放在末尾会被跳过
   prefsSyncFromS();
   try {
     var k = settingsKey();
@@ -10512,14 +11610,14 @@ function setLinkMode(on) {
   var keepTheme = S.theme, keepCssVars = S.cssVars, keepCustomBase = S.customBase;
   var keepLang = (S.lang === 'en') ? 'en' : 'zh';
   
-  try { localStorage.setItem('gbcalc.settings.v1', JSON.stringify(S)); } catch (e) {}
+  try { localStorage.setItem('gbcalc.settings.v1', JSON.stringify(S)); } catch (e) {}   // 单键：切换模式不再换存档
   G.linkOn = !!on;
   document.body.classList.toggle('linkOn', !!on);
   try { localStorage.setItem('gbcalc.link.active', on ? '1' : '0'); } catch (e) {}
   
   LINK_EVAL_BUSY = false; LINK_EVAL_PENDING = ''; LINK_EVAL_LASTFP = ''; LINK_HAS_FRAME = false;
   
-  var nk = 'gbcalc.settings.v1';
+  var nk = 'gbcalc.settings.v1';   // ★ 单键：进/出连线窗读同一份，旧 link 快照不再覆盖用户偏好
   var st = null;
   try { st = JSON.parse(localStorage.getItem(nk) || 'null'); } catch (e) {}
   if (!st) {
@@ -10546,6 +11644,9 @@ function setLinkMode(on) {
     S.mode = 'pve';
     G.heat = []; G.nums = [];
     ++gAiGen; G.busy = false; G.think = [];
+    // ★ 2026-10-13：连线会话一开，就把主界面的规则推给连线窗（用户：「在用户选择规则的时候，
+    //   一定要正确链接」）。上面那段只处理「连线窗先发过 cfg」的情况；连线窗还没发过 cfg 时
+    //   LINK_CFG_LAST 为空、S.rule 保持主界面的值，这里补推一次，保证两边开局就一致。
     tellHost({ type: 'linkCfgSync', rule: +S.rule });
   } else {
     ++gAiGen; G.busy = false; G.think = [];     
@@ -10557,6 +11658,12 @@ function setLinkMode(on) {
   if (els.seg_mode) [].forEach.call(els.seg_mode.querySelectorAll('button'), function (x) {
     x.classList.toggle('on', x.getAttribute('data-mode') === S.mode);
   });
+  // ★ 2026-10-13 修（HEAD 既有缺陷）：这里原来调 turnSecs()，但它只是 **boot() 内部的
+  //   局部函数** —— setLinkMode() 在另一个作用域，于是每次一进连线就抛
+  //   `ReferenceError: turnSecs is not defined`，把这行**之后**的
+  //   「规则下拉回填 els.sel_rule.value / applyLayout / applyLang / buildSelects / refreshUI / paint」
+  //   整段都跳过了 —— 正好卡在用户关心的「规则」那一步上（进连线后主界面规则下拉不刷新）。
+  //   （连线的真机测试就是靠这条红出来的。）改成等价的就地计算，不再依赖 boot() 的局部函数。
   if (els.num_turn) els.num_turn.value = ((+S.turnMs || 2000) / 1000).toFixed(3);
   if (els.sel_rule) els.sel_rule.value = String(S.rule);
   applyLayout();                       
@@ -10604,6 +11711,8 @@ window.addEventListener('keydown', function (e) {
 
 fitFont();
 
+// ★ 2026-10-18 诊断钩子（真机验证「一手到底发了几次搜索」用）。
+//   加密后外部读不到；不挂 UI、不写盘、无副作用，只在被显式调用时才动作。
 try {
   window.__gbProbe = {
     ver: function () { try { return APP_VERSION; } catch (e) { return "?"; } },
@@ -10901,6 +12010,10 @@ function bootLink() {
     else if (st1 && st1.lang) S.lang = (st1.lang === 'en') ? 'en' : 'zh';
     if (st && st.cssVars) { S.cssVars = st.cssVars; applyColorVars(st.cssVars); }
     else if (st1 && st1.cssVars) { S.cssVars = st1.cssVars; applyColorVars(st1.cssVars); }
+    // ★ 2026-10-13（用户：「有禁手和无禁手的平衡点它都是不一样的，在用户选择规则的时候，
+    //   一定要正确链接」）：连线窗启动时先认**全局规则键**（主界面选的那份），
+    //   让下面 `c.rule` 初始化时以它为准 —— 否则连线窗会拿自己上次那份 gbcalc.link.cfg
+    //   覆盖掉主界面刚选的规则，开局第一个平衡点就按错规则算。
     var rgLk = loadRuleGlobal();
     if (rgLk != null) S.rule = rgLk;
   } catch (e) {}
@@ -10966,6 +12079,8 @@ function bootLink() {
           '<span class="dashed-group" id="lkSwGrp">' +
           '<button id="lk_bal" class="btn">' + lkL('交换平衡点', 'Swap Balance') + '</button>' +
           '<button id="lk_eval" class="btn">' + lkL('交换评估', 'Swap Eval') + '</button>' +
+          // ★★ 2026-10-19（用户：「在交换平衡点、交换评估后面，再添加一个取消按键，点击取消后，
+          //   可以停止交换平衡的计算，以及清除上面的平衡标记，恢复正常的初始连线状态」）。
           '<button id="lk_swxcancel" class="btn">' + lkL('取消', 'Cancel') + '</button>' +
           '</span>' +
         '</div>' +
@@ -10984,8 +12099,17 @@ function bootLink() {
         '<canvas id="lkBoard" width="640" height="640"></canvas>' +
       '</div>' +
     '</div>' +
+    // ★★ 2026-10-19（用户：「点击读档会展开一个由连线窗这个小界面由上到下的一个抽屉，里面就是之前
+    //   用户保存的参数名称，最多只能保存 50 个，抽屉里同样有：选择、全选、删除、撤销 4 个功能键，
+    //   两列的风格」）：抽屉 + 点击空白即关的遮罩 + 命名小弹窗，都是 #linkPane 的绝对定位浮层。
     '<div class="lk-drmask" id="lkSlotMask" hidden></div>' +
+    // ★★ 2026-10-19 二次修订（用户：「这个抽屉需要再高 1.2 倍左右（固定高度）；保存的存档条用
+    //   一个小虚线框框起来，虚线框里同时展示 5 个存档，超过 5 个加一个滑动条；四个控制键并排放
+    //   到一行；点存档名字可改名；把『选择』改成『加载』，双击某个存档也能加载」）：
+    //   · `.lk-dr-frame` 就是那个小虚线框（固定高度 = 5 条存档），内部 `.lk-dr-list` 超出即滚动；
+    //   · `.lk-dr-keys` 由 2×2 网格改为一行 4 键并排。
     '<div class="lk-drawer" id="lkSlotDrawer" hidden>' +
+      // ★ 2026-10-23（用户：「读档右上角需要关闭键；存档窗不需要」）：读档抽屉标题行右端加 ✕。
       '<div class="lk-dr-hd">' +
         '<span class="lk-dr-ttl" id="lk_slotInfo"></span>' +
         '<button id="lk_slotX" class="lk-dr-x" aria-label="close" title="' + lkL('关闭', 'Close') + '">&#215;</button>' +
@@ -11008,6 +12132,8 @@ function bootLink() {
             '<button id="lk_nameOk" class="btn"></button>' +
             '<button id="lk_nameNo" class="btn"></button>' +
           '</span>' +
+          // ★ 2026-10-23（用户：「存档窗不需要关闭键」）：这里原来的 ✕ 已移除，
+          //   只留「确定 / 取消」两个键（取消 = 关闭）。
         '</div>' +
         '<input id="lk_nameInp" type="text" maxlength="45" autocomplete="off">' +
       '</div>' +
@@ -11029,9 +12155,12 @@ function bootLink() {
       b.classList.toggle('on', +b.getAttribute('data-rule') === (c.rule >= 0 && c.rule <= 2 ? c.rule : 0));
     });
   }
+  // ★ 2026-10-13（用户：「在用户选择规则的时候，一定要正确链接」）：**全局规则键优先**。
+  //   S.rule 上面刚从全局键载入过 ⇒ 主界面选了什么规则，连线窗开局就用什么规则；
+  //   全局键还没有（首次运行）才退到连线面板自己那份 gbcalc.link.cfg。
   c.rule = (+S.rule === 0 || +S.rule === 1 || +S.rule === 2) ? +S.rule
          : ((c.rule >= 0 && c.rule <= 2) ? +c.rule : 0);
-  lkSaveCfg(c);
+  lkSaveCfg(c);                        // 让 gbcalc.link.cfg 也跟着一致（只作为兜底来源）
   ruleSync();
   q('lk_auto').classList.toggle('on', !!c.auto);
   
@@ -11066,6 +12195,18 @@ function bootLink() {
   };
   q('lk_select').onclick = function () { tellHost({ type: 'linkSelect' }); };
   
+  // ★ 2026-10-18 四次修订（用户：「真实点击和识别参数放到框选棋盘和自动落子的下面，不要放到 AI 执黑
+  //   和 AI 执白的这个框中了」→「框选棋盘、自动落子、×n、真实点击、识别参数为**同一个虚线板块**」）：
+  //   这 5 个键合成一个 `.lk-btns.lk-twoline` 虚线板块，内含两行 `.lk-btns-row`：
+  //     第 1 行 = 框选棋盘 + 识别参数；第 2 行 = 真实点击 + 自动落子 + ×n（次数跟在自动落子后面）。
+  //   它们仍在 AI 区之外（AI 区保持单行：AI执黑 / AI执白 + 思考时间）。
+  //   隐藏的 #__gb_realclick 仍是 bridge.js 的判定源（checked 或 data-on='1'），按钮只负责改它。
+  // ★★ 2026-10-18 晚修订（用户：「软件默认不开『真实点击』」）：
+  //   默认 **关**。原来这里写 `= true`（首次运行就勾上），而真实点击会整体接管物理鼠标 ——
+  //   与「默认不开」正好相反。
+  //   一次性强制关闭 `realClickOff`：老安装的 gbcalc.link.cfg 里已被自动写成 true，
+  //   只改默认值对他们无效（升级后一开连线照样抢鼠标）⇒ 用 migFlag 强制清一次，
+  //   之后再开/关都完全按用户自己的选择持久化。
   if (!migFlag('realClickOff')) c.realClick = false;
   if (c.realClick !== true && c.realClick !== false) c.realClick = false;
   lkSaveCfg(c);
@@ -11087,11 +12228,33 @@ function bootLink() {
   }
   lkSyncTgl();                                   
 
+  // ★★ 2026-10-18 修订（用户：「点击『识别参数』，棋盘上面的按键，更换为各种参数」「各个参数带
+  //   一个小滑动条，各占两行，滑动条一行（条要细），参数名称以及文字框一行」「那 6 个参数一列
+  //   显示（不要两列了）」「不需要下面的提示文字，这样会省出一些空间」「调节后真正能识别的
+  //   效果实时更新」）：
+  //   旧的浮层小窗**取消**，改为「棋盘上方按键就地替换」：
+  //     · 点「识别参数」→ 按钮区 #lkFnBox 隐藏，参数编辑区 #lkRcBox 就地展开；
+  //     · 6 项参数**单列**，每项**两行**（上行 = 细滑动条，下行 = 名称 + 数字框）；无提示文字；
+  //     · 拖滑动条 / 改数字 → 防抖 120ms 发 linkRecogPreview：宿主改「有效参数」**并同时落盘**
+  //       （★ 2026-10-19 修正：原先预览不落盘，用户拖完就关软件 → 下次启动回到默认值，
+  //        正是「连线调整参数的持久化没有做好」的来源），扫描循环下一拍就用新阈值读子 → 棋盘实时反馈；
+  //     · 「应用」→ linkRecogCfg 落盘（宿主单一权威）并收起编辑区；
+  //     · 「取消」→ 本页值回退到打开时那份，并让宿主把有效参数也还原成上次已应用的值（一并落盘）。
+  //   数值框仍只收数字、越界回退原值（沿用旧口径）。
   var rcState = { interval: 200, gray_offset: 50, black_offset: 96,
                   white_offset: 96, black_percent: 33, white_percent: 33 };
   if (c.linkRecog && typeof c.linkRecog === 'object') {
     for (var rk in rcState) if (typeof c.linkRecog[rk] === 'number') rcState[rk] = c.linkRecog[rk] | 0;
   }
+  // ★ 2026-10-18 三次修订（用户：「稍微压缩文本框，在文本框里面有这些提示语：如果棋盘中识别的黑子
+  //   过多，可以降低黑色什么什么参数之类的」）：新增 `hint` —— 每个参数条内常显一行小灰字提示
+  //   （同时作为数字框的 title 悬停提示），指导用户往哪个方向调参。
+  // ★★ 2026-10-18 最终口径（用户：「这是找棋盘的逻辑，用我们昨天的，然后识别棋子的逻辑，
+  //   用今天新的，识别参数恢复那 6 个参数」）：
+  //   定位（自动吸附/找盘）= 自制 findBoardRects + refineGrid；读子（黑白判定）= 今天接入的
+  //   同步算法（readStonesSync / syncCellInfo）。所以 6 个参数**全部生效**：
+  //     · interval      → 宿主侧非锁定扫描周期（g_syncInterval）
+  //     · 其余 5 个阈值 → sync 读子（经 "recog" 下发给 vision）
   var RC_FIELDS = [
     { key: 'interval',      id: 'lk_rc_interval', lo: 40, hi: 2000, step: 10,
       label: lkL('同步时间间隔(ms)', 'Interval (ms)'),
@@ -11117,6 +12280,12 @@ function bootLink() {
     var rcHTML = '';
     for (var ri = 0; ri < RC_FIELDS.length; ri++) {
       var rf = RC_FIELDS[ri];
+      // ★ 2026-10-18 二次修订（用户：「参数名称和数字框放在上面，然后滑动条放到下面，每一个参数
+      //   用一个小虚线框框起来」）：每一项 = 上方「名称 + 数字框」、下方「细滑动条」，
+      //   整项由 .lk-rcitem 的虚线边框单独框住（框形样式见 calc.css）。
+      // ★ 四次修订（用户：「不要在滑动条上面显示这些文字，还是把这些文字放到下面的文本框中」）：
+      //   参数条内**不再**显示提示行（滑条上方只保留「名称 + 数字框」）；提示文字统一写进下方
+      //   的状态文本框 #lkStatus（可滚动），见 rcPanelExtra()。数字框 title 仍保留同一段提示。
       rcHTML +=
         '<div class="lk-rcitem">' +
           '<div class="lk-rcnameline">' +
@@ -11128,12 +12297,17 @@ function bootLink() {
           '" max="' + rf.hi + '" step="' + rf.step + '" tabindex="-1">' +
         '</div>';
     }
+    // ★ 2026-10-18 三次修订（用户：「这个参数条下面再添加一个按键，为通用」）：参数区下方新增
+    //   「通用」——一键载入自制识别引擎的默认阈值（能识别绝大部分棋盘）；详见下方 onclick。
     rcHTML +=
       '<div class="lk-rcbtns">' +
         '<button id="lk_rcGeneral" class="btn" title="' +
         lkL('通用：载入识别默认值（interval 200 / 灰度 50 / 黑偏差 96 / 黑占比 33 / 白偏差 96 / 白占比 33），可识别绝大部分棋盘',
             'General: load the recognition defaults (interval 200 / gray 50 / blackOff 96 / blackPct 33 / whiteOff 96 / whitePct 33)') +
         '">' + lkL('通用', 'General') + '</button>' +
+        // ★★ 2026-10-19（用户：「在通用的后面添加『存档』……然后在保存的后面添加一个功能键『读档』，
+        //   点击读档，会展开一个由连线窗这个小界面由上到下的一个抽屉，里面就是之前用户保存的参数名称，
+        //   最多只能保存 50 个」「『存档 | 读档』这两个小功能键左右胶囊型，再用一个小虚线框框住」）。
         '<span class="lk-slotbox">' +
           '<button id="lk_rcSlotSave" class="btn" title="' +
           lkL('存档：把当前这 6 项参数按主题名称存起来（最多 50 个）',
@@ -11164,16 +12338,24 @@ function bootLink() {
     }
   }
   var rcTimer = 0, rcOrig = null, rcOrigApplied = null;
-  function rcLive() {
+  function rcLive() {   // 实时联动：拖动/改数字 → 宿主生效**并落盘**（★ 2026-10-19：见上方持久化说明）
     clearTimeout(rcTimer);
     rcTimer = setTimeout(function () {
       tellHost({ type: 'linkRecogPreview', recog: rcSnapshot() });
     }, 120);
   }
+  // ★ 2026-10-18 二次修订（用户：「点击识别参数的时候，整个界面只有下面的棋盘和上面的参数和
+  //   参数条」）：进入参数模式时把面板上**其余**部分（按键区、统计行）收起，
+  //   只留「参数区 + 下方提示文本框 + 棋盘」；退出时原样恢复。
   var rcStats = document.querySelector('#linkPane .lk-stats');
   var rcStatusSaved = null;
-  var rcStatusH = 0;
+  var rcStatusH = 0;                     // ★ 七次修订：进入参数模式前量得的文本框高度 × 0.75
   function rcPanelExtra(hide) {
+    // ★ 四次修订（用户：「点开这个识别参数，深度、速度那一行直接消失掉，直接把它腾空」+
+    //   「还是把这些文字放到下面的文本框中，并且下面的文本框支持滑动展示」）：
+    //   · 只把「深度/速度/节点/评估」统计行( .lk-stats )收起腾空；
+    //   · 下方那个文本消息框 #lkStatus **保留**，并写满 6 条识别参数提示（各种文本消息都进这里面）；
+    //   · 参数模式下给 #linkPane 加 rcmode，文本框限高 + overflow-y:auto ⇒ 内容过界可滑动查看。
     if (rcStats) rcStats.hidden = !!hide;
     var paneEl = document.getElementById('linkPane');
     if (paneEl) paneEl.classList.toggle('rcmode', !!hide);
@@ -11182,6 +12364,7 @@ function bootLink() {
     if (hide) {
       if (rcStatusSaved === null) {
         rcStatusSaved = st.innerHTML;
+        // 行内高度 = rcOpen() 里量到的「打开参数界面之前」那个文本框高度 × 0.75
         if (rcStatusH > 0) { st.style.height = rcStatusH + 'px'; st.style.overflowY = 'auto'; }
       }
       var html = '';
@@ -11207,6 +12390,9 @@ function bootLink() {
           black_offset: c.linkRecog.black_offset, white_offset: c.linkRecog.white_offset,
           black_percent: c.linkRecog.black_percent, white_percent: c.linkRecog.white_percent }
       : rcSnapshot();
+    // ★ 2026-10-18 七次修订（用户：「点击识别参数，打开调整界面的时候，文本框自动变矮，
+    //   高度变为之前的 0.75」）：必须在**改布局之前**量 —— 此时按键区还在、统计行还在、
+    //   文案还是常态那几条，这一版高度才是用户眼里「之前的高度」；量完 ×0.75 固定住。
     var st0 = q('lkStatus');
     rcStatusH = (st0 && st0.offsetHeight) ? Math.round(st0.offsetHeight * 0.75) : 0;
     rcPaint();
@@ -11218,25 +12404,25 @@ function bootLink() {
   function rcClose() {
     if (rcBox) rcBox.hidden = true;
     if (lkFnBox) lkFnBox.hidden = false;
-    lkSlotClose();
+    lkSlotClose();                       // 收起参数区时把「读档」抽屉与命名弹窗一并收起
     lkNameClose();
     rcPanelExtra(false);
   }
   for (var fi = 0; fi < RC_FIELDS.length; fi++) {
     (function (f) {
       var s = q(f.id + '_s'), t = q(f.id);
-      if (s && t) s.addEventListener('input', function () {
+      if (s && t) s.addEventListener('input', function () {   // 滑动条一行：即时联动
         var v = parseInt(s.value, 10);
         if (isNaN(v)) return;
         rcState[f.key] = v; t.value = String(v); t.__rcPrev = v; rcLive();
       });
       if (!t) return;
       t.addEventListener('focus', function () { t.__rcPrev = rcState[f.key]; });
-      t.addEventListener('input', function () {
+      t.addEventListener('input', function () {               // 只收数字
         var v = t.value.replace(/[^0-9]/g, '');
         if (v !== t.value) t.value = v;
       });
-      function rcCommit() {
+      function rcCommit() {                                   // 整数校验；越界/空 → 回退原值
         var v = parseInt(t.value, 10);
         var lo = +t.getAttribute('data-min'), hi = +t.getAttribute('data-max');
         if (isNaN(v) || v < lo || v > hi) {
@@ -11252,6 +12438,10 @@ function bootLink() {
     })(RC_FIELDS[fi]);
   }
   if (q('lk_rcparam')) q('lk_rcparam').onclick = rcOpen;
+  // ★ 2026-10-18 三次修订（用户：「这个参数条下面再添加一个按键，为通用，通用就是我们昨天之前就是
+  //   我们自制的识别引擎相关的一些参数，这个参数可以识别绝大部分棋盘」）：
+  //   「通用」= 自制识别引擎的默认阈值 —— 与宿主 g_sync* / gbvision.h SyncRecogParams 完全一致。
+  //   点击后把 6 项填成通用值并即时预览（rcLive）；仍由「应用」落盘、「取消」还原。
   var RC_GENERAL = { interval: 200, gray_offset: 50, black_offset: 96,
                      white_offset: 96, black_percent: 33, white_percent: 33 };
   if (q('lk_rcGeneral')) q('lk_rcGeneral').onclick = function () {
@@ -11261,9 +12451,9 @@ function bootLink() {
   };
   if (q('lk_rcApply')) q('lk_rcApply').onclick = function () {
     c.linkRecog = rcSnapshot();
-    lkSaveCfg(c);
+    lkSaveCfg(c);                                   // 本页兜底缓存（宿主仍为单一权威）
     tellHost({ type: 'linkRecogCfg', recog: c.linkRecog });
-    rcClose();
+    rcClose();                                      // 先复原文本框（含旧消息），再写「已应用」提示
     var stRc = document.getElementById('lkStatus');
     if (stRc) stRc.textContent = lkL('识别参数已应用', 'Recognition params applied');
   };
@@ -11272,11 +12462,21 @@ function bootLink() {
                 black_offset: rcOrig.black_offset, white_offset: rcOrig.white_offset,
                 black_percent: rcOrig.black_percent, white_percent: rcOrig.white_percent };
     rcPaint();
+    // ★ 2026-10-19：宿主收到 cancel 后既回写有效参数、也把这份（还原后的）值落盘 —— 见 host.cpp
+    //   lkApplyRecog(..., persist=true)：取消 = 回到上次已应用的那份，那份本来就该是磁盘上那一份。
     tellHost({ type: 'linkRecogCancel', recog: rcOrigApplied });
     rcClose();
   };
 
   // ═══════════════════════════════════════════════════════════════════════════════════════
+  // ★★ 2026-10-19（用户：「连线调整参数的持久化没有做好，关闭软件再打开，参数又恢复默认了」
+  //   ＋「在通用的后面添加存档 / 读档」）：
+  //   ① 持久化：本页 localStorage 是**延迟提交**的（宿主在退出时直接杀 WebView2 子进程，
+  //      写入常丢 —— 这正是 host.cpp EnginePrefFile 注释里记过的老坑）。所以「识别参数」的
+  //      单一权威只能是宿主那份 GomokuTrainer.linkrecog；这里让**实时预览也落盘**
+  //      （宿主 lkApplyRecog(persist=true)），这样用户拖完滑条就关软件也不会再回到默认值。
+  //   ② 存档：整包列表交给宿主存（GomokuTrainer.linkrecog.slots），本页 localStorage 只当兜底。
+  //      最多 50 个；抽屉里「选择 / 全选 / 删除 / 撤销」4 个功能键两列 2×2。
   // ═══════════════════════════════════════════════════════════════════════════════════════
   var LK_SLOTS_KEY = 'gbcalc.linkrecog.slots';
   var LK_SLOTS_MAX = 50;
@@ -11302,7 +12502,7 @@ function bootLink() {
   function lkSlotsStore() {
     if (lkSlots.length > LK_SLOTS_MAX) lkSlots = lkSlots.slice(0, LK_SLOTS_MAX);
     try { localStorage.setItem(LK_SLOTS_KEY, JSON.stringify(lkSlots)); } catch (e) {}
-    tellHost({ type: 'linkRecogSlots', json: JSON.stringify(lkSlots) });
+    tellHost({ type: 'linkRecogSlots', json: JSON.stringify(lkSlots) });   // 宿主落盘（单一权威）
   }
   function lkEsc(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -11343,16 +12543,22 @@ function bootLink() {
       }
     }
     list.innerHTML = html;
+    // ★★ 2026-10-19 三次修订（用户：「存档里面的名称不用再改了，取消可改名称的这个功能」＋
+    //   「双击某一个历史，也能加载到相应的调整参数上」）：
+    //   · 单击任意处（含名字）→ 勾选/取消勾选（名字不再可点改名）；
+    //   · 双击整条 → 直接加载该存档的参数。
+    //   单击/双击会互相抢占（浏览器先派发 2 次 click 再派发 dblclick），所以单击用 190ms
+    //   去抖：若期间来了第二次点击，就丢弃单击动作，只让 dblclick 生效。
     [].forEach.call(list.querySelectorAll('.lk-dr-item'), function (it) {
       var nm = it.getAttribute('data-name'), hit = 0;
       it.onclick = function () {
-        if (hit) { clearTimeout(hit); hit = 0; return; }
+        if (hit) { clearTimeout(hit); hit = 0; return; }      // 第二次点击：交给 dblclick
         hit = setTimeout(function () { hit = 0; lkSlotToggle(nm); }, 190);
       };
       it.ondblclick = function (ev) {
         if (ev) ev.preventDefault();
         if (hit) { clearTimeout(hit); hit = 0; }
-        lkSlotApply(nm);
+        lkSlotApply(nm);                                      // 双击 = 加载这个存档
       };
     });
     var ai = q('lk_slotAll');
@@ -11376,6 +12582,9 @@ function bootLink() {
     if (!all) for (var i = 0; i < lkSlots.length; i++) lkSlotSel[lkSlots[i].name] = 1;
     lkSlotPaint();
   }
+  // ★★ 2026-10-19 二次修订（用户：「把选择，改成加载，或者双击某一个历史，也能加载到相应的
+  //   调整参数上」）：`lkSlotApply(name)` 的 name 由双击直接给出（跳过必须是唯一勾选的要求）；
+  //   不传 name 时（点「加载」按钮）仍要求恰好勾选 1 个。
   function lkSlotApply(name) {
     var st = q('lkStatus'), nm = name || '';
     if (!nm) {
@@ -11393,7 +12602,7 @@ function bootLink() {
     rcState = { interval: r.interval, gray_offset: r.gray_offset, black_offset: r.black_offset,
                 white_offset: r.white_offset, black_percent: r.black_percent,
                 white_percent: r.white_percent };
-    rcPaint(); rcLive();
+    rcPaint(); rcLive();                      // 即时生效（rcLive 会把这份参数也交给宿主落盘）
     lkSlotClose();
     if (st) st.textContent = lkL('已加载「' + nm + '」并即时生效', 'Loaded preset "' + nm + '" (live)');
   }
@@ -11408,7 +12617,7 @@ function bootLink() {
       if (lkSlotSel[sl.name]) { batch.push(sl); return false; }
       return true;
     });
-    lkSlotUndo.push(batch);
+    lkSlotUndo.push(batch);                   // 撤销栈：可回退最近一次删除
     lkSlotSel = {};
     lkSlotsStore(); lkSlotPaint();
     if (st) st.textContent = lkL('已删除 ' + batch.length + ' 个存档（点「撤销」可找回）',
@@ -11424,6 +12633,13 @@ function bootLink() {
     lkSlotsStore(); lkSlotPaint();
     if (st) st.textContent = lkL('已撤销删除（恢复 ' + back + ' 个存档）', 'Undo done (' + back + ' restored)');
   }
+  // ★★ 2026-10-19 三次修订（用户：「存档命名这个弹窗标题左对齐」「存档里面的名称不用再改了，取消
+  //   可改名称的这个功能」「存档命名默认是（如果用户不想命名）：Parameter 1（2、3…）」＋「英文
+  //   字符名称不可以超过 45 个字母，汉字不可以超过 20 个字符」）：
+  //   · 标题固定四字「存档命名」，靠左（见 .lk-nm-hd/.lk-nm-ttl 的 space-between + text-align:left）；
+  //   · 改名入口已删除 —— 存档条上的名字不再可点改，单击=勾选、双击=加载；
+  //   · 打开即预填默认名 Parameter N（N = 未被占用的最小序号），不想命名直接点「确定」；
+  //   · 名称长度：含汉字 ≤ 20 字符；纯英文 ≤ 45 字母（输入与确定都做截断）。
   var LK_NAME_CJK = /[\u2e80-\u9fff\uf900-\ufaff\uff00-\uffef\u3000-\u303f]/;
   function lkNameClip(s) {
     s = String(s == null ? '' : s);
@@ -11451,7 +12667,7 @@ function bootLink() {
   function lkNameOk() {
     var st = q('lkStatus'), inp = q('lk_nameInp');
     var nm = lkNameClip(((inp && inp.value) || '').replace(/^\s+|\s+$/g, ''));
-    if (!nm) nm = lkDefaultName();
+    if (!nm) nm = lkDefaultName();                    // 空名即用默认 Parameter N
     var rec = rcSnapshot(), hit = false;
     for (var i = 0; i < lkSlots.length; i++) {
       if (lkSlots[i].name === nm) { lkSlots[i].recog = rec; lkSlots[i].ts = Date.now(); hit = true; break; }
@@ -11468,6 +12684,7 @@ function bootLink() {
     if (st) st.textContent = lkL('已存档「' + nm + '」（共 ' + lkSlots.length + ' 个）',
                                  'Saved preset "' + nm + '" (' + lkSlots.length + ' total)');
   }
+  // 「存档」按钮 → 命名弹窗；「加载」按钮 → 用勾选的那个存档（不传 name）。
   if (q('lk_rcSlotSave')) q('lk_rcSlotSave').onclick = function () { lkNameOpen(); };
   if (q('lk_rcSlotLoad')) q('lk_rcSlotLoad').onclick = function () {
     if (slotDrawer && !slotDrawer.hidden) lkSlotClose();
@@ -11478,11 +12695,14 @@ function bootLink() {
   if (q('lk_slotAll')) q('lk_slotAll').onclick = lkSlotAll;
   if (q('lk_slotDel')) q('lk_slotDel').onclick = lkSlotDel;
   if (q('lk_slotUndo')) q('lk_slotUndo').onclick = lkSlotUndoFn;
+  // ★ 2026-10-23（用户：「读档右上角需要关闭键」）：抽屉标题行右端的 ✕ 就等于「收起抽屉」。
   if (q('lk_slotX')) q('lk_slotX').onclick = lkSlotClose;
   if (q('lk_nameOk')) q('lk_nameOk').onclick = lkNameOk;
   if (q('lk_nameNo')) q('lk_nameNo').onclick = lkNameClose;
+  // ✕ 已从「存档命名」弹窗移除（用户 2026-10-23：存档窗不需要关闭键，只留确定/取消）。
   if (q('lkNameMask')) q('lkNameMask').onclick = function (ev) { if (ev && ev.target === this) lkNameClose(); };
   if (q('lk_nameInp')) {
+    // 长度上限即时截断：含汉字 ≤20 字符 / 纯英文 ≤45 字母
     q('lk_nameInp').addEventListener('input', function () {
       var v = lkNameClip(this.value);
       if (v !== this.value) this.value = v;
@@ -11492,7 +12712,7 @@ function bootLink() {
       else if (ev.key === 'Escape') { ev.preventDefault(); lkNameClose(); }
     });
   }
-  lkSlots = lkSlotsFromLocal();
+  lkSlots = lkSlotsFromLocal();               // 先用本页缓存顶上；宿主 ready 后会回填权威那份
 
   window.__lkRcOpen = rcOpen;
   window.__lkRcPaint = rcPaint;
@@ -11501,7 +12721,7 @@ function bootLink() {
     b.onclick = function () {
       c.rule = +b.getAttribute('data-rule'); lkSaveCfg(c); ruleSync(); lkSendCfg();
       lkBridgeRule(c.rule);                    
-      saveRuleGlobal(c.rule);
+      saveRuleGlobal(c.rule);                  // ★ 写全局规则键：主界面下次启动也认这个规则
       if (!lkFramedNow()) lkRemindFrame();     
     };
   });
@@ -11530,6 +12750,10 @@ function bootLink() {
     else linkBalanceEval();
   };
 
+  // ★★ 2026-10-19（用户：「在交换平衡点、交换评估后面再添加一个取消按键，点击取消后，可以停止
+  //   交换平衡的计算，以及清除上面的平衡标记，恢复正常的初始连线状态」）：
+  //   真正的停止/清标记在 bridge.js 的 window.GB_LINK_SWAPCANCEL 里（中断引擎 → 作废在途
+  //   runSwapBal → 清 swQueue / balMarks → 复位界面），本页只负责调用与提示。
   if (q('lk_swxcancel')) q('lk_swxcancel').onclick = function () {
     var ok = false;
     if (typeof window.GB_LINK_SWAPCANCEL === 'function') {
@@ -11554,6 +12778,10 @@ function bootLink() {
     BS.customTurnSec = Math.round((c.turnMs >= 200 ? c.turnMs : 2000) / 100) / 10;
     
     BS.turnMs = (c.turnMs >= 200 ? c.turnMs : 2000); BS.customSec = 600; BS.hashMB = 0;
+    // ★ 2026-10-24（用户：「连线窗是否同步了主界面的后台思考」）：
+    //   冷启动只靠 bridge.js 的 storage 监听是不够的 —— storage 只发给**其它**窗口，
+    //   而且要等主窗下一次写设置才触发。主窗早就开着后台思考、然后才打开连线窗时，
+    //   BS.bgThink 一直是 undefined，「后台思考接力」整条链路不启动。开机就先认共享键。
     try {
       var _bst = JSON.parse(localStorage.getItem('gbcalc.settings.v1') || '{}');
       if (_bst && typeof _bst.bgThink === 'boolean') BS.bgThink = _bst.bgThink;
@@ -11593,6 +12821,10 @@ function bootLink() {
             if (!BS.hasOwnProperty(k)) continue;
             
             if (k === 'lang' || k === 'dark') continue;
+            // ★ 2026-10-13（用户：「在用户选择规则的时候，一定要正确链接」）：
+            //   **规则不由这份「助手状态」恢复** —— 它是另一个键（gbcalc.assist.s），
+            //   内容可能落后于全局规则键，恢复回来就会把刚同步好的规则又改错。
+            //   规则的唯一来源 = 全局规则键 → c.rule → BS.rule（见 bootLink / lkBridgeRule）。
             if (k === 'rule') continue;
             BS[k] = sv[k];
           }
@@ -11716,6 +12948,10 @@ function bootLink() {
     };
   }
 
+  // ★★ 2026-10-17（用户：「点固定变成 ×，下一次打开又变回固定」「卡片移到棋盘左边，
+  //   重启又回原位」）：连线窗走的是 **bootLink**，而原代码在这里**没有面板初始化** ——
+  //   `.pinkey`（固定）和 `.dash`（折叠）根本没绑事件、`loadLayout` 也从不被读。
+  //   主窗 boot() 里有这一整套，连线窗漏了，所以「保存过的固定/布局」在连线窗永远看不到。
   try {
     prefsApplyToS();
     initPanels();
@@ -11773,13 +13009,19 @@ function bootLink() {
       return;
     }
     if (m.type === 'linkCfgSync') {
+      // ★ 2026-10-13（用户：「有禁手和无禁手的平衡点它都是不一样的，在用户选择规则的时候，
+      //   一定要正确链接」）：主界面改了规则推过来时，**必须同时改 bridge 的 BS.rule**。
+      //   原来这里只更新面板高亮（c.rule + ruleSync），而 bridge.js 的引擎调用读的是
+      //   window.GB_S.rule —— 高亮变了、实际喂给引擎的规则没变，等于没同步。
       if (m.rule >= 0 && m.rule <= 2) {
         c.rule = m.rule; ruleSync(); lkBridgeRule(m.rule);
-        saveRuleGlobal(m.rule);
+        saveRuleGlobal(m.rule);              // 全局规则键也跟上（本次会话内一直有效）
       }
       return;
     }
     if (m.type === 'linkRecog' && m.recog) {
+      // ★ 2026-10-18：宿主是本页「识别参数」的单一权威 —— 页面 ready 时回填一次；
+      //   之后每次「应用」宿主也会回填规范化（夹取后）的结果。
       var rr = m.recog;
       if (typeof rr.interval === 'number')      rcState.interval = rr.interval | 0;
       if (typeof rr.gray_offset === 'number')   rcState.gray_offset = rr.gray_offset | 0;
@@ -11795,6 +13037,9 @@ function bootLink() {
       return;
     }
     if (m.type === 'linkRecogSlots' && typeof m.json === 'string') {
+      // ★★ 2026-10-19（用户：「点击读档会展开抽屉，里面就是之前用户保存的参数名称，最多只能保存 50 个」）：
+      //   存档列表以**宿主那份文件**为权威（localStorage 延迟提交会丢）。宿主文件还是空的时候
+      //   （比如刚从旧版本升上来）才把本页缓存顶上并回推给宿主，避免出现两套数据。
       var arr = [];
       try { arr = JSON.parse(m.json) || []; } catch (eS) { arr = []; }
       if (!(arr && typeof arr.length === 'number')) arr = [];
@@ -11825,6 +13070,11 @@ function bootLink() {
       return;
     }
     if (m.type === 'linkStats') {
+      // ★ 2026-10-17（用户：「评估的分数还是会正负抖动，就是符号上的问题」）：
+      //   连线窗评估栏 lk_s_eval 只能有一个数据源 —— 连线窗自己的 bridge
+      //   （BS.myEval → GBUI.setStatPanel）。主窗经 linkStats 传来的 eval 是**主窗自己
+      //   那盘棋**的分数（而且空闲时是 '-'），写进同一个元素就是第二个来源：两个来源
+      //   交替覆盖同一个数字，表现正是「评估分数正负抖动」。此处去掉 eval 映射。
       var sMap = { depth: 'lk_s_depth', speed: 'lk_s_speed', nodes: 'lk_s_nodes' };
       for (var sk in sMap) {
         var elv = document.getElementById(sMap[sk]);

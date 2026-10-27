@@ -6,9 +6,9 @@ A Windows desktop assistant for Gomoku / Renju. It **reads the board you are alr
 
 <p align="center"><img src="docs/images/main.png" width="780" alt="Main window"></p>
 
-> 📄 **Printable bilingual manual (PDF, 48 pages):** [docs/Meter-Gomoku-Manual.pdf](docs/Meter-Gomoku-Manual.pdf)
+> 📄 **Printable bilingual manual (PDF):** [docs/Meter-Gomoku-Manual.pdf](docs/Meter-Gomoku-Manual.pdf)
 
-Current version: **4.43** · Engine: **Rapfi 0.44.1** (mix9 NNUE)
+Current version: **4.46** · Engine: **Rapfi 0.44.1** (mix9 NNUE shipped, mix10 in source)
 
 ---
 
@@ -27,7 +27,7 @@ Current version: **4.43** · Engine: **Rapfi 0.44.1** (mix9 NNUE)
 
 ## 2. Quick start
 
-1. Run `Release/Meter Gomoku_Setup4.43.exe` and finish the installer.
+1. Install **Meter Gomoku 4.46** (from the Releases page) and finish the installer.
 2. Start the app, then open your Gomoku client (or a web board) and get to the game screen.
 3. In the main window click **Link** in the top bar — the small link window appears.
 4. Click **Frame Board** and drag a rectangle around the board *including its outer border*.
@@ -78,7 +78,7 @@ The quickest way to see whether the engine is actually working — every value u
 <td valign="top">
 <ul>
 <li><b>Compute</b> — one deep search of the current position; the best point is marked on the board. The button toggles to <b>Stop</b>.</li>
-<li><b>Multi-point</b> — returns <i>N</i> candidates (2–8, default 4); each ring carries its rank and score.</li>
+<li><b>Multi-point</b> — returns <i>N</i> candidates (1–8, default 3; the same value as <i>Analysis points</i> in Game setup); each ring carries its rank and score.</li>
 <li><b>Balance picks</b> with <b>Points</b> — the engine's native paired balance search; returns points where neither side has a clear edge (<code>|eval| ≤ 50</code> counts as balanced). <b>Points</b> sets how many to return (1–6); an empty board is fixed at 3.</li>
 <li><b>Defend scan</b> — scores every empty point in a 9×9 neighbourhood as <b>W</b> (moves to win) / <b>L</b> (moves to lose); re-scans after each move.</li>
 <li><b>Look-ahead · VCF · VCT</b> — forced-line tools. Look-ahead plays the position forward until five in a row actually appears; VCF uses consecutive fours only; VCT adds live threes.</li>
@@ -92,19 +92,54 @@ The quickest way to see whether the engine is actually working — every value u
 
 ### 3.3 Game setup
 
+The card has three sections; each is shown below with its own explanation.
+
+#### 3.3.1 Game
+
 <table>
 <tr>
-<td width="30%" valign="top"><img src="docs/images/setup.png" width="285" alt="Game setup card"></td>
+<td width="30%" valign="top"><img src="docs/images/setup_a.png" width="290" alt="Game section"></td>
 <td valign="top">
 <ul>
 <li><b>Mode</b> — <i>Play</i> · <i>Free</i> (place stones) · <i>Endgame</i> (mate problem).</li>
 <li><b>AI plays</b> — Black / White toggles; both off means you play both colours.</li>
 <li><b>Think time</b> — 0.2 s to 300 s. Shared with the link window; the two are always in step.</li>
-<li><b>Background thinking</b> — keeps searching during your turn (hot transposition table), so the AI replies faster.</li>
-<li><b>Rules</b> — Freestyle · Overline · Renju.</li>
-<li><b>Engine</b> — <b>Threads</b> (maximum chosen from the real topology: physical cores minus two) and <b>Hash</b> (memory-adaptive). Both are persisted.</li>
-<li><b>Board display</b> — <b>Move numbers</b> on stones, <b>Hover box</b> preview.</li>
-<li><b>Position</b> — copy / paste / load the whole position as one string.</li>
+<li><b>Background thinking</b> — rebuilt on the engine-native <b>pondering</b> in 4.46: while it is on the engine works out your reply during the opponent's turn; while it is off the engine stops the moment it moves (no idle spinning).</li>
+<li><b>Rules</b> — Freestyle · Overline (a six-in-a-row does not win) · Renju (forbidden moves).</li>
+</ul>
+</td>
+</tr>
+</table>
+
+#### 3.3.2 Engine
+
+<table>
+<tr>
+<td width="30%" valign="top"><img src="docs/images/setup_b.png" width="290" alt="Engine section"></td>
+<td valign="top">
+<ul>
+<li><b>Threads</b> — maximum chosen from the real topology (physical cores minus two); <b>Hash</b> — memory-adaptive. Both are persisted.</li>
+<li><b>Engine variant</b> — <i>Auto (recommended)</i> picks the fastest binary from the instruction-set builds by measured throughput; 4.46 fixed the auto-bench that used to mis-pick AVX2.</li>
+<li><b>Weights</b> — <i>NNUE (accurate)</i> for strength, or <i>classical</i> for speed in fast games.</li>
+<li><b>Candidate range</b> — the engine's <code>CAUTION_FACTOR</code> in six steps: 0 most aggressive (5×5 range) … 5 most cautious (whole board), default 3 (7×7+4, the recommended step).</li>
+<li><b>Analysis points</b> — 1–8, default 3; the same value shared with Multi-PV and the Analysis card.</li>
+<li><b>Max depth / Max nodes</b> — optional hard caps; leave at their defaults for unlimited search.</li>
+<li>The Active / Idle / Usage line shows how the hash is split between the main lane and helper lanes.</li>
+</ul>
+</td>
+</tr>
+</table>
+
+#### 3.3.3 Board display and position
+
+<table>
+<tr>
+<td width="30%" valign="top"><img src="docs/images/setup_c.png" width="290" alt="Board display and position"></td>
+<td valign="top">
+<ul>
+<li><b>Move numbers</b> — print the move number on every stone.</li>
+<li><b>Hover box</b> — show a rounded box under the cursor while hovering the board.</li>
+<li><b>Position code</b> — the whole position as one compact string (lowercase column letter + row, moves concatenated; same format as gomocalc.com). <b>Copy</b> / <b>Paste</b> / <b>Load</b> act on it.</li>
 </ul>
 </td>
 </tr>
@@ -142,7 +177,8 @@ Open it from <b>Image</b> in the top bar. It turns a screenshot into a position 
 
 * **Two-stage fusion** — the first frame is pinned down by the app's own detector, which also reports the exact position of all 15 horizontal and 15 vertical lines. Once locked, the synchronous stone reader takes over and the window fingerprint is handed across, so the full search happens exactly once.
 * **Cell-by-cell change detection** — every intersection keeps a 6×6 sample signature, so a still picture re-reads zero cells and a single stone re-reads exactly one.
-* **Image tolerance** — if the whole board reads empty, the thresholds are relaxed once against this frame's own peak; if still empty, a local-contrast reader takes over (it compares each intersection's centre patch with the diagonal patches around it). A grid that does not line up with the lines is re-checked by an older projector-based recogniser, and a whole row of 15 stones — impossible in Gomoku — is treated as a one-cell misalignment and re-read after shifting the grid.
+* **Strict parameters in 4.46** — if any of the five thresholds differs from its default, the strict path is used and the result follows exactly what you set; the whole fallback chain (relaxed re-read, local-contrast reader, grid re-check) only runs while every value is still at its default.
+* **Image tolerance** — when the whole board reads empty at default settings, the thresholds are relaxed once against this frame's own peak; if still empty, a local-contrast reader takes over (it compares each intersection's centre patch with the diagonal patches around it). A whole row of 15 stones — impossible in Gomoku — is treated as a one-cell misalignment and re-read after shifting the grid.
 * **Capture protection** — every mark the app draws is excluded from screen capture, so it can never misread its own overlay as stones.
 
 ---
@@ -211,7 +247,7 @@ One click replaces the button area with the six thresholds; the statistics row f
 <li><b>Gray offset</b> — larger is easier to detect; smaller is stricter.</li>
 <li><b>Black offset / Black percent</b> — the grey threshold and in-cell coverage for Black stones.</li>
 <li><b>White offset / White percent</b> — the same for White stones.</li>
-<li>Dragging or typing applies the value <b>immediately</b> and also saves it.</li>
+<li>Dragging or typing applies the value <b>immediately</b> and also saves it. In 4.46 a non-default value switches recognition to the strict path, so the result follows your numbers instead of being overridden by the fallbacks.</li>
 <li><b>General</b> — restores defaults (200 / 50 / 96 / 33 / 96 / 33).</li>
 <li><b>Save</b> / <b>Load</b> — store the six values under a name (up to 50 presets).</li>
 <li><b>Apply</b> — saves and folds the panel; <b>Cancel</b> restores the last applied values, in the page <i>and</i> in the host.</li>
@@ -232,32 +268,47 @@ One click replaces the button area with the six thresholds; the statistics row f
 
 ---
 
-## 8. Engine update: Rapfi 0.44.1
+## 8. What's new in 4.46
 
-The bundled engine has been moved to the newer **Rapfi 0.44.1** (upstream master, mix9 NNUE) and is built as four instruction-set variants with clang + LTO. Compared with the previous mix8 engine this is a large strength step:
-
-| Area | What changed |
+| Area | Change |
 |---|---|
-| **NNUE** | New **mix9** architecture. Upstream VLTC: **+29 Elo** (freestyle-15), **+21 Elo** (freestyle-20), **+34 Elo** (standard-15), **+56 Elo** (renju-15) versus mix8. |
-| **Instruction sets** | New **AVX-VNNI** and **AVX512-VNNI** builds; the installer ships SSE / AVX2 / AVX512 / AVX-VNNI and picks the best one for your CPU. |
-| **Search** | Optimised search and better scaling on multi-core machines. |
-| **Protocol** | `SWAPABLE` flag and the native `YXBALANCEONE` / `YXBALANCETWO` balance commands, which this app uses directly for swap balance. |
-| **Startup** | Four NNUE networks (~38 MB) are decompressed at launch, so the engine answers its first command after 300–800 ms; the host waits for that before sending the first position. |
-
-The `rapfi/` folder in this repository tracks this newer upstream source. Rapfi is distributed under **GPL-3.0** — see `rapfi/` for the licence text and full source.
+| **Recognition parameters** | Now really take effect: if any of the five thresholds differs from its default, the strict path is used and the fallback chain no longer silently overrides your values; the fallbacks run only while every value is at its default. |
+| **Background thinking** | Rebuilt on engine-native **pondering** (the same rhythm as the official bundle): on = the engine pre-computes your reply during the opponent's turn; off = it stops the moment it moves, so CPU is no longer held high while idle. |
+| **Game settings** | New **style (caution)** selector with six steps (0 most aggressive … 5 most cautious, default 3) plus a **Multi-PV** row (1–8, default 3), each step explained. |
+| **Analysis points** | Shared with Multi-PV and kept in sync both ways; also drives multi-point analysis, look-ahead deep search (floor lowered to 1–2) and the candidate cap of the defence scan. |
+| **Engine variant** | The auto-bench used to mis-pick AVX2 as fastest; it now picks the genuinely fastest variant from measured nodes/s. |
+| **Candidate de-duplication** | Moved down to the engine reply layer, so each point appears once and duplicate ranks are gone. |
+| **Card grouping** | Only the Engine section (candidate range / analysis points / threads / hash) uses the dashed frame; the other sections have no frame. |
+| **Localisation** | All placeholders are filled in the English UI (<code>{n}</code> / <code>{p}</code> no longer leak), and occasional lost lines in concurrent logging are fixed. |
 
 ---
 
-## 9. Performance notes
+## 9. Engine: Rapfi 0.44.1
+
+The bundled engine is **Rapfi 0.44.1**, built as four instruction-set variants with clang + LTO. The source also carries the newer **mix10** NNUE architecture alongside mix9; the shipped weights are the **mix9svq** network (`model260809.bin`), and the Weights selector can fall back to the classical evaluator for speed.
+
+| Area | What it gives |
+|---|---|
+| **NNUE** | **mix9** shipped (upstream VLTC vs mix8: **+29 Elo** freestyle-15, **+21 Elo** freestyle-20, **+34 Elo** standard-15, **+56 Elo** renju-15); **mix10** is in the source tree and selectable once weights are added. |
+| **Instruction sets** | **AVX-VNNI** and **AVX512-VNNI** builds alongside SSE / AVX2 / AVX512; Auto picks the fastest by measured throughput. |
+| **Search** | Optimised search and better scaling on multi-core machines; candidate de-duplication at the reply layer. |
+| **Protocol** | `SWAPABLE` flag and the native `YXBALANCEONE` / `YXBALANCETWO` balance commands, used directly by exchange balance. |
+| **Startup** | NNUE weights are decompressed at launch (several hundred ms); the host waits for the engine to speak before sending the first position. |
+
+The `rapfi/` folder tracks the upstream source. Rapfi is distributed under **GPL-3.0** — see `rapfi/` for the licence text and full source.
+
+---
+
+## 10. Performance notes
 
 * The engine runs as a **separate process** and is never pinned to specific cores — pinning it costs about 5× the nodes per second on modern hybrid CPUs.
 * Recognition gets its own share of the cores and runs at high priority; it is intermittent (cell-by-cell change detection), so it uses a small fraction of one core.
 * The main engine lane owns the whole transposition table; helper lanes drop to a floor value, so total hash usage equals the size you selected.
-* First launch defaults to the top of the thread list (12 threads / 512 MB on a 16-thread machine).
+* With Background thinking off the engine no longer idles at high CPU after moving (4.46).
 
 ---
 
-## 10. Frequently asked questions
+## 11. Frequently asked questions
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -270,27 +321,26 @@ The `rapfi/` folder in this repository tracks this newer upstream source. Rapfi 
 
 ---
 
-## 11. Repository layout
+## 12. Repository layout
 
 ```
 host/      Win32 C++ host: board scan, recognition IPC, engine processes,
            overlay window, simulated clicks (host.cpp, engine_host.*, appver.*)
 ui/        WebView2 front-end: calc.html / calc.css / calc.js / bridge.js
 vision/    screen board & stone recognition (statically linked OpenCV)
-core/      legacy shared engine glue, kept for reference (not loaded by 4.43)
+core/      legacy shared engine glue, kept for reference (not loaded by 4.46)
 rapfi/     Rapfi 0.44.1 search core + per-ISA build presets
            (upstream: dhbloo/rapfi, GPL-3.0)
-Release/   pre-built installer (Meter Gomoku_Setup4.43.exe)
-docs/      screenshots used by this document
+docs/      screenshots and the printable manual used by this document
 ```
 
-> The `ui/` folder is a **reading snapshot** of the shipped 4.43 front-end, not a complete build tree (the engine adapter and a few helper modules are not included). Build scripts, the UI packing tool and intermediate artefacts are intentionally not part of this repository.
+> The `ui/` folder is a **reading snapshot** of the shipped 4.46 front-end, not a complete build tree (the engine adapter and a few helper modules are not included). Build scripts, the UI packing tool and intermediate artefacts are intentionally not part of this repository.
 
 The installer ships the UI as a single packed container (`calc/ui.pak`, binary-encrypted), which the host decrypts in memory before handing it to WebView2 — there is no plain HTML on disk.
 
 ---
 
-## 12. Requirements
+## 13. Requirements
 
 * Windows 10 / 11 (x64)
 * [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (already present on Windows 11)
@@ -298,7 +348,7 @@ The installer ships the UI as a single packed container (`calc/ui.pak`, binary-e
 
 ---
 
-## 13. Building from source (reference)
+## 14. Building from source (reference)
 
 Toolchain: MSVC 2022 (v143), Windows 10/11 SDK, WebView2 SDK, statically linked OpenCV.
 
@@ -309,7 +359,7 @@ Toolchain: MSVC 2022 (v143), Windows 10/11 SDK, WebView2 SDK, statically linked 
 
 ---
 
-## 14. Credits & licence
+## 15. Credits & licence
 
 * Engine: [Rapfi](https://github.com/dhbloo/rapfi) by dhbloo and contributors — the world-class Gomoku/Renju engine behind the search, the evaluation and the `YXBALANCE` opening commands. Distributed under **GPL-3.0**; see `rapfi/` for the licence text and the source.
 * Vision pipeline built on **OpenCV** (Apache-2.0), statically linked.
