@@ -19,7 +19,7 @@
   window.onerror = function (m, s, l, c, e) {
     report('JSERR', m + ' @' + (s || '') + ':' + l + ':' + c +
       (e && e.stack ? ' | ' + String(e.stack).split('\n').slice(0, 3).join(' <- ') : ''));
-    return false;   // 不吞掉：控制台照旧能看到
+    return false;
   };
   window.addEventListener('unhandledrejection', function (ev) {
     var r = ev && ev.reason;
@@ -72,17 +72,17 @@
     <span id="t_title">Meter Gomoku</span><span class="ver" id="t_ver"></span>
   </div>
   <div class="hdr-actions">
-    
+
     <button id="btn_link" class="btn">连线</button>
-    
+
     <button id="btn_vis" class="btn">识图</button>
     <button id="btn_review" class="btn">复盘</button>
-    
+
     <button id="btn_history" class="btn">历史</button>
-    
+
     <button id="btn_about" class="btn" data-tip="aboutTip">关于</button>
     <button id="btn_lang" class="btn ghost">EN</button>
-    
+
     <button id="btn_color" class="btn ghost">颜色</button>
   </div>
 </header>
@@ -96,18 +96,18 @@
       <div class="vis-imgbar">
         <button id="btn_vis_upload" class="btn">上传图片</button>
         <button id="btn_vis_shot" class="btn">屏幕截图</button>
-        
+
         <button id="btn_vis_crop" class="btn">裁剪</button>
-        
+
         <button id="btn_vis_prev" class="btn sq">&lt;</button>
-        
+
         <button id="visPos" class="pill vis-pill">0 / 0</button>
         <button id="btn_vis_next" class="btn sq">&gt;</button>
       </div>
-      
+
       <div class="vis-box" id="visBox">
         <img id="visImg" alt="" hidden>
-        
+
         <textarea id="visInput" spellcheck="false" wrap="soft"></textarea>
         <button id="btn_vis_del" class="btn sq vis-del" title="移除当前张" hidden>✕</button>
       </div>
@@ -115,14 +115,14 @@
         <button id="btn_vis_rec" class="btn accent">识别</button>
         <button id="btn_vis_rc" class="btn" title="识别参数：调整识别的 5 项阈值（拖动即时生效、自动保存）；再次点击关闭">识别参数</button>
         <button id="btn_vis_load" class="btn">加载到练习</button>
-        
+
         <button id="btn_vis_vc" class="btn" title="算杀题模式：黑白子数不统一也可保存/加载，加载后自动 VCF/VCT 模拟">VC 模式</button>
-        
+
         <button id="btn_vis_edit" class="btn">修改</button>
       </div>
-      
+
       <div class="vis-rcbox" id="visRcBox" hidden></div>
-      
+
       <div class="vis-codebar" id="visCodeBar" hidden>
         <span class="hint vcl" id="t_visCode">棋盘代码</span>
         <textarea id="visCode" spellcheck="false" wrap="soft" readonly></textarea>
@@ -157,7 +157,7 @@
       <span class="ttl" id="t_visDrawer">图片</span>
       <span class="hint" id="vdCount">0</span>
       <span class="grow"></span>
-      
+
       <button id="btn_vd_sel" class="btn vd-mini">选择</button>
       <button id="btn_vd_all" class="btn vd-mini">全选</button>
       <button id="btn_vd_del" class="btn vd-mini danger">删除</button>
@@ -171,7 +171,7 @@
     <div id="boardWrap"><canvas id="board"></canvas></div>
 
     <div id="visEditBar" hidden>
-      
+
       <div class="ve-row">
         <button id="btn_ve_swap" class="btn">交换黑白子</button>
         <button id="btn_ve_del" class="btn">删除棋子</button>
@@ -188,11 +188,11 @@
 
     <div id="boardFoot">
       <div class="bf-side bf-l">
-        
+
         <button id="btn_live" class="btn bfkey">分析计算</button>
       </div>
       <div id="boardBtns">
-        
+
         <span class="bgroup nav-group">
           <button id="btn_prev" class="btn ico" title="上一步">←</button>
           <button id="btn_next" class="btn ico" title="下一步">→</button>
@@ -207,13 +207,13 @@
         </span>
       </div>
       <div class="bf-side bf-r">
-        
+
         <button id="btn_aiside" class="btn bfkey">AI 执子</button>
-        
+
         <button id="btn_set" class="btn bfkey">设置</button>
       </div>
     </div>
-    
+
     <div id="mirrorPop" hidden>
       <span class="sp-ttl" id="t_mirrorTtl">翻转棋子布局</span>
       <span class="sp-btns">
@@ -224,7 +224,7 @@
         <button id="btn_mv_close" class="btn ico" title="关闭">✕</button>
       </span>
     </div>
-    
+
     <div id="shiftPop" hidden>
       <span class="sp-ttl" id="t_shiftTtl">局面平移</span>
       <span class="sp-btns">
@@ -235,12 +235,12 @@
         <button id="btn_shift_close" class="btn ico" title="关闭">✕</button>
       </span>
     </div>
-    
+
     <div id="openBar" hidden><span class="hint" id="openHint"></span>
       <button id="btn_ten" class="btn" hidden>十打（叫 10 个候选点）</button><button id="btn_balcall" class="btn" hidden>平衡打点</button><span id="yamaDecl" hidden></span><span id="taraSwap" hidden><button id="btn_tara_yes" class="btn">换手</button><button id="btn_tara_no" class="btn">继续</button></span></div>
 
     <div id="egBar" hidden>
-      
+
       <button id="btn_eg_ok" class="btn">确定</button>
       <button id="btn_eg_seq" class="btn">顺序摆盘</button>
       <button id="btn_eg_free" class="btn">任意摆盘</button>
@@ -260,7 +260,7 @@
 
     <div id="aiSidePop" hidden>
       <span class="ai-grp">
-        
+
         <button id="ai_side_b" data-ai="b" class="tglbtn"><span class="tgl"><i></i></span><span class="tgl-txt">AI 执黑</span></button>
         <button id="ai_side_w" data-ai="w" class="tglbtn"><span class="tgl"><i></i></span><span class="tgl-txt">AI 执白</span></button>
       </span>
@@ -288,7 +288,7 @@
         <button id="btn_rv_prev" class="btn sq" data-tip="prev" hidden>◀</button>
         <span class="pill" id="rvPos" hidden>0 / 0</span>
         <button id="btn_rv_next" class="btn sq" data-tip="next" hidden>▶</button>
-        
+
         <button id="btn_rv_play" class="btn sq" hidden>播放</button>
         <select id="rvSpeed" hidden data-tip="rvSpeedTtl" title="单步间隔 0.5~5 秒">
           <option value="0.5">0.5s</option>
@@ -301,12 +301,12 @@
         </select>
         <button id="btn_rv_exit" class="btn" hidden>退出</button>
       </span>
-      
+
       <button id="btn_rv_num" class="btn">序号</button>
       <button id="btn_redo_rv" class="btn">重来</button>
       <button id="btn_save_rv" class="btn">保存局面</button>
       <button id="btn_rv_hist" class="btn">历史</button>
-      
+
     </div>
   </section>
 
@@ -316,25 +316,22 @@
       <div class="card-h">
         <span class="ttl" id="t_setup">对局设置</span>
         <span class="grow"></span>
-        
+
         <span class="dash" data-tip="dragCard" title="点击折叠 / 展开；按住标题栏拖动换位"></span>
         <button class="pinkey" data-tip="closeCard" data-pin="setup" title="关闭卡片">✕</button>
       </div>
       <div class="card-b">
-        
+
         <div class="sec" data-sec="game">
           <div class="sec-h"><span class="sec-t" id="t_secGame">对局</span></div>
           <div class="sec-b">
-        
-        <!-- ★ 2026-10-25 二次修订（用户：「这个框应用到对局设置里面的『引擎』板块」）：
-             细天蓝虚线框 .grp **只用在「引擎」板块**（线程/哈希、变体/权重、选点范围/点数…），
-             让用户一眼看出哪些是引擎相关设置。「对局」板块（模式/执子/思考/规则）保持原样无框。 -->
+
         <div id="modeGrp">
           <div class="row head"><label id="t_mode">模式</label>
-            
+
             <div class="seg s3" id="seg_mode">
               <button data-mode="pve" class="on">对弈</button>
-              
+
               <span class="subseg">
                 <button data-mode="place">摆盘</button>
                 <button data-mode="endgame">残局</button>
@@ -342,10 +339,10 @@
             </div>
           </div>
         </div>
-        
+
         <div id="sideGrp">
           <div class="row head"><label id="t_side">AI 执子</label>
-            
+
             <div class="seg s2" id="seg_side">
               <button data-ai="b" class="tglbtn"><span class="tgl"><i></i></span><span class="tgl-txt">AI 执黑</span></button>
               <button data-ai="w" class="tglbtn"><span class="tgl"><i></i></span><span class="tgl-txt">AI 执白</span></button>
@@ -353,7 +350,7 @@
           </div>
           <div class="row"><span class="hint" id="sideHint"></span></div>
         </div>
-        
+
         <div class="row" id="turnRow"><label id="t_turn">思考时间</label>
           <span class="field">
             <span class="numbox">
@@ -363,9 +360,7 @@
           </span>
         </div>
         <div class="row"><label id="t_bgThink">后台思考</label>
-          <!-- ★ 2026-10-24（用户：「后台思考由选择键变成像 AI 执黑一样的开关键」）：
-               沿用 #seg_side 同款 .tglbtn/.tgl 滑动开关（左侧 label 已表意，右侧只放开关）；
-               下面的 hint 保留 —— 它还承担「计算占用时已自动暂停」的动态状态（bgThinkHintSync）。 -->
+
           <button id="btn_bgThink" class="tglbtn" type="button" aria-pressed="false"><span class="tgl"><i></i></span></button>
           <span class="hint" id="t_bgThinkHint"></span>
         </div>
@@ -379,28 +374,23 @@
         <div class="row"><span class="hint" id="ruleHint"></span></div>
           </div>
         </div>
-        
+
         <div class="sec" data-sec="engine">
           <div class="sec-h"><span class="sec-t" id="t_secEngine">引擎</span></div>
           <div class="sec-b">
-        
+
         <div class="row"><span class="hint" id="sysInfo"></span></div>
         <div class="grp" id="powerGrp">
         <div class="row"><label id="t_cores">线程数</label>
           <select id="sel_cores"></select>
-          
+
           <span class="hint" id="coresHint"></span>
         </div>
         <div class="row"><label id="t_hash">哈希表</label>
           <select id="sel_hash"></select>
         </div>
         </div>
-        <!-- ★ 2026-10-23（用户：「对局设置里加引擎权重下拉，可选不同权重，不同电脑默认搭配最佳」）：
-             NNUE = mix9svq 权重（准，慢）；传统估值 = 只加载 classical + model260809（快，
-             同时间搜得深）。宿主收到变化后对 config-classic.toml 发 RELOADCONFIG。 -->
-        <!-- ★ 2026-10-24（用户：「引擎变体也让用户选，默认配置最好的，不支持的别显示」）：
-             选项由宿主 caps 的 hasAVX2/hasAVXVNNI/hasAVX512/hasAVX512VNNI 动态生成，
-             默认「自动」= 按 kVariantOrder 从高到低探测；选了就强制那一档（不可用则自动回退）。 -->
+
         <div class="grp" id="buildGrp">
         <div class="row"><label id="t_variant">引擎变体</label>
           <select id="sel_variant"></select>
@@ -411,18 +401,7 @@
           <span class="hint" id="weightsHint"></span>
         </div>
         </div>
-        <!-- ★ 2026-10-24（用户：「参考 gomoku-calculator 加选点范围 / 最大深度 / 最大节点」）：
-             三条都是 gomocup 的 INFO 选项，宿主在每轮 ask 前下发。
-             选点范围 = INFO CAUTION_FACTOR（3 = 三圈半，官方推荐）；
-             最大深度 = INFO MAX_DEPTH（72 官方推荐；2 秒内到不了，纯兜底）；
-             最大节点 = INFO MAX_NODE（0 = 不限制）。 -->
-        <!-- ★ 2026-10-25（用户：「对局设置再添加两个功能键：style（谨慎度）、多主变，默认选最好」）：
-             style = 引擎官方 INFO CAUTION_FACTOR（Yixin 整合包 settings.txt 里的
-             `3  ;style (rash 0 ~ 5 cautious)` 就是这个）。它控制根节点候选点的生成半径
-             （CandidateRange，见 Rapfi core/pos.h）：0=5x5 最窄算得最深但可能漏远处的点，
-             5=全盘每格都算最全但最浅。默认 3 = 7x7+四线，官方推荐值。
-             多主变 = 引擎 INFO 里的 multi-pv（Yixin 的 `3 ;default number of multi-pv`），
-             即 YXNBEST N 的 N：一次搜索回吐前 N 个候选点。与「分析点数」共用同一份设置。 -->
+
         <div class="grp" id="searchGrp">
         <div class="row"><label id="t_candRange">选点范围</label>
           <select id="sel_candRange"></select>
@@ -432,10 +411,7 @@
           <select id="sel_multiPv"></select>
           <span class="hint" id="multiPvHint"></span>
         </div>
-        <!-- ★ 2026-10-24 三次修订（用户截图反馈：嵌入版太挤，恢复之前的逻辑）：
-             撤掉 .sel-in 嵌入，恢复「下拉 + 输入框」两个控件；.duo 让二者独占一整行
-             （label 在上，控件占满下行）。逻辑保留升级版：输入自定义值（4~128 整数 /
-             0.1~256M）→ 下拉追加并选中显示该数字；留空 = 不限；非法值自动收敛。 -->
+
         <div class="row"><label id="t_maxDepth">最大深度</label>
           <span class="duo"><select id="sel_maxDepth"></select><input
                  id="inp_maxDepth" class="num-in" type="number" min="4" max="128" step="1"
@@ -448,11 +424,11 @@
                  class="unit">M</span></span>
         </div>
         </div>
-        
+
         <div class="row"><span class="hint" id="hashInfo"></span></div>
           </div>
         </div>
-        
+
         <div class="sec" data-sec="view">
           <div class="sec-h"><span class="sec-t" id="t_secView">棋盘显示</span></div>
           <div class="sec-b">
@@ -460,14 +436,14 @@
           <input id="chk_num" class="chk-dot" type="checkbox">
           <span class="hint" id="t_showNumHint">棋子上标出第几手</span>
         </div>
-        
+
         <div class="row"><label id="t_preview">预览框</label>
           <input id="chk_preview" class="chk-dot" type="checkbox">
           <span class="hint" id="t_previewHint">鼠标悬停时显示的圆角方框</span>
         </div>
           </div>
         </div>
-        
+
         <div class="sec" data-sec="code">
           <div class="sec-h"><span class="sec-t" id="t_secCode">局面</span></div>
           <div class="sec-b">
@@ -494,9 +470,9 @@
         <button class="pinkey" data-tip="closeCard" data-pin="analysis" title="关闭卡片">✕</button>
       </div>
       <div class="card-b">
-        
+
         <div class="anbtns">
-          
+
           <button id="btn_an_nbest" class="btn">多点分析</button>
           <button id="btn_an_defend" class="btn">扫描防守</button>
           <span class="dashed-group">
@@ -504,16 +480,16 @@
           <span class="hint" data-i18n="anBalLabel">点数</span>
           <select id="btn_an_baln" class="sel" title="平衡点数（1~6，空盘固定 3）"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
           </span>
-          
+
           <button id="btn_an_stop" class="btn accent">计算</button>
-          
+
           <button id="btn_fwd_clear" class="btn" data-i18n="fwdClear" title="清除计算 / 多点分析 / 平衡点 / 扫描防守 / 前瞻 · VCF · VCT 留在棋盘上的所有标记（不动局面）">清除计算</button>
         </div>
-        
+
         <div class="fwdbox" id="fwdBox">
           <div class="fwd-h">
             <button id="btn_fwd" class="btn fwdkey" data-i18n="fwd">前瞻</button>
-            
+
             <button id="btn_fwd_vcf" class="btn fwdkey fwdmini" data-i18n="fwdFindVcf">VCF</button>
             <button id="btn_fwd_vct" class="btn fwdkey fwdmini" data-i18n="fwdFindVct">VCT</button>
             <span class="grow"></span>
@@ -521,7 +497,7 @@
             <button id="btn_fwd_next" class="btn sq2">&gt;</button>
           </div>
           <div class="fwd-h fwd-h2">
-            
+
             <span class="fwd-lg" id="fwdLg" title="进攻方指示框（不可点）：紫框 = 黑子，浅蓝框 = 白子；自动 = 轮走方（算杀题面 = 子多一方）">
               <span class="lgr lgfr-b" id="fwdLgB"><em data-i18n="fwdBlack">黑子</em></span>
               <span class="lgr lgfr-w" id="fwdLgW"><em data-i18n="fwdWhite">白子</em></span>
@@ -532,7 +508,7 @@
           <div class="fwd-body" id="fwdBody"><span class="hint" id="fwdMsg"></span></div>
           <div class="fwd-seq" id="fwdSeq"></div>
         </div>
-        
+
         <div class="row"><label id="t_nbest">分析点数</label>
           <input id="num_nbest" type="number" min="1" max="8" step="1" value="3">
           <span class="hint" id="t_nbestHint">至多 8 点（引擎按局面给点，未必给满）</span>
@@ -541,13 +517,13 @@
           <span class="hint" id="anStatus"></span>
           <div id="anList" class="anlist"></div>
         </div>
-        
+
         <div class="heatbox">
           <div class="row"><label id="t_coach">指导视图</label>
             <input id="chk_coach" class="chk-dot" type="checkbox">
             <span class="hint" id="t_coachHint">方形四色热力：AI 帮你算最佳落点，落子即消失</span>
           </div>
-          
+
           <div class="row" id="heatLegend" hidden>
             <span class="lg"><i style="background:rgba(0,191,165,.75)"></i><span id="t_heatBest">最佳</span></span>
             <span class="lg"><i style="background:rgba(120,200,80,.75)"></i><span id="t_heatGood">良好</span></span>
@@ -561,9 +537,9 @@
     <section class="card" data-id="engine">
       <div class="card-h">
         <span class="ttl" id="t_engine">引擎仪表盘</span>
-        
+
         <span class="grow"></span>
-        
+
         <span class="dash" data-tip="dragCard" title="点击折叠 / 展开；按住标题栏拖动换位"></span>
         <button class="pinkey" data-tip="closeCard" data-pin="engine" title="关闭卡片">✕</button>
       </div>
@@ -573,21 +549,17 @@
           <div class="stat"><span class="k" id="t_speed">速度</span><span class="v" id="st_speed">-</span></div>
           <div class="stat"><span class="k" id="t_nodes">节点</span><span class="v" id="st_nodes">-</span></div>
           <div class="stat"><span class="k" id="t_time">用时</span><span class="v" id="st_time">-</span></div>
-          <!-- ★ 2026-10-23（用户：「「评估」要展示 ai 执子的哪一方」/「为什么里面有个小圆圈，去掉他」）：
-               执子方改成标题上的后缀（评估·黑 / 评估·白），数值统一折算成 **AI 执子方视角**
-               （正 = AI 有利）。不再在数值前画圆点。 -->
+
           <div class="stat"><span class="k" id="t_eval">评估</span><span class="v"><span id="st_eval">-</span></span></div>
           <div class="stat"><span class="k" id="t_best">最佳</span><span class="v" id="st_best">-</span></div>
         </div>
-        <!-- ★ 2026-10-23（用户：「评估曲线板块上移，log 文字框放到评估曲线框的下面」）：
-             顺序改为 曲线 → 黑白信息框 → 消息框。曲线与信息框紧挨着，悬停读数就在曲线正下方。 -->
+
         <div class="curve-head"><span id="t_curveTtl">评估曲线</span></div>
         <div id="curveWrap">
           <canvas id="curveAxis"></canvas>
           <div id="curveScroll"><canvas id="curve"></canvas><div id="curveHover"></div></div>
         </div>
-        <!-- ★ 2026-10-23：取代原来左下角的「黑子/白子」线条图例 —— 两个半透明信息框，
-             分别显示黑 / 白的分数与胜率；鼠标悬停曲线时跟随悬停手数，否则显示最新一手。 -->
+
         <div class="curve-info" id="curveInfo">
           <div class="ci cb">
             <span class="cih" id="t_blackCurve">黑子</span>
@@ -601,22 +573,12 @@
           </div>
         </div>
 
-        <!-- ★ 消息框（2026-10-16 重新设计，用户要求）：固定高度的虚线框，
-             专门盛放消息（引擎状态 / 连线提示 / 最佳着法等）。
-             现在外框 #engMsg 高度恒定，消息只在其内部滚动；#st_line 仍是消息行的容器
-             （既有 textContent 读法只会拿到多行拼接）。 -->
         <div class="eng-msg" id="engMsg">
           <div class="line" id="st_line"></div>
-          <!-- ★ 2026-10-22（用户：「这个卡片也能配合滑动调移动，就是镶嵌在滑动的界面中」）：
-               「路线」小框改为消息框滚动内容的一部分（排在最新消息之后）——
-               拖滑动条时它跟着一起走，自动滚到底时它仍在视野内；
-               代码多/少由引擎当前路线长度决定，卡片高度随之伸缩，不再钉在顶部遮挡消息。 -->
+
           <div class="pv-box" id="pvBox" hidden></div>
         </div>
-        <!-- ★ 2026-10-23（用户：「下架引擎仪表盘最下面的条状提示」）：原来的
-             「轮到你 · 白子（双方都你下）」胶囊整行移除。回合状态改由棋盘右上角的
-             执子提示与仪表盘「评估·黑/白」后缀承载，卡片底部不再留空条。
-             元素已删；`setTurnPill()` 内部有 `if (els.turnPill)` 守卫，照常空转。 -->
+
       </div>
     </section>
 
@@ -628,13 +590,13 @@
     <div class="tabs">
       <button class="tab on" data-tab="hist" id="t_history">历史</button>
       <button class="tab" data-tab="saved" id="t_saved">保存历史</button>
-      
+
       <button id="dr_all" class="btn dr-allbtn">全部选中</button>
     </div>
     <span class="grow"></span>
     <span class="hint" id="drCount">0</span>
   </div>
-  
+
   <div class="dr-actions">
     <button id="dr_open" class="btn">打开</button>
     <button id="dr_save" class="btn accent">保存选中</button>
@@ -678,7 +640,7 @@
     </div>
     <div class="modal-body cp-body">
       <div class="cp-row"><label id="t_cpTheme">主题</label>
-        
+
         <div class="seg s3" id="cp_theme">
           <button data-th="light">浅色</button>
           <button data-th="dark">深色</button>
@@ -691,12 +653,12 @@
           <button data-tg="page">背景</button>
         </div>
       </div>
-      
+
       <div class="cp-picker">
         <canvas id="cp_sv" width="288" height="150"></canvas>
         <canvas id="cp_hue" width="288" height="16"></canvas>
       </div>
-      
+
       <div class="cp-sliders">
         <label>R</label><input id="cp_rn" type="number" min="0" max="255" step="1">
         <label>G</label><input id="cp_gn" type="number" min="0" max="255" step="1">
@@ -705,7 +667,7 @@
       <div class="cp-row"><label id="t_cpHex">RGB 代码</label>
         <input id="cp_hex" spellcheck="false" placeholder="#d9b878">
       </div>
-      
+
       <div class="cp-row" id="cpPresetRow"><label id="t_cpPreset">预制色</label>
         <div class="cp-presets" id="cp_presets"></div>
       </div>
@@ -725,7 +687,6 @@
 
 <input id="file_vis" type="file" accept="image/*" multiple hidden>
 
-<!-- ★ 2026-10-19 回归 4.36：engine-core.js 单源层退役，解析自含于 bridge.js / engine-ai.js -->
 <script src="calc.js"></script>
 </body>
 </html>
