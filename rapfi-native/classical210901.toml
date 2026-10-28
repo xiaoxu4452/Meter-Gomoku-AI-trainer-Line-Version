@@ -1,0 +1,67 @@
+# Rapfi sample config for an older weight set (unused by Meter Gomoku).
+
+[requirement]
+min_version = [0,41,1]
+
+[general]
+reload_config_each_move = false
+clear_hash_after_config_loaded = false
+default_thread_num = 1
+message_mode = "normal"
+coord_conversion_mode = "X_flipY"
+default_candidate_range = "square3_line4"
+memory_reserved_mb = 0
+default_tt_size_kb = 32768
+
+[model]
+binary_file = "model210901.bin"
+
+[search]
+aspiration_window = true
+num_iteration_after_mate = 24
+num_iteration_after_singular_root = 24
+max_search_depth = 99
+
+[search.timectl]
+match_space = 21.0
+match_space_min = 7.0
+average_branch_factor = 1.7
+advanced_stop_ratio = 0.9
+move_horizon = 64
+
+[database]
+enable_by_default = false
+type = "yixindb"
+url = "rapfi.db"
+
+[database.yixindb]
+compressed_save = true
+save_on_close = true
+num_backups_on_save = 2
+ignore_corrupted = true
+
+[database.search]
+readonly_mode = false
+query_ply = 3
+pv_iter_per_ply_increment = 1
+nonpv_iter_per_ply_increment = 2
+pv_write_ply = 0
+pv_write_min_depth = 25
+write_value_range = 800
+mate_write_ply = 2
+mate_write_min_depth_exact = 0
+mate_write_min_depth_nonexact = 0
+mate_write_min_step = 0
+exact_overwrite_ply = 100
+nonexact_overwrite_ply = 0
+overwrite_rule = "better_value_depth_bound"
+overwrite_exact_bias = 4
+overwrite_depth_bound_bias = -1
+query_result_depth_bound_bias = 0
+
+[database.libfile]
+black_win_mark = "a"
+white_win_mark = "c"
+black_lose_mark = "c"
+white_lose_mark = "a"
+ignore_comment = false

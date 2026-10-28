@@ -1,0 +1,20 @@
+Rapfi  --  Gomoku/Renju playing engine
+Copyright (C) 2022 Rapfi developers
+License: GNU General Public License v3.0 (see COPYING-GPLv3.txt)
+Source:  https://github.com/dhbloo/rapfi  (branch master)
+Weights: https://github.com/dhbloo/rapfi-networks  (mix9svq + classical)
+
+This directory contains the OFFICIAL prebuilt Windows binaries of Rapfi 0.43.01
+(release 250615, upstream: https://github.com/dhbloo/rapfi/releases).
+Five CPU variants are shipped; the host picks one at startup by CPUID and then
+runs a real 300ms search as a smoke test (a wrong pick would SIGILL at once):
+  RapfiEngine-avx512vnni.exe  AVX512F/DQ/BW/VL + AVX512_VNNI
+  RapfiEngine-avxvnni.exe     AVX2 + AVX-VNNI (VEX; Intel Alder Lake+ / AMD Zen5+)
+  RapfiEngine-avx512.exe      AVX512F/DQ/BW/VL
+  RapfiEngine-avx2.exe        AVX2 + FMA + BMI2
+  RapfiEngine-sse.exe         baseline (any x64)
+NOTE: these binaries require the OLD-FORMAT classical model (model210901.bin,
+23 204 bytes, shipped in this directory). The newer master-format file (30 109
+bytes) is rejected by them - do not swap it in.
+Pack script: tools/pack-rapfi-native.js  (staging: tools/rapfi-official/)
+Weights extraction: tools/extract-rapfi-networks.js
