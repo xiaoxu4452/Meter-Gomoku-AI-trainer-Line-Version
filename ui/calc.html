@@ -81,9 +81,8 @@
     <button id="btn_history" class="btn">历史</button>
 
     <button id="btn_about" class="btn" data-tip="aboutTip">关于</button>
-    <button id="btn_lang" class="btn ghost">EN</button>
 
-    <button id="btn_color" class="btn ghost">颜色</button>
+    <button id="btn_settings" class="btn">设置</button>
   </div>
 </header>
 
@@ -272,12 +271,6 @@
         </span>
       </span>
       <button id="btn_ai_close" class="btn ico" title="关闭">✕</button>
-    </div>
-
-    <div id="setPop" hidden>
-      <button data-card="engine" class="btn">引擎仪表盘</button>
-      <button data-card="setup" class="btn">对局设置</button>
-      <button data-card="analysis" class="btn">计算评估</button>
     </div>
 
     <div id="rvBar" hidden>
@@ -601,6 +594,45 @@
       <button id="vcxPop_close" class="btn">关闭</button>
     </div>
     <div id="vcxPopBody" class="modal-body"></div>
+  </div>
+</div>
+
+<div id="setWin" class="modal setwin" hidden>
+  <div class="modal-card setwin-card" role="dialog" aria-modal="true" aria-labelledby="t_setWin">
+    <div class="modal-head setwin-h" id="setWinHead">
+      <span class="modal-title" id="t_setWin">设置</span>
+      <span class="grow"></span>
+      <button id="setWin_close" class="btn">关闭</button>
+    </div>
+    <div class="modal-body setwin-b">
+
+      <div class="setkeys" id="setKeys">
+        <button id="btn_set_lang" class="btn setkey" title="点击切换到 English">
+          <span class="sk-k" id="t_setLang">语言</span>
+          <b class="sk-v" id="setLangVal">EN</b>
+        </button>
+        <button id="btn_set_color" class="btn setkey" title="主题与棋子 / 背景配色">
+          <span class="sk-k" id="t_setColor">颜色</span>
+          <b class="sk-v" id="setColorVal">浅色</b>
+        </button>
+        <button class="btn setkey sk-tgl" data-card="engine" title="引擎仪表盘显示在主界面">
+          <i class="sk-dot"></i><span class="sk-k" id="t_setEngine">引擎仪表盘</span>
+        </button>
+        <button class="btn setkey sk-tgl" data-card="analysis" title="计算评估显示在主界面">
+          <i class="sk-dot"></i><span class="sk-k" id="t_setAnalysis">计算评估</span>
+        </button>
+      </div>
+
+      <div class="setbox">
+        <div class="setbox-h"><span class="setbox-t" id="t_setBox">对局设置</span></div>
+        <div class="setbox-b" id="setBoxBody"></div>
+      </div>
+
+      <div class="setpin">
+        <button id="btn_set_pin" class="btn"><span id="t_setPin">固定</span></button>
+        <span class="hint" id="t_setPinHint">固定后关闭设置，「对局设置」仍显示在主界面</span>
+      </div>
+    </div>
   </div>
 </div>
 

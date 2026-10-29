@@ -1363,3 +1363,56 @@ html[lang="en"] body.linkOn #hdr .brand::after{ content:'· Linking'; }
 .duo select{flex:1.618 1 0; min-width:0}
 .duo .num-in{flex:1 1 0; width:auto; min-width:2.6rem; text-align:left}
 .duo .unit{flex:none}
+
+/* ---- settings window: its own floating window, all preferences in one place ---- */
+.setwin-card{width:min(940px,96vw); max-height:min(92vh,880px)}
+#hdr .btn.on{background:var(--card); color:var(--accent); border-color:var(--accent)}
+.setwin-h{cursor:grab; user-select:none}
+body.setwin-drag, body.setwin-drag .setwin-h{cursor:grabbing}
+.setwin-b{display:flex; flex-direction:column; gap:.65rem; padding:.7rem .9rem 1rem; overflow:auto}
+
+.setkeys{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.42rem}
+.setkey{
+  display:flex; align-items:center; justify-content:center; gap:.42rem;
+  height:2.05rem; padding:0 .5rem; font-size:.9rem; white-space:nowrap;
+}
+.setkey .sk-k{overflow:hidden; text-overflow:ellipsis}
+.setkey .sk-v{
+  flex:0 0 auto; font-size:.76rem; font-weight:600; color:var(--accent);
+  padding:.02rem .34rem; border:1px solid var(--border); border-radius:6px;
+}
+.sk-dot{
+  flex:0 0 auto; width:.5rem; height:.5rem; border-radius:50%;
+  border:1.5px solid var(--border); background:transparent;
+}
+.sk-tgl{background:var(--card)}
+.sk-tgl.on{border-color:var(--accent); color:var(--accent); background:var(--card)}
+.sk-tgl.on .sk-dot{background:var(--accent); border-color:var(--accent)}
+
+/* the big dashed frame holding the whole game-setup card, laid out in two columns */
+.setbox{
+  border:1px dashed var(--sub); border-radius:10px;
+  padding:.5rem .7rem .25rem; min-height:5rem;
+  background:rgba(127,127,127,.05);
+}
+.setbox-h{display:flex; align-items:center; gap:.4rem; margin:0 0 .4rem}
+.setbox-t{font-size:.84rem; font-weight:600; color:var(--sub); letter-spacing:.02em}
+.setbox-b .card{background:none; border:0; border-radius:0; padding:0}
+.setbox-b .card-h{display:none}
+.setbox-b .card.collapsed{padding:0; background:none}
+.setbox-b .card.collapsed .card-b{display:block}
+/* two balanced columns: the sections are split by height in layoutSetColumns() */
+.setbox-b .card-b{overflow:visible; display:flex; gap:1.15rem; align-items:flex-start}
+.setcol{flex:1 1 0; min-width:0}
+.setbox-b .sec{margin:0 0 .55rem}
+
+.setpin{display:flex; align-items:center; gap:.5rem; flex-wrap:wrap}
+.setpin .btn{height:1.95rem; padding:0 .95rem; font-size:.88rem}
+/* one pin only: the key inside the settings window. The docked card keeps drag / fold. */
+.card[data-id="setup"] .card-h .pinkey{display:none}
+.setpin .btn.on{border-color:var(--accent); color:var(--accent); background:var(--card)}
+
+@media (max-width:820px){
+  .setkeys{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .setbox-b .card-b{display:block}
+}

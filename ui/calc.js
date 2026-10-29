@@ -233,6 +233,12 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     btnAiside: 'AI 执子', btnSet: '设置', pinFix: '固定',
     pinFixTtl: '固定这张卡片：设置里开其它卡片时它不再被收起',
     pinCloseTtl: '取消固定并关闭这张卡片',
+    setWin: '设置', setLang: '语言', pinOff: '取消固定',
+    pinHint: '固定后关闭设置，「对局设置」仍显示在主界面',
+    pinOnHint: '已固定 · 关闭设置后「对局设置」留在主界面',
+    cardOnTtl: '显示在主界面 · 点击隐藏',
+    cardOffTtl: '已隐藏 · 点击显示在主界面',
+    langTip: '点击切换到 English',
     aiSideB: 'AI 执黑', aiSideW: 'AI 执白', aiTurnLbl: '思考时间',
     tagBal1: '一手平衡', tagBal2: '二手平衡', tagFwd: '前瞻推演', tagTen: '十打选点',
     eval: '评估', best: '最佳', curve: '评估曲线', blackCurve: '黑子', whiteCurve: '白子',
@@ -693,6 +699,12 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     btnAiside: 'AI side', btnSet: 'Settings', pinFix: 'Pin',
     pinFixTtl: 'Pin this card: it stays when other cards are opened from Settings',
     pinCloseTtl: 'Unpin and close this card',
+    setWin: 'Settings', setLang: 'Language', pinOff: 'Unpin',
+    pinHint: 'When pinned, Game Setup stays on the main screen after Settings closes',
+    pinOnHint: 'Pinned - Game Setup stays on the main screen when Settings closes',
+    cardOnTtl: 'Shown on the main screen - click to hide',
+    cardOffTtl: 'Hidden - click to show on the main screen',
+    langTip: 'Click to switch to 中文',
     aiSideB: 'AI Black', aiSideW: 'AI White', aiTurnLbl: 'Think time',
     tagBal1: 'Balance 1', tagBal2: 'Balance 2', tagFwd: 'Look-ahead', tagTen: 'Ten-call',
     eval: 'Eval', best: 'Best', curve: 'Eval curve', blackCurve: 'Black', whiteCurve: 'White',
@@ -1161,7 +1173,11 @@ function grab() {
    'cp_r','cp_g','cp_b','cp_rn','cp_gn','cp_bn','cp_hex','cp_presets','cp_prev','cp_hint','cp_reset',
    'cpPresetRow',
    't_cpTheme','t_cpTarget','t_cpHex','t_cpPreset',
-   'btn_set','setPop','btn_aiside','aiSidePop','btn_ai_close',
+   'btn_set','btn_settings','setPop','btn_aiside','aiSidePop','btn_ai_close',
+   'setWin','setWinHead','setWin_close','setBoxBody','setKeys',
+   'btn_set_lang','btn_set_color','btn_set_pin','setLangVal','setColorVal',
+   't_setWin','t_setBox','t_setLang','t_setColor','t_setEngine','t_setAnalysis',
+   't_setPin','t_setPinHint',
    'ai_side_b','ai_side_w','t_aiTurn','num_turn2','btn_live',
    't_analysis','btn_an_calc','btn_an_bal','btn_an_baln','btn_an_defend',
    'num_nbest','t_nbest','t_nbestHint',
@@ -6535,6 +6551,7 @@ function defaultLayout() {
   });
   CARD_IDS.forEach(function (id) {
     var c = document.querySelector('.card[data-id="' + id + '"]');
+    if (c && setupInWin(c)) return;
     if (c && c.parentNode !== els.dockR && c.parentNode !== els.dockL) els.dockR.appendChild(c);
   });
 }
@@ -6543,6 +6560,7 @@ function defaultLayoutLink() {
   if (!els.dockL) return;
   ['engine', 'setup', 'analysis'].forEach(function (id) {
     var c = document.querySelector('.card[data-id="' + id + '"]');
+    if (c && setupInWin(c)) return;
     if (c) els.dockL.appendChild(c);
   });
 }
@@ -6553,6 +6571,7 @@ function defaultLayoutLink() {
 function cardsToLeftDock() {
   if (!els.dockL) return;
   [].forEach.call(document.querySelectorAll('.card'), function (c) {
+    if (setupInWin(c)) return;
     if (c.parentNode !== els.dockL) els.dockL.appendChild(c);
   });
 }
@@ -6566,7 +6585,7 @@ function applyLayout() {
     if (!list || !els[dn]) return;
     list.forEach(function (id) {
       var card = document.querySelector('.card[data-id="' + id + '"]');
-      if (card) els[dn].appendChild(card);
+      if (card && !setupInWin(card)) els[dn].appendChild(card);
     });
   });
 
@@ -6744,8 +6763,12 @@ function applyLang() {
   els.btn_history.textContent = d.openDrawer;
 
   if (!RV_MODE) {
-    els.btn_color.textContent = d.color;
-    els.t_color.textContent = d.color;
+    if (els.btn_color) els.btn_color.textContent = d.color;
+    if (els.t_color) els.t_color.textContent = d.color;
+    if (els.setColorVal) {
+      var thC = (S.theme === 'dark') ? d.theme : (S.theme === 'custom') ? d.themeCustom : d.theme2;
+      els.setColorVal.textContent = thC;
+    }
     els.cp_close.textContent = d.cpClose;
     els.cp_reset.textContent = d.cpReset;
     els.t_cpTheme.textContent = d.cpTheme;
@@ -6761,6 +6784,20 @@ function applyLang() {
     if (ctt[1]) ctt[1].textContent = d.cpPage;
 
     if (els.btn_set) els.btn_set.textContent = d.btnSet;
+    if (els.btn_settings) els.btn_settings.textContent = d.setWin;
+    if (els.t_setWin) els.t_setWin.textContent = d.setWin;
+    if (els.setWin_close) els.setWin_close.textContent = d.cpClose;
+    if (els.t_setBox) els.t_setBox.textContent = d.setup;
+    if (els.t_setLang) els.t_setLang.textContent = d.setLang;
+    if (els.t_setColor) els.t_setColor.textContent = d.color;
+    if (els.t_setEngine) els.t_setEngine.textContent = d.engine;
+    if (els.t_setAnalysis) els.t_setAnalysis.textContent = d.analysis;
+    if (els.setLangVal) els.setLangVal.textContent = (S.lang === 'en') ? '中文' : 'EN';
+    if (els.btn_set_lang) els.btn_set_lang.title = d.langTip;
+    if (els.btn_settings) els.btn_settings.title = d.setWin;
+    buildCardMenu();
+    // Labels just changed, so the two column heights changed too.
+    if (setWinOpen()) setTimeout(function () { try { layoutSetColumns(); } catch (eLC) {} }, 0);
     if (els.btn_aiside) els.btn_aiside.textContent = d.btnAiside;
     if (els.ai_side_b && els.ai_side_b.querySelector('.tgl-txt')) els.ai_side_b.querySelector('.tgl-txt').textContent = d.aiSideB;
     if (els.ai_side_w && els.ai_side_w.querySelector('.tgl-txt')) els.ai_side_w.querySelector('.tgl-txt').textContent = d.aiSideW;
@@ -6950,6 +6987,12 @@ function applyTheme() {
   drawCurve();
   if (els.btn_color) els.btn_color.title = T('color');
   cpSyncSegs();
+  // keep the colour chip in the settings window in step with the theme
+  if (els.setColorVal) {
+    var dTH = I18N[S.lang] || I18N.zh;
+    els.setColorVal.textContent = (S.theme === 'dark') ? dTH.theme
+      : (S.theme === 'custom') ? dTH.themeCustom : dTH.theme2;
+  }
 
   if (HOST) tellHost({ type: 'uiTheme', theme: themeKey(), bg: pageBgHex(), lang: S.lang, cssVars: S.cssVars });
 }
@@ -7313,8 +7356,7 @@ function openColorPop() {
 function closeColorPop() { if (els.colorPop) els.colorPop.hidden = true; }
 // ---- palette window: board colours, page background, themes ----
 function wireColors() {
-  if (!els.btn_color) return;
-  els.btn_color.onclick = function () { openColorPop(); };
+  if (els.btn_color) els.btn_color.onclick = function () { openColorPop(); };
   els.cp_close.onclick = closeColorPop;
   els.colorPop.addEventListener('click', function (e) { if (e.target === els.colorPop) closeColorPop(); });
   els.cp_theme.onclick = function (e) {
@@ -7543,30 +7585,154 @@ function applyCardVis() {
     var el = document.querySelector('.card[data-id="' + id + '"]');
     if (el) el.hidden = !v[id];
   });
+  // The setup card has two homes: the settings window (while it is open) and its dock (only when
+  // pinned), so its visibility is decided here rather than by the plain hidden flag above.
+  if (setWinOpen()) mountSetupCard(); else restoreSetupCard();
   buildCardMenu();
   syncDocks();
 
   syncPinKeys();
 }
 
-function buildCardMenu() {
-  if (!els.setPop) return;
-  [].forEach.call(els.setPop.querySelectorAll('button[data-card]'), function (b) {
-    var id = b.getAttribute('data-card');
-    b.textContent = T(id);
-    b.classList.toggle('on', !!cardVis()[id]);
+// ---- settings window ------------------------------------------------------------------------
+// One floating window owns every preference: language, colours, which cards sit on the main
+// screen, and the whole game-setup card (two columns inside a dashed frame). The setup card is a
+// single DOM node: it lives in that dashed frame while the window is open, and only goes back to
+// the dock when the user pinned it - so there is never a second copy of the same controls.
+function setWinOpen() { return !!(els.setWin && !els.setWin.hidden); }
+function setupCardEl() { return document.querySelector('.card[data-id="setup"]'); }
+function setupPinned() { return !!cardVis().setup; }
+// True while the card is parked in the settings window (dock loops must leave it alone then).
+function setupInWin(c) { return !!(c && els.setBoxBody && c.parentNode === els.setBoxBody); }
+function setupHomeDock() { return (linkSessionOn() && els.dockL) ? els.dockL : els.dockR; }
+
+function mountSetupCard() {
+  var c = setupCardEl();
+  if (!c || !els.setBoxBody) return;
+  if (c.parentNode !== els.setBoxBody) els.setBoxBody.appendChild(c);
+  c.hidden = false;
+  layoutSetColumns();
+}
+// Two columns inside the dashed frame: sections keep their order but each one goes to whichever
+// column is currently shorter, so a tall "engine" block does not leave half a column empty.
+// Heights are only known while the window is visible; before that they fall back to alternating.
+function layoutSetColumns() {
+  var card = setupCardEl();
+  if (!card) return;
+  var body = card.querySelector('.card-b');
+  if (!body) return;
+  var secs = [].slice.call(body.querySelectorAll('.sec'));
+  if (!secs.length) return;
+  var cols = [].slice.call(body.querySelectorAll(':scope > .setcol'));
+  if (cols.length !== 2) {
+    cols = [document.createElement('div'), document.createElement('div')];
+    cols[0].className = 'setcol';
+    cols[1].className = 'setcol';
+    body.appendChild(cols[0]);
+    body.appendChild(cols[1]);
+  }
+  secs.forEach(function (s, i) { if (s.__ord === undefined) s.__ord = i; });
+  secs.sort(function (a, b) { return a.__ord - b.__ord; });
+  var hs = secs.map(function (s) { return s.offsetHeight || 0; });
+  var measured = hs.some(function (v) { return v > 0; });
+  var hh = [0, 0];
+  secs.forEach(function (s, i) {
+    var k = measured ? (hh[0] <= hh[1] ? 0 : 1) : (i % 2);
+    cols[k].appendChild(s);
+    hh[k] += hs[i];
   });
 }
-function toggleSetPop() {
-  if (!els.setPop) return;
+function restoreSetupCard() {
+  var c = setupCardEl();
+  if (!c) return;
+  if (setupPinned()) {
+    var home = setupHomeDock();
+    if (home && c.parentNode !== home) home.appendChild(c);
+    c.hidden = false;
+  } else {
+    if (els.setBoxBody && c.parentNode !== els.setBoxBody) els.setBoxBody.appendChild(c);
+    c.hidden = true;
+  }
+  syncDocks();
+}
 
+function buildCardMenu() {
+  var v = cardVis();
+  [].forEach.call(document.querySelectorAll('#setKeys .sk-tgl'), function (b) {
+    var id = b.getAttribute('data-card');
+    var on = !!v[id];
+    b.classList.toggle('on', on);
+    b.title = on ? T('cardOnTtl') : T('cardOffTtl');
+  });
+  if (els.btn_set_pin) {
+    var pin = !!v.setup;
+    els.btn_set_pin.classList.toggle('on', pin);
+    if (els.t_setPin) els.t_setPin.textContent = pin ? T('pinOff') : T('pinFix');
+    if (els.t_setPinHint) els.t_setPinHint.textContent = pin ? T('pinOnHint') : T('pinHint');
+  }
+}
+
+function openSettings() {
+  if (!els.setWin) return;
   if (els.aiSidePop && !els.aiSidePop.hidden) {
     els.aiSidePop.hidden = true;
     if (els.btn_aiside) els.btn_aiside.classList.remove('on');
   }
-  els.setPop.hidden = !els.setPop.hidden;
+  els.setWin.hidden = false;
+  mountSetupCard();
   buildCardMenu();
-  if (els.btn_set) els.btn_set.classList.toggle('on', !els.setPop.hidden);
+  if (els.btn_set) els.btn_set.classList.add('on');
+  if (els.btn_settings) els.btn_settings.classList.add('on');
+  layoutBoard();
+}
+function closeSettings() {
+  if (!els.setWin) return;
+  els.setWin.hidden = true;
+  var sc = els.setWin.querySelector('.setwin-card');
+  if (sc) { sc.style.transform = ''; delete sc.dataset.dx; delete sc.dataset.dy; }
+  if (els.btn_set) els.btn_set.classList.remove('on');
+  if (els.btn_settings) els.btn_settings.classList.remove('on');
+  closeColorPop();
+  restoreSetupCard();
+  persistLayout();
+  layoutBoard();
+}
+function toggleSettings() { if (setWinOpen()) closeSettings(); else openSettings(); }
+function toggleSetPop() { toggleSettings(); }
+
+function toggleLangNow() {
+  S.lang = (S.lang === 'zh') ? 'en' : 'zh';
+  save();
+  applyLang();
+  refreshUI();
+}
+// The window is centred by the modal backdrop; dragging the title bar offsets it so the user can
+// push it aside and watch the board while tuning (cleared again on close).
+function wireSetWinDrag() {
+  if (!els.setWinHead || !els.setWin) return;
+  var card = els.setWin.querySelector('.setwin-card');
+  if (!card) return;
+  var d = null;
+  els.setWinHead.addEventListener('mousedown', function (e) {
+    if (e.button !== 0) return;
+    if (e.target && e.target.closest && e.target.closest('.btn')) return;
+    d = { x: e.clientX, y: e.clientY,
+          ox: parseFloat(card.dataset.dx || '0') || 0,
+          oy: parseFloat(card.dataset.dy || '0') || 0 };
+    document.body.classList.add('setwin-drag');
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', function (e) {
+    if (!d) return;
+    var dx = d.ox + (e.clientX - d.x), dy = d.oy + (e.clientY - d.y);
+    card.dataset.dx = String(dx); card.dataset.dy = String(dy);
+    card.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+  });
+  window.addEventListener('mouseup', function () {
+    if (!d) return;
+    d = null;
+    document.body.classList.remove('setwin-drag');
+  });
 }
 
 function cardOrderBySelect(id) {
@@ -7590,10 +7756,8 @@ function toggleCardFromMenu(id) {
   v[id] = opening ? 1 : 0;
   if (!opening) { delete CARD_PIN[id]; savePins(); }
   save();
-  if (opening && (id === 'setup' || id === 'analysis')) {
-    var other = (id === 'setup') ? 'analysis' : 'setup';
-    if (v[other] && !CARD_PIN[other]) v[other] = 0;
-  }
+  // No auto-close between setup and analysis any more: the setup card lives in the settings
+  // window unless it was explicitly pinned, so a pinned card must survive other toggles.
   applyCardVis();
   if (opening) cardOrderBySelect(id);
   syncPinKeys();
@@ -7614,22 +7778,35 @@ function pinKeySync(pk, id) {
 function wireCards() {
 
   if (els.btn_set) {
-    els.btn_set.onclick = function (e) { e.stopPropagation(); toggleSetPop(); };
+    els.btn_set.onclick = function (e) { e.stopPropagation(); toggleSettings(); };
   }
-  if (els.setPop) {
-    [].forEach.call(els.setPop.querySelectorAll('button[data-card]'), function (b) {
-      b.onclick = function () { toggleCardFromMenu(b.getAttribute('data-card')); };
-    });
+  if (els.btn_settings) {
+    els.btn_settings.onclick = function (e) { e.stopPropagation(); toggleSettings(); };
   }
-  function outside(e) {
-    if (!els.setPop || els.setPop.hidden) return;
-    if (els.setPop.contains(e.target)) return;
-    if (e.target && e.target.closest && e.target.closest('#btn_set')) return;
-    els.setPop.hidden = true;
-    if (els.btn_set) els.btn_set.classList.remove('on');
+  if (els.setWin_close) els.setWin_close.onclick = closeSettings;
+  if (els.setWin) {
+    els.setWin.addEventListener('click', function (e) { if (e.target === els.setWin) closeSettings(); });
   }
-  document.addEventListener('mousedown', outside);
-  document.addEventListener('click', outside);
+  [].forEach.call(document.querySelectorAll('#setKeys .sk-tgl'), function (b) {
+    b.onclick = function () { toggleCardFromMenu(b.getAttribute('data-card')); };
+  });
+  if (els.btn_set_lang) els.btn_set_lang.onclick = function () { toggleLangNow(); };
+  if (els.btn_set_color) els.btn_set_color.onclick = function () { openColorPop(); };
+  if (els.btn_set_pin) els.btn_set_pin.onclick = function () {
+    var v = cardVis();
+    v.setup = v.setup ? 0 : 1;
+    if (!v.setup) delete CARD_PIN.setup;
+    save();
+    applyCardVis();
+    persistLayout();
+    layoutBoard();
+  };
+  wireSetWinDrag();
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !setWinOpen()) return;
+    e.stopPropagation();
+    closeSettings();
+  });
 }
 
 function anaTierOf(i) { return Math.min(ANA_PAL.length - 1, i); }
@@ -10313,7 +10490,7 @@ function boot() {
   window.addEventListener('resize', function () { fitFont(); layoutBoard(); visLayout(); });
   if (window.ResizeObserver) new ResizeObserver(function () { fitFont(); layoutBoard(); }).observe(els.boardWrap);
 
-  els.btn_lang.onclick = function () { S.lang = (S.lang === 'zh') ? 'en' : 'zh'; save(); applyLang(); refreshUI(); };
+  if (els.btn_lang) els.btn_lang.onclick = function () { toggleLangNow(); };
 
   els.btn_pause.onclick = function () {
 
