@@ -319,6 +319,7 @@ static void PostToPage(const std::string& json) {
 static const UINT_PTR kMainTimerOutbox = 6;
 static const UINT_PTR kMainTimerHook = 7;
 static const UINT_PTR kMainTimerPrewarmSet = 15;   // pre-create the settings window at boot
+static const UINT_PTR kMainTimerTestSetMin = 16;   // GB_TEST_SET_MINIMIZE: minimize the settings window
 
 static const UINT kMsgFlushOutbox = WM_APP + 2;
 
@@ -4412,6 +4413,15 @@ static void FireTestHooks() {
     LogMsg("[set] test hook: settings window opened");
   }
   memset(tv, 0, sizeof(tv));
+  if (GetEnvironmentVariableA("GB_TEST_SET_MINIMIZE", tv, sizeof(tv)) && tv[0] == '1') {
+    UINT delayMs = 4000;                 // the settings window prewarm lands ~1.5 s after boot
+    char dv[16] = {0};
+    if (GetEnvironmentVariableA("GB_TEST_SET_MINIMIZE_DELAY_MS", dv, sizeof(dv)) && atoi(dv) > 0)
+      delayMs = (UINT)atoi(dv);
+    SetTimer(g_hwnd, kMainTimerTestSetMin, delayMs, nullptr);
+    LogMsg("[set] test hook: minimizing the settings window in " + std::to_string(delayMs) + " ms");
+  }
+  memset(tv, 0, sizeof(tv));
   if (GetEnvironmentVariableA("GB_TEST_SAVE_POS", tv, sizeof(tv)) && tv[0] == '1') {
     PostToPage("{\"type\":\"testSavePos\"}");
     LogMsg("[save] test hook: asked the page to save the position");
@@ -8019,8 +8029,23 @@ static LRESULT CALLBACK SetWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       PaintSplash(h, g_setPageReady, kBrandNameSet);
       return 0;
     case WM_SIZE:
+      if (w == SIZE_RESTORED || w == SIZE_MAXIMIZED) {
+        // back from the taskbar: claim the privileged (topmost) level again
+        if (!(GetWindowLongPtrW(h, GWL_EXSTYLE) & WS_EX_TOPMOST)) {
+          SetWindowPos(h, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+          LogMsg("[set] restored -> topmost again");
+        }
+      }
       LayoutSetWebView();
       return 0;
+    case WM_SYSCOMMAND:
+      if ((static_cast<UINT>(w) & 0xFFF0) == SC_MINIMIZE) {
+        // a TOPMOST window minimizes into a floating caption ABOVE the taskbar; drop the
+        // privileged level first so it lands in the taskbar like any normal window
+        SetWindowPos(h, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        LogMsg("[set] minimize -> taskbar (topmost dropped)");
+      }
+      break;                     // DefWindowProc performs the actual minimize
     case WM_CLOSE:
       DestroyWindow(h);
       return 0;
@@ -8261,6 +8286,17 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       if (w == kMainTimerHook) {
         KillTimer(h, kMainTimerHook);
         FireTestHooks();
+        return 0;
+      }
+
+      if (w == kMainTimerTestSetMin) {
+        KillTimer(h, kMainTimerTestSetMin);
+        if (g_setHwnd && IsWindow(g_setHwnd)) {
+          PostMessageW(g_setHwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
+          LogMsg("[set] test hook: SC_MINIMIZE posted");
+        } else {
+          LogMsg("[set] test hook: settings window is not there yet");
+        }
         return 0;
       }
       
