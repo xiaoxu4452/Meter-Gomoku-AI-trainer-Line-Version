@@ -457,7 +457,7 @@
 
         <div class="anbtns">
 
-          <button id="btn_an_nbest" class="btn">多点分析</button>
+          <button id="btn_an_calc" class="btn accent">分析计算</button>
           <button id="btn_an_defend" class="btn">扫描防守</button>
           <span class="dashed-group">
           <button id="btn_an_bal" class="btn">平衡点</button>
@@ -465,9 +465,7 @@
           <select id="btn_an_baln" class="sel" title="平衡点数（1~6，空盘固定 3）"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
           </span>
 
-          <button id="btn_an_stop" class="btn accent">计算</button>
-
-          <button id="btn_fwd_clear" class="btn" data-i18n="fwdClear" title="清除计算 / 多点分析 / 平衡点 / 扫描防守 / 前瞻 · VCF · VCT 留在棋盘上的所有标记（不动局面）">清除计算</button>
+          <button id="btn_fwd_clear" class="btn wide" data-i18n="fwdClear" title="清除计算 / 平衡点 / 扫描防守 / 前瞻 · VCF · VCT 留在棋盘上的所有标记（不动局面）">清除计算</button>
         </div>
 
         <div class="fwdbox" id="fwdBox">
@@ -493,27 +491,12 @@
           <div class="fwd-seq" id="fwdSeq"></div>
         </div>
 
-        <div class="row"><label id="t_nbest">分析点数</label>
+        <div class="row nbestRow"><label id="t_nbest">分析点数</label>
           <input id="num_nbest" type="number" min="1" max="8" step="1" value="3">
-          <span class="hint" id="t_nbestHint">至多 8 点（引擎按局面给点，未必给满）</span>
         </div>
         <div class="row col" id="anStatusRow">
           <span class="hint" id="anStatus"></span>
           <div id="anList" class="anlist"></div>
-        </div>
-
-        <div class="heatbox">
-          <div class="row"><label id="t_coach">指导视图</label>
-            <input id="chk_coach" class="chk-dot" type="checkbox">
-            <span class="hint" id="t_coachHint">方形四色热力：AI 帮你算最佳落点，落子即消失</span>
-          </div>
-
-          <div class="row" id="heatLegend" hidden>
-            <span class="lg"><i style="background:rgba(0,191,165,.75)"></i><span id="t_heatBest">最佳</span></span>
-            <span class="lg"><i style="background:rgba(120,200,80,.75)"></i><span id="t_heatGood">良好</span></span>
-            <span class="lg"><i style="background:rgba(255,179,193,.8)"></i><span id="t_heatFair">一般</span></span>
-            <span class="lg"><i style="background:rgba(255,200,215,.8)"></i><span id="t_heatPoor">劣势</span></span>
-          </div>
         </div>
       </div>
     </section>

@@ -717,6 +717,10 @@ button.sq2{flex:0 0 auto; padding:.22rem .52rem; font-size:.82rem; border-radius
 
 .anbtns{display:grid; grid-template-columns:1fr 1fr; gap:.32rem; margin-bottom:.42rem}
 .anbtns .btn{width:100%; padding:.34rem .25rem; font-size:.85rem; white-space:nowrap}
+/* analysis points: label + number box on one line */
+.nbestRow{flex-wrap:nowrap !important}
+.nbestRow>label{flex:0 0 auto; white-space:nowrap}
+.nbestRow>input[type=number]{flex:0 0 auto; width:4.8rem}
 .anbtns .btn.on{background:var(--chip-on); color:var(--chip-on-ink); border-color:var(--chip-on)}
 
 .anbtns .wide{grid-column:1 / -1; padding:.42rem .25rem}

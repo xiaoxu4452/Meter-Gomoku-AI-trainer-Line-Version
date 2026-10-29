@@ -317,7 +317,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
 
     analysis: '计算评估',
 
-    anCalc: '计算', anStop: '停止计算', anDefend: '扫描防守', anStopScan: '停止扫描',
+    anCalc: '分析计算', anStop: '停止计算', anDefend: '扫描防守', anStopScan: '停止扫描',
     anNbest: '多点分析', anBal: '平衡点', anBaln: '点数',
     anDefendDone: '扫 {c} 点：%越高越要防，W=距赢 L=距输',
     anDefendRefine: '持续加深…第 {r} 轮 · 每轮 {t}s',
@@ -760,7 +760,7 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     cards: 'Cards', cardsHint: 'Pick the panels shown right of the board',
     cardSideL: 'L', cardSideR: 'R',
     analysis: 'Analysis',
-    anCalc: 'Compute', anStop: 'Stop', anDefend: 'Defend scan', anStopScan: 'Stop scan',
+    anCalc: 'Analyze', anStop: 'Stop', anDefend: 'Defend scan', anStopScan: 'Stop scan',
     anNbest: 'Multi-point', anBal: 'Balance picks', anBaln: 'Points',
     anDefendDone: 'Scanned {c} points: higher % = more urgent (W = to win, L = to lose)',
     anDefendRefine: 'Deepening… round {r} · {t}s each',
@@ -1147,7 +1147,7 @@ function grab() {
    't_cpTheme','t_cpTarget','t_cpHex','t_cpPreset',
    'btn_set','setPop','btn_aiside','aiSidePop','btn_ai_close',
    'ai_side_b','ai_side_w','t_aiTurn','num_turn2','btn_live',
-   't_analysis','btn_an_stop','btn_an_nbest','btn_an_bal','btn_an_baln','btn_an_defend',
+   't_analysis','btn_an_calc','btn_an_bal','btn_an_baln','btn_an_defend',
    'num_nbest','t_nbest','t_nbestHint','anStatus','anList','anStatusRow',
    't_history','t_saved','t_drTip'].forEach(function (id) {
     els[id] = document.getElementById(id);
@@ -1277,6 +1277,12 @@ function paint() {
     ctx.moveTo(p, pad); ctx.lineTo(p, pad + gap * (N - 1));
   }
   ctx.stroke();
+
+  // Board frame: the outer boundary is drawn twice as thick as the inner grid lines.
+  ctx.save();
+  ctx.lineWidth = Math.max(1, size / 700) * 2;
+  ctx.strokeRect(pad, pad, gap * (N - 1), gap * (N - 1));
+  ctx.restore();
 
   ctx.fillStyle = css('--axis');
   ctx.font = Math.max(7, g.axis * 0.5) + 'px "Segoe UI",system-ui,sans-serif';
@@ -6728,7 +6734,6 @@ function applyLang() {
     [].forEach.call(document.querySelectorAll('.ci-score'), function (el) { el.textContent = d.score; });
     [].forEach.call(document.querySelectorAll('.ci-win'), function (el) { el.textContent = d.winRate; });
     drawCurveInfo();
-    els.btn_an_nbest.textContent = (G.ana.busy && G.ana.kind === 'nbest') ? d.anStop : d.anNbest;
     els.btn_an_defend.textContent = (G.ana.busy && G.ana.kind === 'defend') ? d.anStopScan : d.anDefend;
     els.btn_an_bal.textContent = d.anBal;
     if (els.btn_an_baln) { els.btn_an_baln.value = String(balPN()); els.btn_an_baln.title = d.anBalnHint; }
@@ -6746,7 +6751,7 @@ function applyLang() {
     if (els.fwdMsg && !G.fwd.busy && !(G.fwd.line && G.fwd.line.length)) els.fwdMsg.textContent = d.fwdIdle;
     anaCalcUI();
     els.t_nbest.textContent = d.nbest;
-    els.t_nbestHint.textContent = d.nbestHint;
+    if (els.t_nbestHint) els.t_nbestHint.textContent = d.nbestHint;
     if (els.t_multiPv) els.t_multiPv.textContent = d.multiPv;
     if (els.multiPvHint) els.multiPvHint.textContent = d.multiPvHint;
     if (els.candRangeHint) els.candRangeHint.textContent = d.candRangeHint || '';
@@ -7593,21 +7598,18 @@ function pvText(line) {
 }
 
 function anaMark(btn) {
-  [els.btn_an_nbest, els.btn_an_bal, els.btn_an_baln, els.btn_an_defend].forEach(function (b) {
+  [els.btn_an_calc, els.btn_an_bal, els.btn_an_baln, els.btn_an_defend].forEach(function (b) {
     if (b) b.classList.toggle('on', !!btn && b === btn);
   });
   anaCalcUI();
 }
 
 function anaCalcUI() {
-  if (!els.btn_an_stop) return;
+  if (!els.btn_an_calc) return;
   var busy = !!G.ana.busy;
-  els.btn_an_stop.disabled = false;
-  els.btn_an_stop.classList.toggle('on', busy);
-  els.btn_an_stop.textContent = busy ? T('anStop') : T('anCalc');
-  if (els.btn_an_nbest) {
-    els.btn_an_nbest.textContent = (busy && G.ana.kind === 'nbest') ? T('anStop') : T('anNbest');
-  }
+  els.btn_an_calc.disabled = false;
+  els.btn_an_calc.classList.toggle('on', busy);
+  els.btn_an_calc.textContent = busy ? T('anStop') : T('anCalc');
   if (els.btn_an_defend) {
     els.btn_an_defend.textContent = (busy && G.ana.kind === 'defend') ? T('anStopScan') : T('anDefend');
   }
@@ -7779,7 +7781,7 @@ async function anaCalc() {
   G.ana.busy = true; G.ana.kind = 'calc';
   G.ana.marks = []; G.ana.rows = [];
   setPvLine([]);
-  anaMark(els.btn_an_stop);
+  anaMark(els.btn_an_calc);
   renderAna(T('anCalcRun').replace('{d}', '0'));
   anaLiveRun('calc', 1, 'tagCalc');
 }
@@ -9469,7 +9471,7 @@ async function anaNbest() {
   G.ana.busy = true; G.ana.kind = 'nbest';
   G.ana.marks = []; G.ana.rows = [];
   setPvLine([]);
-  anaMark(els.btn_an_nbest);
+  anaMark(null);
   renderAna(T('anNbestRun').replace('{d}', '0'));
   anaLiveRun('nbest', N, 'tagNbest');
 }
@@ -9770,11 +9772,9 @@ function balPN() {
 
 function wireAnalysis() {
   wireCurveHover();
-  if (!els.btn_an_nbest) return;
+  if (!els.btn_an_calc) return;
 
-  els.btn_an_stop.onclick = function () { if (G.ana.busy) anaStop(); else anaCalc(); };
-
-  els.btn_an_nbest.onclick = function () { if (G.ana.busy && G.ana.kind === 'nbest') { anaStop(); return; } anaNbest(); };
+  els.btn_an_calc.onclick = function () { if (G.ana.busy) anaStop(); else anaCalc(); };
 
   els.btn_fwd.onclick = function () { fwdToggle(); };
 
@@ -10073,6 +10073,7 @@ function boot() {
 
   // Move numbers are the default now, so switch existing profiles on once.
   if (!migFlag('showNumOn')) { S.showNum = true; try { save(); } catch (eSN) {} }
+  S.coach = false;   // coach view retired from the UI: never paint its heat marks again
 
   if (!G.board) G.board = newBoard();
   enginePrefEnsure();    // seed the engine key from legacy saves (one-time)
@@ -10232,6 +10233,10 @@ function boot() {
       if (ev.key !== 'Enter' || ev.shiftKey) return;
       ev.preventDefault();
       loadFromCode(els.inp_code.value);
+    });
+    // Ctrl+V into the box shows the position immediately (the browser inserts after this event).
+    els.inp_code.addEventListener('paste', function () {
+      setTimeout(function () { applyCodeText(els.inp_code.value); }, 0);
     });
   }
 
@@ -10462,7 +10467,7 @@ function boot() {
     save(); applyEngineConfig();
   };
 
-  els.chk_coach.onchange = function () {
+  if (els.chk_coach) els.chk_coach.onchange = function () {
     S.coach = !!els.chk_coach.checked; save();
     if (S.coach) { evalQuietAi(); refreshCoach().then(paint); }
     else { clearCoach(); paint(); }
@@ -10488,7 +10493,7 @@ function boot() {
 
   els.num_turn.value = turnSecs();
   els.sel_rule.value = String(S.rule);
-  els.chk_coach.checked = !!S.coach;
+  if (els.chk_coach) els.chk_coach.checked = !!S.coach;
   els.chk_num.checked = !!S.showNum;
   els.chk_preview.checked = S.previewOn !== false;
   if (els.btn_bgThink) {
@@ -11156,6 +11161,12 @@ function lkPaintBoard() {
     ctx.moveTo(ox + o, oy); ctx.lineTo(ox + o, oy + span);
   }
   ctx.stroke();
+
+  // Same as the main board: frame twice as thick as the inner lines.
+  ctx.save();
+  ctx.lineWidth = Math.max(1, cell * R.line) * 2;
+  ctx.strokeRect(ox, oy, span, span);
+  ctx.restore();
 
   ctx.fillStyle = css('--axis', '#7a6338');
   ctx.font = Math.max(6, cell * R.font) + 'px "Segoe UI",system-ui,sans-serif';
