@@ -101,7 +101,7 @@ var I18N = {
     fwdVctNone: '当前局面，{c}（所选进攻方）不存在VCT强制连续冲四杀棋',
     fwdClear: '清除计算',
 
-    markCleared: '已清除棋盘上的所有分析标记（计算 / 多点分析 / 平衡点 / 扫描防守 / 前瞻 · VCF · VCT）',
+    markCleared: '已清除棋盘上的所有分析标记（分析计算 / 平衡点 / 扫描防守 / 前瞻 · VCF · VCT）',
     vcxPopTitle: '算杀结果',
     fwdAtkAuto: '进攻方：自动 —— 轮走方（算杀题面按惯例 = 子多的一方）。黑/白框只是**指示框，不可点**',
     fwdAtkB: '进攻方：黑棋（自动判定）',
@@ -455,6 +455,10 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     anBalFail: '平衡搜索失败：',
     anBalnSet: '平衡点数已设为 {n}（空盘固定 3）',
     anBalnHint: '平衡点数（1~6，空盘固定 3）',
+    balRunStat: '平衡计算中 · 第 {r} 轮 · 深度 {d} · 已用 {t}s —— 再点「平衡点」停止并把最终结果画到棋盘',
+    balStopShow: '停止并显示',
+    balRunTip: '引擎官方平衡搜索（YXBALANCETWO）：每跑完一轮就把预算加大再算一轮，越算越准；再点一次才把最后结果画到棋盘',
+    balShown: '平衡结果已画到棋盘 · 深度 {d}',
     anBalLabel: '点数',
     anBalColor: '（蓝色 = 白子，紫色 = 黑子）',
 
@@ -556,7 +560,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     fwdVcfNone: 'No VCF (forcing fours) win exists for {c} (the chosen attacker) in this position',
     fwdVctNone: 'No VCT (continuous threats) win exists for {c} (the chosen attacker) in this position',
     fwdClear: 'Clear calc',
-    markCleared: 'Cleared every analysis mark on the board (Calculating / Multi-point / Balance picks / Scan def / Lookahead \u00b7 VCF \u00b7 VCT)',
+    markCleared: 'Cleared every analysis mark on the board (Live analysis / Balance picks / Scan def / Lookahead \u00b7 VCF \u00b7 VCT)',
     vcxPopTitle: 'Solver result',
     fwdAtkAuto: 'Attacker: auto - the side to move (mate puzzles: the majority side, as usual). The black/white frames are indicators only, not clickable',
     fwdAtkB: 'Attacker: Black (auto)',
@@ -894,6 +898,10 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     anBalFail: 'Balance search failed: ',
     anBalnSet: 'Balance point count set to {n} (3 fixed on empty board)',
     anBalnHint: 'Balance point count (1-6, 3 fixed on empty board)',
+    balRunStat: 'Balancing · round {r} · depth {d} · {t}s — press Balance again to stop and draw the final result',
+    balStopShow: 'Stop & show',
+    balRunTip: 'Engine-native balance search (YXBALANCETWO): every finished round re-runs with a larger budget, so it keeps getting more accurate; press again to put the last result on the board',
+    balShown: 'Balance result drawn on the board · depth {d}',
     anBalLabel: 'Points',
     anBalColor: ' (Blue = White, Purple = Black)',
 
@@ -1268,33 +1276,45 @@ function paint() {
   ctx.fillStyle = css('--board');
   ctx.fillRect(0, 0, size, size);
 
+  // Grid: drawn on device-pixel boundaries with an integer device line width, so a 1 px line
+  // lands exactly on the raster and never turns into a grey half-pixel smear.
+  var lwDev = Math.max(1, Math.round(size * dpr / 620));
+  var even = function (v) { return Math.round(v * dpr) / dpr; };
+  var odd = function (v) { return (Math.round(v * dpr) + (lwDev % 2 ? 0.5 : 0)) / dpr; };
+  var x0 = even(pad), x1 = even(pad + gap * (N - 1));
   ctx.strokeStyle = css('--line');
-  ctx.lineWidth = Math.max(1, size / 700);
+  ctx.lineWidth = lwDev / dpr;
   ctx.beginPath();
   for (var i = 0; i < N; i++) {
-    var p = pad + i * gap;
-    ctx.moveTo(pad, p); ctx.lineTo(pad + gap * (N - 1), p);
-    ctx.moveTo(p, pad); ctx.lineTo(p, pad + gap * (N - 1));
+    var p = odd(pad + i * gap);
+    ctx.moveTo(x0, p); ctx.lineTo(x1, p);
+    ctx.moveTo(p, x0); ctx.lineTo(p, x1);
   }
   ctx.stroke();
 
   // Board frame: the outer boundary is drawn twice as thick as the inner grid lines.
   ctx.save();
-  ctx.lineWidth = Math.max(1, size / 700) * 2;
-  ctx.strokeRect(pad, pad, gap * (N - 1), gap * (N - 1));
+  ctx.lineWidth = (lwDev * 2) / dpr;
+  ctx.strokeRect(x0, x0, x1 - x0, x1 - x0);
   ctx.restore();
 
   ctx.fillStyle = css('--axis');
-  ctx.font = Math.max(7, g.axis * 0.5) + 'px "Segoe UI",system-ui,sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  var coordPx = Math.max(10, Math.round(g.axis * 0.52 * dpr));
+  ctx.font = '600 ' + (coordPx / dpr) + 'px "Segoe UI",system-ui,-apple-system,sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  var aMid = g.axis * 0.5, aBase = even(size - aMid);
   for (i = 0; i < N; i++) {
-    var cx = pad + i * gap;
+    var cx = even(pad + i * gap);
     var letter = String.fromCharCode(65 + i);
-    ctx.fillText(letter, cx, g.axis * 0.5);
-    ctx.fillText(letter, cx, size - g.axis * 0.5);
     var num = String(N - i);
-    ctx.fillText(num, g.axis * 0.5, cx);
-    ctx.fillText(num, size - g.axis * 0.5, cx);
+    var ml = ctx.measureText(letter);
+    var dyL = (ml.actualBoundingBoxAscent - ml.actualBoundingBoxDescent) / 2;
+    ctx.fillText(letter, cx, even(aMid) + dyL);
+    ctx.fillText(letter, cx, aBase + dyL);
+    var mn = ctx.measureText(num);
+    var dyN = (mn.actualBoundingBoxAscent - mn.actualBoundingBoxDescent) / 2;
+    ctx.fillText(num, even(aMid), even(pad + i * gap) + dyN);
+    ctx.fillText(num, even(size - aMid), even(pad + i * gap) + dyN);
   }
 
   ctx.fillStyle = css('--star');
@@ -2236,7 +2256,7 @@ var LocalAI = (function () {
       if (/^[+-]?M/.test(ev)) num = (ev.charAt(0) === '-') ? -1000 : 1000;
       else { var n = parseInt(ev, 10); num = isNaN(n) ? null : n; }
     }
-    return { moves: pts, eval: num, swap: !!r.swap, error: r.err || '' };
+    return { moves: pts, eval: num, swap: !!r.swap, error: r.err || '', depth: r.depth || 0 };
   }
   function onAck(m) {
     if (!m || !m.id) return;
@@ -7598,19 +7618,24 @@ function pvText(line) {
 }
 
 function anaMark(btn) {
-  [els.btn_an_calc, els.btn_an_bal, els.btn_an_baln, els.btn_an_defend].forEach(function (b) {
+  [els.btn_an_bal, els.btn_an_baln, els.btn_an_defend].forEach(function (b) {
     if (b) b.classList.toggle('on', !!btn && b === btn);
   });
   anaCalcUI();
 }
 
+// The card key mirrors the board key: it is a toggle for the continuous live analysis, so its
+// label and on-state follow LIVE_AN only (never the old one-shot calc state).
 function anaCalcUI() {
   if (!els.btn_an_calc) return;
-  var busy = !!G.ana.busy;
-  els.btn_an_calc.disabled = false;
-  els.btn_an_calc.classList.toggle('on', busy);
-  els.btn_an_calc.textContent = busy ? T('anStop') : T('anCalc');
+  var liveOn = !!(typeof LIVE_AN !== 'undefined' && LIVE_AN && LIVE_AN.on);
+  var ban = aiVsAi();
+  els.btn_an_calc.disabled = ban;
+  els.btn_an_calc.title = ban ? T('liveAnaBan') : '';
+  els.btn_an_calc.classList.toggle('on', liveOn);
+  els.btn_an_calc.textContent = liveOn ? T('liveAnaStop') : T('anCalc');
   if (els.btn_an_defend) {
+    var busy = !!G.ana.busy;
     els.btn_an_defend.textContent = (busy && G.ana.kind === 'defend') ? T('anStopScan') : T('anDefend');
   }
 }
@@ -7667,6 +7692,7 @@ function renderAna(msg, quietLog) {
 
 function anaReset() {
   G.ana.gen++;
+  balAbort();
   anaLiveStop();
   defLiveStop();
   G.ana.defCells = null;
@@ -7999,12 +8025,14 @@ function liveAnaClear() {
   paint();
 }
 function liveAnaUI() {
-  if (!els.btn_live) return;
   if (aiVsAi() && LIVE_AN.on) { LIVE_AN.on = false; liveAnaClear(); }
-  els.btn_live.disabled = aiVsAi();
-  els.btn_live.title = aiVsAi() ? T('liveAnaBan') : '';
-  els.btn_live.classList.toggle('on', LIVE_AN.on);
-  els.btn_live.textContent = LIVE_AN.on ? T('liveAnaStop') : T('liveAna');
+  if (els.btn_live) {
+    els.btn_live.disabled = aiVsAi();
+    els.btn_live.title = aiVsAi() ? T('liveAnaBan') : '';
+    els.btn_live.classList.toggle('on', LIVE_AN.on);
+    els.btn_live.textContent = LIVE_AN.on ? T('liveAnaStop') : T('liveAna');
+  }
+  anaCalcUI();
 }
 function liveAnaToggle() {
   if (aiVsAi()) { liveAnaUI(); return; }
@@ -9618,123 +9646,149 @@ function balOpenHintTxt() {
   return '\n　※ ' + out.join('\n　※ ');
 }
 
-async function anaBalPoints() {
+// ---- balance points: continuous refinement, result only on the second press ------------------
+// Rapfi's YXBALANCETWO is a one-shot command (see command/gomocup.cpp balance()), so "keep
+// computing" means: run the same official balance search again on the same board with a larger
+// INFO TIMEOUT_TURN each round. The transposition table stays warm between rounds, so every round
+// really does search deeper and the picks get closer to the official balanced window. Nothing is
+// drawn while it runs - the user presses the key a second time and only then does the last
+// (deepest) result go onto the board.
+var BAL = { on: false, last: null, round: 0, depth: 0, t0: 0 };
+
+function balUI() {
+  if (!els.btn_an_bal) return;
+  els.btn_an_bal.classList.toggle('on', BAL.on);
+  els.btn_an_bal.textContent = BAL.on ? T('balStopShow') : T('anBal');
+  els.btn_an_bal.title = BAL.on ? T('balRunTip') : T('anBalnHint');
+}
+
+function balAbort() {
+  if (typeof BAL === 'undefined' || !BAL || !BAL.on) return;
+  BAL.on = false; BAL.last = null;
+  if (els.btn_an_baln) els.btn_an_baln.disabled = false;
+  balUI();
+}
+
+function balStat() {
+  renderAna(T('balRunStat')
+    .replace('{r}', String(BAL.round || 1))
+    .replace('{d}', String(BAL.depth || 0))
+    .replace('{t}', String(Math.max(0, Math.round((Date.now() - BAL.t0) / 1000)))));
+}
+
+// One round of the official pair chain (YXBALANCETWO) at a fixed per-call budget.
+async function balPass(need, qMs, gen) {
+  if (!G.moves.length) {
+    var marksE = await openBalChain(engineRule(), Math.max(2000, S.turnMs || 2000), gen);
+    if (gen !== G.ana.gen) return null;
+    if (marksE.length < 3) {
+      var cyB = (N - 1) >> 1;
+      marksE = [{ x: cyB, y: cyB, color: 'b', seq: '1' }];
+      var fbk = BAL_OPEN_TJ[Math.floor(Math.random() * BAL_OPEN_TJ.length)];
+      marksE.push({ x: fbk[1][0], y: fbk[1][1], color: 'w', seq: '2' });
+      marksE.push({ x: fbk[2][0], y: fbk[2][1], color: 'b', seq: '3' });
+      G.ana.balEval = null;
+    }
+    return { marks: marksE, names: marksE.map(function (m) { return coordName(m.x, m.y); }),
+             eval: G.ana.balEval, depth: 0 };
+  }
+  var bmB = G.board.map(function (r) { return r.slice(); });
+  var plyB = G.moves.length;
+  var marksArr = [], namesB = [], evB = null, depthB = 0;
+  while (marksArr.length < need) {
+    var qi = marksArr.length;
+    var curB = ((plyB + qi) % 2 === 0);
+    var jQ = null;
+    try {
+      jQ = await apiBalance({
+        board: bmB, moveList: [], n: 1, mode: 'two', rule: engineRule(),
+        turnMs: qMs, lane: 'main', cid: 'calc-balpts-' + G.moves.length + '-' + qi,
+        side: curB ? 1 : 2,
+      }, qMs + 20000);
+    } catch (eQ) { jQ = null; }
+    if (gen !== G.ana.gen) return null;
+    if (jQ && jQ.swap) return { swap: true };
+    if (jQ && jQ.eval != null) evB = jQ.eval;
+    if (jQ && jQ.depth) depthB = Math.max(depthB, jQ.depth);
+    var ptsQ = (jQ && jQ.moves) || [];
+    if (!ptsQ.length) break;
+    var addedQ = 0;
+    for (var pk = 0; pk < ptsQ.length && marksArr.length < need; pk++) {
+      if (bmB[ptsQ[pk][1]][ptsQ[pk][0]]) continue;
+      var sideQ = ((plyB + marksArr.length) % 2 === 0) ? 1 : 2;
+      bmB[ptsQ[pk][1]][ptsQ[pk][0]] = sideQ;
+      marksArr.push({ x: ptsQ[pk][0], y: ptsQ[pk][1],
+                      color: sideQ === 1 ? 'b' : 'w', seq: String(marksArr.length + 1) });
+      namesB.push(coordName(ptsQ[pk][0], ptsQ[pk][1]));
+      addedQ++;
+    }
+    if (!addedQ) break;
+  }
+  return { marks: marksArr, names: namesB, eval: evB, depth: depthB };
+}
+
+function balWait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+async function balLoop(gen) {
+  var need = !G.moves.length ? 3 : Math.max(1, Math.min(6, balPN()));
+  // One round = need pair searches; keep a round near a few seconds whatever the point count.
+  var capMs = Math.max(700, Math.min(2600, Math.round(5200 / need)));
+  var budget = Math.min(500, capMs), fails = 0;
+  while (BAL.on && gen === G.ana.gen) {
+    var r = null;
+    try { r = await balPass(need, budget, gen); } catch (eB) { r = null; }
+    if (gen !== G.ana.gen || !BAL.on) return;
+    if (r && r.swap) { balFinish(); renderAna(T('balSwapNow')); paint(); return; }
+    if (!r || !r.marks || !r.marks.length) {
+      // A superseded / timed-out round is not fatal: the engine may have been pulled away by a
+      // move or the AI. Retry a couple of times before reporting the sub-engine as unavailable.
+      if (++fails <= 2) { budget = Math.min(capMs, budget + 400); await balWait(450); continue; }
+      balFinish(); renderAna(T('anBalNoEngine')); paint(); return;
+    }
+    fails = 0;
+    BAL.last = r;
+    BAL.round++;
+    BAL.depth = Math.max(BAL.depth, r.depth || 0);
+    balStat();
+    budget = Math.min(capMs, Math.round(budget * 1.6));
+  }
+}
+
+function balFinish() {
+  BAL.on = false;
+  balUI();
+  if (els.btn_an_baln) els.btn_an_baln.disabled = false;
+  G.ana.busy = false; G.ana.kind = '';
+  anaMark(null);
+}
+
+function balToggle() {
+  if (BAL.on) {
+    var last = BAL.last;
+    G.ana.gen++;                       // whatever round is in flight is dropped now
+    balFinish();
+    if (last && last.marks && last.marks.length) {
+      renderBalMarks(last.marks, balDoneMsg(last.marks.length, last.names, last.eval) + balOpenHintTxt() +
+        (BAL.depth ? '\n' + T('balShown').replace('{d}', String(BAL.depth)) : ''));
+    } else {
+      renderAna(T('anBalNoEngine'));
+      paint();
+    }
+    return;
+  }
   if (!anaGuard(0)) return;
   aiStandDown();
+  BAL.on = true; BAL.last = null; BAL.round = 1; BAL.depth = 0; BAL.t0 = Date.now();
   var gen = ++G.ana.gen;
+  if (els.btn_an_baln) els.btn_an_baln.disabled = true;
   G.ana.busy = true; G.ana.kind = 'bal';
+  G.ana.marks = []; G.ana.rows = [];
+  setPvLine([]);
   anaMark(els.btn_an_bal);
-  renderAna(T('anRunning'));
-  var turnMs = Math.max(2000, S.turnMs || 2000);
-  var empty = !G.moves.length;
-  var need = empty ? 3 : Math.max(1, Math.min(6, balPN()));
-  try {
-    if (!empty) {
-      var bmB = G.board.map(function (r) { return r.slice(); });
-      var plyB = G.moves.length;
-      var marksArr = [], namesB = [], evB = null;
-      var qMs = Math.max(600, Math.min(1800, turnMs));
-      while (marksArr.length < need) {
-        var modeB = 'two';
-        var qi = marksArr.length;
-        var curB = ((plyB + qi) % 2 === 0);
-        var jQ = null;
-        try {
-          jQ = await apiBalance({
-            board: bmB, moveList: [], n: 1, mode: modeB, rule: engineRule(),
-            turnMs: qMs, lane: 'main', cid: 'calc-balpts-' + G.moves.length + '-' + qi,
-            side: curB ? 1 : 2,
-          }, qMs + 20000);
-        } catch (eQ) { jQ = null; }
-        if (gen !== G.ana.gen) return;
-        if (jQ && jQ.swap) { renderAna(T('balSwapNow')); paint(); return; }
-        if (jQ && jQ.eval != null) evB = jQ.eval;
-        var ptsQ = (jQ && jQ.moves) || [];
-        if (!ptsQ.length) break;
-        var addedQ = 0;
-        for (var pk = 0; pk < ptsQ.length && marksArr.length < need; pk++) {
-          if (bmB[ptsQ[pk][1]][ptsQ[pk][0]]) continue;
-          var sideQ = ((plyB + marksArr.length) % 2 === 0) ? 1 : 2;
-          bmB[ptsQ[pk][1]][ptsQ[pk][0]] = sideQ;
-          marksArr.push({ x: ptsQ[pk][0], y: ptsQ[pk][1],
-                          color: sideQ === 1 ? 'b' : 'w', seq: String(marksArr.length + 1) });
-          namesB.push(coordName(ptsQ[pk][0], ptsQ[pk][1]));
-          addedQ++;
-        }
-        if (!addedQ) break;
-      }
-      if (marksArr.length) {
-        renderBalMarks(marksArr, balDoneMsg(marksArr.length, namesB, evB) + balOpenHintTxt());
-        return;
-      }
-      if (typeof window.GB_BAL_POINTS === 'function') {
-        marksArr = []; namesB = [];
-        try {
-          await window.GB_BAL_POINTS({
-            board: G.board, moves: G.moves.length, need: need, rule: engineRule(),
-            turnMs: Math.max(2000, S.turnMs || 2000),
-            onMarks: function (ms) { marksArr = ms || []; },
-          });
-        } catch (eB) { marksArr = []; }
-        if (gen !== G.ana.gen) return;
-        if (marksArr && marksArr.length) {
-          marksArr.forEach(function (m) { namesB.push(coordName(m.x, m.y)); });
-          renderBalMarks(marksArr, T('anBalDone').replace('{n}', String(marksArr.length)).replace('{list}', namesB.join(', ')));
-          return;
-        }
-      }
-      var retry = null;
-      try {
-        retry = await apiBalance({
-          board: bmB, moveList: [], n: 1, mode: 'two', rule: engineRule(),
-          turnMs: Math.max(1200, qMs), lane: 'sub',
-          cid: 'calc-balpts-retry-' + G.moves.length, side: ((plyB % 2 === 0) ? 1 : 2),
-        }, Math.max(1200, qMs) + 20000);
-      } catch (eR) { retry = null; }
-      if (gen !== G.ana.gen) return;
-      if (retry && retry.swap) { renderAna(T('balSwapNow')); paint(); return; }
-      if (retry && retry.moves && retry.moves.length) {
-        var addR = 0;
-        for (var rk = 0; rk < retry.moves.length && marksArr.length < need; rk++) {
-          if (bmB[retry.moves[rk][1]][retry.moves[rk][0]]) continue;
-          var sideR = ((plyB + marksArr.length) % 2 === 0) ? 1 : 2;
-          bmB[retry.moves[rk][1]][retry.moves[rk][0]] = sideR;
-          marksArr.push({ x: retry.moves[rk][0], y: retry.moves[rk][1],
-                          color: sideR === 1 ? 'b' : 'w', seq: String(marksArr.length + 1) });
-          namesB.push(coordName(retry.moves[rk][0], retry.moves[rk][1]));
-          addR++;
-        }
-        if (retry.eval != null) evB = retry.eval;
-        if (addR && marksArr.length) {
-          renderBalMarks(marksArr, balDoneMsg(marksArr.length, namesB, evB));
-          return;
-        }
-      }
-      renderAna(T('anBalNoEngine'));
-      return;
-    }
-    if (empty) {
-      var ruleE = engineRule();
-      var marksE = await openBalChain(ruleE, Math.max(2000, S.turnMs || 2000), gen);
-      if (gen !== G.ana.gen) return;
-      if (marksE.length < 3) {
-        var cyB = (N - 1) >> 1;
-        marksE = [{ x: cyB, y: cyB, color: 'b', seq: '1' }];
-        var fbk = BAL_OPEN_TJ[Math.floor(Math.random() * BAL_OPEN_TJ.length)];
-        marksE.push({ x: fbk[1][0], y: fbk[1][1], color: 'w', seq: '2' });
-        marksE.push({ x: fbk[2][0], y: fbk[2][1], color: 'b', seq: '3' });
-        G.ana.balEval = null;
-      }
-      var namesE = marksE.map(function (m) { return coordName(m.x, m.y); });
-      renderBalMarks(marksE, balDoneMsg(marksE.length, namesE, G.ana.balEval) + balOpenHintTxt());
-      return;
-    }
-    renderAna(T('anBalNoEngine'));
-  } catch (e) {
-    if (gen === G.ana.gen) renderAna(T('offline'));
-  } finally {
-    if (gen === G.ana.gen) { G.ana.busy = false; anaMark(null); }
-  }
+  balUI();
+  balStat();
+  paint();
+  balLoop(gen);
 }
 
 function renderBalMarks(arr, msg) {
@@ -9774,7 +9828,7 @@ function wireAnalysis() {
   wireCurveHover();
   if (!els.btn_an_calc) return;
 
-  els.btn_an_calc.onclick = function () { if (G.ana.busy) anaStop(); else anaCalc(); };
+  els.btn_an_calc.onclick = function () { liveAnaToggle(); };
 
   els.btn_fwd.onclick = function () { fwdToggle(); };
 
@@ -9800,7 +9854,7 @@ function wireAnalysis() {
     if (G.ana.busy && G.ana.kind === 'defend') { anaDefendStop(); return; }
     aiStandDown(); anaDefend(true);
   };
-  els.btn_an_bal.onclick = function () { anaBalPoints(); };
+  els.btn_an_bal.onclick = function () { balToggle(); };
   if (els.btn_an_baln) els.btn_an_baln.onchange = function () {
     var n = parseInt(els.btn_an_baln.value, 10);
     if (isNaN(n) || n < 1 || n > 6) n = 2;
@@ -11010,6 +11064,40 @@ function linkIngest(o) {
 }
 
 window.addEventListener('wheel', function (e) { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+
+// Wheel over a card: an inner scroller (engine log, code textarea, PV list) eats the wheel and,
+// once it reaches its end, the card dock behind it would not move - the page looked frozen while
+// the pointer happened to be over the card. Pass the leftover delta up to the dock instead.
+(function wheelChain() {
+  function innerScroller(el) {
+    for (var n = el; n && n !== document.body; n = n.parentElement) {
+      if (n.nodeType !== 1) break;
+      var st = getComputedStyle(n);
+      if (!/(auto|scroll)/.test(st.overflowY)) continue;
+      if (n.scrollHeight - n.clientHeight > 1) return n;
+    }
+    return null;
+  }
+  document.addEventListener('wheel', function (e) {
+    if (e.defaultPrevented || e.ctrlKey || e.altKey || e.shiftKey) return;
+    var t = e.target;
+    if (!t || t.nodeType !== 1) return;
+    var sc = innerScroller(t);
+    if (!sc) return;
+    var d = e.deltaY;
+    if (!d) return;
+    var atTop = sc.scrollTop <= 0;
+    var atBot = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1;
+    if (d < 0 ? !atTop : !atBot) return;          // the inner scroller can still move
+    var dock = sc.parentElement;
+    while (dock && dock !== document.body && !(dock.classList && dock.classList.contains('dock')))
+      dock = dock.parentElement;
+    if (!dock || dock === sc || dock === document.body) return;
+    if (dock.scrollHeight - dock.clientHeight <= 1) return;
+    e.preventDefault();
+    dock.scrollTop += d;
+  }, { passive: false });
+})();
 window.addEventListener('keydown', function (e) {
   if (e.ctrlKey && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) e.preventDefault();
 }, false);
@@ -11152,7 +11240,7 @@ function lkPaintBoard() {
   ctx.fillStyle = css('--board', '#d9b878');
   ctx.fillRect(0, 0, W, H);
 
-  ctx.strokeStyle = css('--line', '#8a6f42');
+  ctx.strokeStyle = css('--line', '#24282c');
   ctx.lineWidth = Math.max(1, cell * R.line);
   ctx.beginPath();
   for (var i = 0; i < N; i++) {
@@ -11168,8 +11256,8 @@ function lkPaintBoard() {
   ctx.strokeRect(ox, oy, span, span);
   ctx.restore();
 
-  ctx.fillStyle = css('--axis', '#7a6338');
-  ctx.font = Math.max(6, cell * R.font) + 'px "Segoe UI",system-ui,sans-serif';
+  ctx.fillStyle = css('--axis', '#1b1e21');
+  ctx.font = '600 ' + Math.max(6, cell * R.font) + 'px "Segoe UI",system-ui,sans-serif';
   ctx.textBaseline = 'middle';
   for (i = 0; i < N; i++) {
     var cy = oy + cell * i, cx = ox + cell * i, row = String(N - i);
@@ -11179,7 +11267,7 @@ function lkPaintBoard() {
     ctx.fillText(String.fromCharCode(65 + i), cx, oy + span + gapPx + cell * (R.coord / 2));
   }
 
-  ctx.fillStyle = css('--star', '#4a3a1e');
+  ctx.fillStyle = css('--star', '#14171a');
   [3, 7, 11].forEach(function (sa) {
     [3, 7, 11].forEach(function (sb) {
       ctx.beginPath();
