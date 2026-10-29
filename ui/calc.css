@@ -10,7 +10,7 @@
   --accent:#2f86d6; --accent-ink:#ffffff;
   --guide:#3aa0e8;
 
-  --board:#d9b878; --line:#24282c; --star:#14171a; --axis:#1b1e21;
+  --board:#d9b878; --line:#24282c; --star:#14171a; --axis:#3d4247;
   --blk:#1b1916; --blk-edge:#f2eee7; --wht:#eeeadf; --wht-edge:#c3bda9;
   --chip:#f2f2ef; --chip-on:#191919; --chip-on-ink:#ffffff;
   --miss:#ff5f9e;
@@ -574,7 +574,7 @@ input[type=checkbox].chk-dot:focus-visible{outline:2px solid var(--accent); outl
   overflow-y:auto; overflow-x:hidden; overscroll-behavior:auto;
 }
 #st_line{color:var(--sub); font-size:.8rem; line-height:1.32; word-break:break-all}
-#st_line .em-line{margin:0}
+#st_line .em-line{margin:0; white-space:pre-line}
 #st_line .em-line + .em-line{margin-top:.08rem}
 
 .pv-box{
@@ -735,13 +735,7 @@ button.sq2{flex:0 0 auto; padding:.22rem .52rem; font-size:.82rem; border-radius
   padding:.28rem .4rem;
 }
 .anlist:empty{display:none}
-#anStatus{
-  display:block; color:var(--sub); font-size:.8rem;
-  border:1px dashed var(--border); border-radius:9px;
-  padding:.28rem .45rem;
-}
-#anStatus:empty{display:none}
-
+/* analysis messages now land in the engine dashboard log, not in a card box */
 .anlist .it{
   display:grid; grid-template-columns:auto auto 1fr; column-gap:.42rem; row-gap:.12rem;
   align-items:baseline;

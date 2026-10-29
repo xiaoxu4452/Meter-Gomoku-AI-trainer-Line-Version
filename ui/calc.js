@@ -455,10 +455,12 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     anBalFail: '平衡搜索失败：',
     anBalnSet: '平衡点数已设为 {n}（空盘固定 3）',
     anBalnHint: '平衡点数（1~6，空盘固定 3）',
-    balRunStat: '平衡计算中 · 第 {r} 轮 · 深度 {d} · 已用 {t}s —— 再点「平衡点」停止并把最终结果画到棋盘',
-    balStopShow: '停止并显示',
-    balRunTip: '引擎官方平衡搜索（YXBALANCETWO）：每跑完一轮就把预算加大再算一轮，越算越准；再点一次才把最后结果画到棋盘',
-    balShown: '平衡结果已画到棋盘 · 深度 {d}',
+    balStart: '官方平衡搜索运行中（YXBALANCETWO）—— 棋盘标记每轮刷新；再点「平衡点」停止并自动落子',
+    balRunStat: '平衡计算中 · 第 {r} 轮 · 深度 {d} · 已用 {t}s',
+    balStopShow: '停止并落子',
+    balRunTip: '引擎官方平衡搜索（YXBALANCETWO）：每轮把预算加大再算一轮，越算越准，棋盘标记会随搜索结果变动；再点一次停止，并把最后结果直接落到棋盘上',
+    balShown: '已自动落子 {n} 手 · 平衡深度 {d}',
+    balNoPlay: '（当前是开局 / 交换流程：标记已保留在棋盘上，未自动落子）',
     anBalLabel: '点数',
     anBalColor: '（蓝色 = 白子，紫色 = 黑子）',
 
@@ -898,10 +900,12 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     anBalFail: 'Balance search failed: ',
     anBalnSet: 'Balance point count set to {n} (3 fixed on empty board)',
     anBalnHint: 'Balance point count (1-6, 3 fixed on empty board)',
-    balRunStat: 'Balancing · round {r} · depth {d} · {t}s — press Balance again to stop and draw the final result',
-    balStopShow: 'Stop & show',
-    balRunTip: 'Engine-native balance search (YXBALANCETWO): every finished round re-runs with a larger budget, so it keeps getting more accurate; press again to put the last result on the board',
-    balShown: 'Balance result drawn on the board · depth {d}',
+    balStart: 'Official balance search running (YXBALANCETWO) — the marks on the board refresh every round; press Balance again to stop and play the stones',
+    balRunStat: 'Balancing · round {r} · depth {d} · {t}s',
+    balStopShow: 'Stop & play',
+    balRunTip: 'Engine-native balance search (YXBALANCETWO): every round re-runs with a larger budget, so it keeps getting more accurate and the marks keep moving; press again to stop and play the last result straight onto the board',
+    balShown: 'Played {n} stones · balance depth {d}',
+    balNoPlay: ' (opening / swap flow active: marks kept on the board, nothing played automatically)',
     anBalLabel: 'Points',
     anBalColor: ' (Blue = White, Purple = Black)',
 
@@ -1156,7 +1160,7 @@ function grab() {
    'btn_set','setPop','btn_aiside','aiSidePop','btn_ai_close',
    'ai_side_b','ai_side_w','t_aiTurn','num_turn2','btn_live',
    't_analysis','btn_an_calc','btn_an_bal','btn_an_baln','btn_an_defend',
-   'num_nbest','t_nbest','t_nbestHint','anStatus','anList','anStatusRow',
+   'num_nbest','t_nbest','t_nbestHint',
    't_history','t_saved','t_drTip'].forEach(function (id) {
     els[id] = document.getElementById(id);
   });
@@ -1300,7 +1304,7 @@ function paint() {
 
   ctx.fillStyle = css('--axis');
   var coordPx = Math.max(10, Math.round(g.axis * 0.52 * dpr));
-  ctx.font = '600 ' + (coordPx / dpr) + 'px "Segoe UI",system-ui,-apple-system,sans-serif';
+  ctx.font = '400 ' + (coordPx / dpr) + 'px "Segoe UI",system-ui,-apple-system,sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
   var aMid = g.axis * 0.5, aBase = even(size - aMid);
   for (i = 0; i < N; i++) {
@@ -7673,21 +7677,12 @@ function cellScore(board, x, y, c) {
   cellLines(board, x, y, c).forEach(function (l) { total += anaLineScore(l.cnt, l.open); });
   return total;
 }
+// Analysis messages go to the engine dashboard log: the card's own text box is gone, so this is
+// the only sink. Progress lines that tick faster than a couple of seconds (live analysis, the
+// defence scan) pass quietLog so they never flood the 60-line log.
 function renderAna(msg, quietLog) {
-  if (els.anStatus) {
-    els.anStatus.textContent = msg || '';
-    els.anStatus.style.whiteSpace = (typeof msg === 'string' && msg.indexOf('\n') >= 0) ? 'pre-line' : '';
-  }
-  if (!els.anList) return;
-  els.anList.innerHTML = G.ana.rows.map(function (r) {
-    var pal = (r.tier < 0) ? ANA_BAL : ANA_PAL[anaTierOf(r.i)];
-    if (r.col) pal = { badge: r.col };
-    return '<div class="it"><span class="rk" style="background:' + pal.badge + '">' + escHtml(r.badge) + '</span>' +
-           '<span class="co">' + escHtml(r.coord) + '</span>' +
-           '<span class="ev">' + escHtml(r.eval) + '</span>' +
-           (r.pv ? '<span class="pv">' + escHtml(r.pv) + '</span>' : '') + '</div>';
-  }).join('');
-  if (!quietLog) engMsgAdd(msg);
+  if (!msg || quietLog) return;
+  engMsgAdd(msg);
 }
 
 function anaReset() {
@@ -7897,7 +7892,7 @@ function anaDefend(renew) {
     }
     if (now - lastAna >= 1000) {
       lastAna = now;
-      renderAna(T('anScanRun').replace('{d}', String(depth || 0)).replace('{c}', String(cells.length)));
+      renderAna(T('anScanRun').replace('{d}', String(depth || 0)).replace('{c}', String(cells.length)), true);
     }
     if (now - lastPaint >= 320) { lastPaint = now; paint(); }
   }, function (ev) {
@@ -8089,7 +8084,7 @@ function liveAnaApply(res) {
   if (now - LIVE_AN.lastUi >= 300) {
     LIVE_AN.lastUi = now;
     liveAnaRows();
-    renderAna(T('liveAnaRun').replace('{d}', String(LIVE_AN.depth || 0)));
+    renderAna(T('liveAnaRun').replace('{d}', String(LIVE_AN.depth || 0)), true);
   }
   if (now - (LIVE_AN.lastPaint || 0) >= 120) { LIVE_AN.lastPaint = now; paint(); }
 }
@@ -8098,7 +8093,7 @@ function liveAnaRows() {
     return { i: i, badge: String(i + 1), coord: coordName(c.x, c.y),
              eval: Math.round((c.wr || 0) * 100) + '%  ' + c.ev, pv: '' };
   });
-  renderAna(T('liveAnaRun').replace('{d}', String(LIVE_AN.depth || 0)));
+  renderAna(T('liveAnaRun').replace('{d}', String(LIVE_AN.depth || 0)), true);
 }
 
 function liveAnaStart() {
@@ -8112,7 +8107,7 @@ function liveAnaStart() {
   LIVE_AN.mate = false;
   if (!LIVE_AN.t0) LIVE_AN.t0 = Date.now();
   G.ana.busy = true; G.ana.kind = 'live';
-  renderAna(T('liveAnaRun').replace('{d}', String(LIVE_AN.depth || 0)));
+  renderAna(T('liveAnaRun').replace('{d}', String(LIVE_AN.depth || 0)), true);
   var ended = false;
   var h = LocalAI.live({
     board: G.board, moveList: [], matchMs: 600000, turnMs: 3600000, timeUsedMs: 0,
@@ -9646,14 +9641,14 @@ function balOpenHintTxt() {
   return '\n　※ ' + out.join('\n　※ ');
 }
 
-// ---- balance points: continuous refinement, result only on the second press ------------------
+// ---- balance points: keep refining, picks live on the board, second press plays them ----------
 // Rapfi's YXBALANCETWO is a one-shot command (see command/gomocup.cpp balance()), so "keep
 // computing" means: run the same official balance search again on the same board with a larger
 // INFO TIMEOUT_TURN each round. The transposition table stays warm between rounds, so every round
-// really does search deeper and the picks get closer to the official balanced window. Nothing is
-// drawn while it runs - the user presses the key a second time and only then does the last
-// (deepest) result go onto the board.
-var BAL = { on: false, last: null, round: 0, depth: 0, t0: 0 };
+// searches deeper and the picks visibly drift - exactly like the official bundle, where the marks
+// keep moving while the search deepens. The current picks are drawn after every round; pressing
+// the key a second time stops the search and plays the last (deepest) set as real moves.
+var BAL = { on: false, last: null, round: 0, depth: 0, t0: 0, logT: 0, logD: -1 };
 
 function balUI() {
   if (!els.btn_an_bal) return;
@@ -9669,11 +9664,16 @@ function balAbort() {
   balUI();
 }
 
-function balStat() {
+// One log line per visible improvement (or every 6 s): the engine log has 60 lines of history and
+// a round can finish in 1.5 s, so logging every round would flush everything else out.
+function balLogStat() {
+  var now = Date.now();
+  if (now - BAL.logT < 6000 && (BAL.depth || 0) <= BAL.logD) return;
+  BAL.logT = now; BAL.logD = BAL.depth || 0;
   renderAna(T('balRunStat')
     .replace('{r}', String(BAL.round || 1))
     .replace('{d}', String(BAL.depth || 0))
-    .replace('{t}', String(Math.max(0, Math.round((Date.now() - BAL.t0) / 1000)))));
+    .replace('{t}', String(Math.max(0, Math.round((now - BAL.t0) / 1000)))));
 }
 
 // One round of the official pair chain (YXBALANCETWO) at a fixed per-call budget.
@@ -9749,7 +9749,9 @@ async function balLoop(gen) {
     BAL.last = r;
     BAL.round++;
     BAL.depth = Math.max(BAL.depth, r.depth || 0);
-    balStat();
+    balSetMarks(r.marks);            // current picks go on the board right away
+    paint();
+    balLogStat();
     budget = Math.min(capMs, Math.round(budget * 1.6));
   }
 }
@@ -9762,23 +9764,54 @@ function balFinish() {
   anaMark(null);
 }
 
+// Play the last set of picks as real moves (same order the marks are numbered). `place()` is the
+// normal move path, so the side to move alternates exactly as it does for a human click.
+function balPlayOut(r) {
+  if (!r || !r.marks || !r.marks.length) return 0;
+  var n = 0;
+  G.ana.kind = 'bal';                    // keeps place() on the balance branch (marks survive)
+  for (var i = 0; i < r.marks.length; i++) {
+    var m = r.marks[i];
+    if (!m || m.x == null || m.y == null || G.over) continue;
+    // afterMove() is what a real click runs: win check, persist, UI refresh, AI kick.
+    if (place(m.x, m.y, false, true)) { n++; afterMove(); }
+  }
+  G.ana.kind = ''; G.ana.busy = false;
+  G.ana.marks = []; G.ana.rows = []; G.ana.balLeft = 0;
+  anaMark(null);
+  paint(); refreshUI();
+  return n;
+}
+
 function balToggle() {
   if (BAL.on) {
     var last = BAL.last;
     G.ana.gen++;                       // whatever round is in flight is dropped now
     balFinish();
-    if (last && last.marks && last.marks.length) {
-      renderBalMarks(last.marks, balDoneMsg(last.marks.length, last.names, last.eval) + balOpenHintTxt() +
-        (BAL.depth ? '\n' + T('balShown').replace('{d}', String(BAL.depth)) : ''));
-    } else {
+    if (!last || !last.marks || !last.marks.length) {
       renderAna(T('anBalNoEngine'));
       paint();
+      return;
+    }
+    if (openActive()) {                // opening / swap flow: never auto-play into it
+      balSetMarks(last.marks);
+      paint();
+      renderAna(balDoneMsg(last.marks.length, last.names, last.eval) + T('anBalColor') + T('balNoPlay'));
+      return;
+    }
+    var n = balPlayOut(last);
+    if (n) {
+      renderAna(balDoneMsg(last.marks.length, last.names, last.eval) + T('anBalColor') + balOpenHintTxt() +
+        '\n' + T('balShown').replace('{n}', String(n)).replace('{d}', String(BAL.depth || 0)));
+    } else {
+      renderAna(T('anBalNoEngine'));
     }
     return;
   }
   if (!anaGuard(0)) return;
   aiStandDown();
-  BAL.on = true; BAL.last = null; BAL.round = 1; BAL.depth = 0; BAL.t0 = Date.now();
+  BAL.on = true; BAL.last = null; BAL.round = 1; BAL.depth = 0;
+  BAL.t0 = Date.now(); BAL.logT = 0; BAL.logD = -1;
   var gen = ++G.ana.gen;
   if (els.btn_an_baln) els.btn_an_baln.disabled = true;
   G.ana.busy = true; G.ana.kind = 'bal';
@@ -9786,15 +9819,15 @@ function balToggle() {
   setPvLine([]);
   anaMark(els.btn_an_bal);
   balUI();
-  balStat();
+  renderAna(T('balStart'));
   paint();
   balLoop(gen);
 }
 
-function renderBalMarks(arr, msg) {
+function balSetMarks(arr) {
+  var WHITE_DISC = 'rgba(70,190,255,.95)';
   G.ana.balLeft = arr.length;
   G.ana.balBase = G.moves.length;   // these marks belong to THIS board state
-  var WHITE_DISC = 'rgba(70,190,255,.95)';
   G.ana.marks = arr.map(function (m, i) {
     // Sequence number only - no eval score on the balance marks
     return { x: m.x, y: m.y, badge: m.seq, label: '', tier: -1, inline: true,
@@ -9804,8 +9837,6 @@ function renderBalMarks(arr, msg) {
     return { i: i, badge: m.seq, coord: coordName(m.x, m.y), eval: '', pv: '', tier: -1,
              col: m.color === 'b' ? null : WHITE_DISC };
   });
-  renderAna(msg + T('anBalColor'));
-  paint();
   if (linkSessionOn() && arr.length) {
     var gm2 = null;
     try { var bb = els.board.getBoundingClientRect(); gm2 = { gap: Math.round(bb.width / 14) }; } catch (e) { gm2 = { gap: 40 }; }
@@ -11256,8 +11287,8 @@ function lkPaintBoard() {
   ctx.strokeRect(ox, oy, span, span);
   ctx.restore();
 
-  ctx.fillStyle = css('--axis', '#1b1e21');
-  ctx.font = '600 ' + Math.max(6, cell * R.font) + 'px "Segoe UI",system-ui,sans-serif';
+  ctx.fillStyle = css('--axis', '#3d4247');
+  ctx.font = '400 ' + Math.max(6, cell * R.font) + 'px "Segoe UI",system-ui,sans-serif';
   ctx.textBaseline = 'middle';
   for (i = 0; i < N; i++) {
     var cy = oy + cell * i, cx = ox + cell * i, row = String(N - i);
