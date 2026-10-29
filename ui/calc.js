@@ -7588,7 +7588,7 @@ function applyCardVis() {
 // ---- settings window (its own WebView, ?set=1) ------------------------------------------------
 // Preferences live in a second WebView window that the host creates (width = 0.4 of the main
 // window, same height, fixed ratio). The page runs this same file in SET_MODE: it shows the key
-// list and, behind the 颜色 key, the palette. Cards keep living in the main window - the keys
+// list and, behind the colour key, the palette. Cards keep living in the main window - the keys
 // here only decide whether a card is visible there.
 //
 // State sharing: the settings page must never write the big gbcalc.settings.v1 snapshot (it would
