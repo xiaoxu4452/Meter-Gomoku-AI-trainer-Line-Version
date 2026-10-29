@@ -780,7 +780,8 @@ button.sq2{flex:0 0 auto; padding:.22rem .52rem; font-size:.82rem; border-radius
 }
 .cp-presets button:hover{border-color:var(--sub)}
 .cp-presets button.on{outline:2px solid var(--accent); outline-offset:1px}
-.cp-foot{display:flex; align-items:center; gap:.55rem; margin-top:.1rem}
+.cp-foot{display:flex; align-items:center; gap:.55rem; margin-top:.1rem; min-width:0}
+.cp-foot #cp_reset{flex:0 0 auto; white-space:nowrap; font-size:.78rem; height:1.7rem; padding:0 .55rem}
 .cp-prev{
   width:3.2rem; height:1.7rem; border-radius:9px; display:inline-block;
   border:1px solid var(--border); background:var(--board);
@@ -1404,22 +1405,29 @@ body.setwin #ctxMenu, body.setwin #file_imp, body.setwin #file_vis{display:none 
 .sp-tgl.on .sw{background:var(--accent); border-color:var(--accent)}
 .sp-tgl.on .sw i{left:.73rem; background:#fff}
 
-/* embedded setup card: header stripped, rows scroll with the pane */
-.sp-setup{flex:1 1 auto; min-height:0; overflow-y:auto; padding:.15rem .8rem .7rem}
-.sp-setup .card{width:100%; padding:.45rem .6rem .5rem}
+/* keys and setup sections share ONE scroll container */
+.sp-scroll{flex:1 1 auto; min-height:0; overflow-y:auto; padding-bottom:.7rem}
+.sp-setup{flex:0 0 auto; padding:0 .8rem}
+
+/* embedded setup card: outer card frame removed, each section framed by a big dashed box */
+.sp-setup .card{width:100%; padding:0; border:none; background:transparent}
 .sp-setup .card-h{display:none}
 .sp-setup .card-b{overflow:visible}
-
-.sp-foot{
-  flex:0 0 auto; display:flex; align-items:center; gap:.5rem;
-  padding:.4rem .82rem .7rem; color:var(--sub); font-size:.76rem;
+.sp-setup .sec{
+  border:1px dashed rgba(58,160,232,.62); border-radius:10px;
+  padding:.3rem .5rem .42rem; margin:.5rem 0;
+  background:rgba(58,160,232,.028);
 }
-.sp-foot .btn{margin-left:auto; height:1.9rem; padding:0 .95rem; font-size:.86rem}
+[data-theme="dark"] .sp-setup .sec{
+  border-color:rgba(88,166,224,.58);
+  background:rgba(88,166,224,.055);
+}
+.sp-setup .sec:last-child{margin-bottom:.1rem}
+.sp-setup .sec-h{border-radius:6px}
 
 /* colour view: the whole window turns into the palette */
 .sp-color{flex:1 1 auto; min-height:0; display:none; flex-direction:column}
-body.sp-coloring .sp-rows, body.sp-coloring .sp-setup,
-body.sp-coloring .sp-foot{display:none}
+body.sp-coloring .sp-scroll{display:none}
 body.sp-coloring .sp-color{display:flex}
 .sp-color-h{
   flex:0 0 auto; display:flex; align-items:center; gap:.5rem;

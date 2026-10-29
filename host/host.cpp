@@ -116,6 +116,12 @@ static void FireTestHooks();
 static void OpenUpdateWindow();
 static void OpenSetWindow();
 
+// settings window globals (defined once here; used by MsgHandler mainSync relay too)
+static HWND      g_setHwnd = nullptr;
+static ICoreWebView2* g_setWebview = nullptr;
+static ICoreWebView2Controller* g_setController = nullptr;
+static bool g_setCreating = false, g_setPageReady = false;
+
 static const UINT_PTR kRvTimerTestOpen = 3;  
 
 static HWND      g_visHwnd = nullptr;
@@ -310,8 +316,9 @@ static void PostToPage(const std::string& json) {
   g_webview->PostWebMessageAsJson(w.c_str());
 }
 
-static const UINT_PTR kMainTimerOutbox = 6;       
-static const UINT_PTR kMainTimerHook = 7;         
+static const UINT_PTR kMainTimerOutbox = 6;
+static const UINT_PTR kMainTimerHook = 7;
+static const UINT_PTR kMainTimerPrewarmSet = 15;   // pre-create the settings window at boot
 
 static const UINT kMsgFlushOutbox = WM_APP + 2;
 
@@ -4062,6 +4069,16 @@ class MsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       OpenSetWindow();
       return S_OK;
     }
+    if (s.find("\"mainSync\"") != std::string::npos) {
+      // the main window changed settings (AI sides, think time, ...): the settings window
+      // is the master panel and follows immediately
+      std::string patch = JsonStrAfterDecoded(s, "\"patch\":");
+      if (!patch.empty() && g_setWebview) {
+        g_setWebview->PostWebMessageAsJson(
+            Utf8ToWide("{\"type\":\"setSync\",\"patch\":" + patch + "}").c_str());
+      }
+      return S_OK;
+    }
     if (s.find("\"openLink\"") != std::string::npos) {
       
       if (g_visHwnd) PostMessageW(g_visHwnd, WM_CLOSE, 0, 0);
@@ -4360,6 +4377,8 @@ class DomHandler : public Cb<ICoreWebView2DOMContentLoadedEventHandler> {
     PostToPage(SysInfoJson());   
     
     if (g_hwnd && IsWindow(g_hwnd)) SetTimer(g_hwnd, kMainTimerSysMem, kSysMemIntervalMs, nullptr);
+    // pre-create the settings window shortly after boot so the first open is instant
+    if (g_hwnd && IsWindow(g_hwnd)) SetTimer(g_hwnd, kMainTimerPrewarmSet, 1500, nullptr);
     LogBoot("dom content loaded");
     FireTestHooks();
     return S_OK;
@@ -7930,11 +7949,6 @@ static const wchar_t* kSetCls = L"GbSetWin";
 static const wchar_t* kSetTitle = L"Settings";
 static const wchar_t* kBrandNameSet = L"Gomoku Settings";
 
-static HWND g_setHwnd = nullptr;
-static ICoreWebView2Controller* g_setController = nullptr;
-static ICoreWebView2* g_setWebview = nullptr;
-static bool g_setCreating = false, g_setPageReady = false;
-
 static void LayoutSetWebView() {
   if (!g_setController || !g_setHwnd) return;
   RECT r;
@@ -7968,18 +7982,20 @@ static void RevealSetPage() {
   if (g_setController) g_setController->put_IsVisible(TRUE);
   if (g_setHwnd && IsWindow(g_setHwnd)) InvalidateRect(g_setHwnd, nullptr, TRUE);
 }
-// Creation-time rect only: width = 0.4 x main client width, height = main client height, placed
-// beside the main window (left side when there is no room), clamped to the work area. From here
-// the window is fixed: no resize, no following the main window.
+// Fixed-size settings window: 410 x 656 CSS px (= 0.8 x the previous 0.4-of-main-window width
+// x main-window height). Screen adaptation uses the SAME algorithm as the main window
+// (GbPx DIP->physical + GbClampToWorkArea), so it fits any resolution / DPI exactly like the
+// main UI does. Created once, never resized, never follows the main window.
 static void SetWinDesiredRect(RECT* out) {
-  RECT mr = { 0, 0, 0, 0 }, mc = { 0, 0, 0, 0 }, work = { 0, 0, 0, 0 };
-  if (g_hwnd) { GetWindowRect(g_hwnd, &mr); GetClientRect(g_hwnd, &mc); }
-  SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+  RECT mr = { 0, 0, 0, 0 };
+  if (g_hwnd) GetWindowRect(g_hwnd, &mr);
 
-  int cw = (int)(mc.right * 0.4 + 0.5);
-  int ch = mc.bottom;
-  if (cw < 320) cw = 320;                 // never narrower than a usable panel
-  if (ch < 240) ch = 240;
+  // width : height = 1 : 1.618 (golden ratio), 410 CSS px wide
+  int cw = GbPx(g_hwnd, 410), ch = GbPx(g_hwnd, 663);   // per-monitor DPI of the main window
+  GbClampToWorkArea(g_hwnd, cw, ch);
+
+  RECT work = { 0, 0, 0, 0 };
+  SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
 
   int x = mr.right + 10, y = mr.top;
   if (x + cw > work.right) x = mr.left - cw - 10;
@@ -8046,12 +8062,15 @@ class SetMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       return S_OK;
     }
     if (s.find("\"settingsPatch\"") != std::string::npos) {
-      // the settings page pushes its patch; relay it to the main page and the link page
+      // the settings page pushes its patch; relay it to EVERY window (settings are master:
+      // main, link, review and vision all follow immediately)
       std::string patch = JsonStrAfterDecoded(s, "\"patch\":");
       if (!patch.empty()) {
         std::string msg = "{\"type\":\"setSync\",\"patch\":" + patch + "}";
         PostToPageSoon(msg);
         PostToLinkPageSoon(msg);
+        PostToRvPageSoon(msg);
+        PostToVisPageSoon(msg);
       }
       return S_OK;
     }
@@ -8099,13 +8118,15 @@ class SetCtlHandler : public Cb<ICoreWebView2CreateCoreWebView2ControllerComplet
 
 static void CreateSetWindow() {
   if (g_setHwnd || g_setCreating || !g_env) return;
+  static HBRUSH setBgBrush = nullptr;                 // theme-coloured splash/backdrop (no white flash)
+  if (!setBgBrush) setBgBrush = CreateSolidBrush(g_uiBg);
   WNDCLASSEXW wc = {};
   wc.cbSize = sizeof(wc);
   wc.lpfnWndProc = SetWndProc;
   wc.hInstance = g_hInst;
   wc.lpszClassName = kSetCls;
   wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-  wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+  wc.hbrBackground = setBgBrush;
   wc.hIcon = LoadIconW(g_hInst, MAKEINTRESOURCEW(1));
   wc.hIconSm = LoadIconW(g_hInst, MAKEINTRESOURCEW(1));
   RegisterClassExW(&wc);
@@ -8113,7 +8134,8 @@ static void CreateSetWindow() {
   RECT d;
   SetWinDesiredRect(&d);
   DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN;
-  g_setHwnd = CreateWindowExW(0, kSetCls, kSetTitle, style,
+  // TOPMOST: the settings window is the master panel - it stays above every other window
+  g_setHwnd = CreateWindowExW(WS_EX_TOPMOST, kSetCls, kSetTitle, style,
                               d.left, d.top, d.right - d.left, d.bottom - d.top,
                               g_hwnd, nullptr, g_hInst, nullptr);
   if (!g_setHwnd) { LogMsg("[set] CreateWindowEx failed"); return; }
@@ -8126,6 +8148,9 @@ static void CreateSetWindow() {
 }
 
 static void OpenSetWindow() {
+  if (g_setHwnd && !IsWindow(g_setHwnd)) {   // stale handle: prewarmed window died, rebuild
+    g_setHwnd = nullptr; g_setController = nullptr; g_setWebview = nullptr; g_setCreating = false;
+  }
   if (g_setHwnd) {
     if (IsIconic(g_setHwnd)) ShowWindow(g_setHwnd, SW_RESTORE);
     ShowWindow(g_setHwnd, SW_SHOWNORMAL);
@@ -8264,6 +8289,13 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       if (w == kRvTimerPrewarm) {
         KillTimer(h, kRvTimerPrewarm);
         PrewarmReviewWindow();
+        return 0;
+      }
+
+      if (w == kMainTimerPrewarmSet) {
+        KillTimer(h, kMainTimerPrewarmSet);
+        // pre-create the settings window (hidden) so the first open is instant
+        if (!g_setHwnd && !g_setCreating) { CreateSetWindow(); LogMsg("[set] prewarmed at boot"); }
         return 0;
       }
       

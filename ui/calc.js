@@ -5933,6 +5933,7 @@ function bootVis() {
 
   function onVisHostMsg(ev) {
     var m = ev.data; if (!m) return;
+    if (m.type === 'setSync') { try { setPatchApply(m.patch || null); } catch (eSV) {} return; }
     if (m.type === 'visShotData') { visAddImage(m.data, true); visMsg(''); }
     else if (m.type === 'visShotFail') visMsg(T('visShotFail'));
     else if (m.type === 'visShotCancel') visMsg('');
@@ -6088,6 +6089,7 @@ function bootReview() {
 
   function onRvHostMsg(ev) {
     var m = ev.data; if (!m) return;
+    if (m.type === 'setSync') { try { setPatchApply(m.patch || null); } catch (eSR) {} return; }
     if (m.type === 'reviewData') reviewLoad(m.record || null);
 
     else if (m.type === 'histTxt') importHist(m.text == null ? '' : String(m.text));
@@ -7279,6 +7281,7 @@ function cpLive() {
 
   cpRender();
   var hex = rgbToHex.apply(null, cpRGB());
+  if (!S.customColors || typeof S.customColors !== 'object') S.customColors = {};
   if (CP.target === 'page') { S.pageBgColor = hex; S.customColors.page = hex; }
   else { S.boardColor = hex; S.customColors.board = hex; }
   applyColors(); paint();
@@ -7287,6 +7290,7 @@ function cpLive() {
 function cpCommit(keepTheme) {
   if (!keepTheme && S.theme !== 'custom') { S.customBase = (S.theme === 'dark') ? 'dark' : 'light'; S.theme = 'custom'; cpSyncSegs(); }
   var hex = rgbToHex.apply(null, cpRGB());
+  if (!S.customColors || typeof S.customColors !== 'object') S.customColors = {};
   if (CP.target === 'page') { S.pageBgColor = hex; S.customColors.page = hex; }
   else { S.boardColor = hex; S.customColors.board = hex; }
 
@@ -7352,12 +7356,14 @@ function wireColors() {
     if (th !== 'custom') S.customBase = th;
 
     if (th !== 'custom') {
+      if (!S.customColors || typeof S.customColors !== 'object') S.customColors = {};
       if (S.boardColor) S.customColors.board = S.boardColor;
       if (S.pageBgColor) S.customColors.page = S.pageBgColor;
       S.boardColor = ''; S.pageBgColor = '';
     }
 
     if (th === 'custom' && !S.boardColor && !S.pageBgColor) {
+      if (!S.customColors || typeof S.customColors !== 'object') S.customColors = {};
       if (S.customColors.board || S.customColors.page) {
         S.boardColor = S.customColors.board;
         S.pageBgColor = S.customColors.page;
@@ -7412,6 +7418,7 @@ function wireColors() {
     cpCommit();
   };
   els.cp_reset.onclick = function () {
+    if (!S.customColors || typeof S.customColors !== 'object') S.customColors = {};
     S.boardColor = ''; S.pageBgColor = '';
 
     S.customColors.board = ''; S.customColors.page = '';
@@ -7589,6 +7596,7 @@ function applyCardVis() {
 // on the storage event. Writes are memoised, so an apply never echoes back.
 var SETKEY = 'gbcalc.setwin.v1';
 var __patchLast = '';
+var __mainPatchLast = '';   // memo for the mainSync broadcast (main -> settings window)
 
 function setPatchNow() {
   var cv = cardVis();
@@ -7724,7 +7732,9 @@ function setPatchApply(p) {
   try { if (setupCh || langCh) { refreshUI(); syncSideUI(); } } catch (e3) {}
   try { if (setupCh) { syncSetSetup(); paint(); } } catch (e6) {}
   try { if (langCh) applyLang(); } catch (e7) {}
-  try { save(); } catch (e4) {}
+  // the review / vision windows only FOLLOW the settings visually - they must never write
+  // their own (stale, theme-normalised) snapshot back over the master state
+  if (!RV_MODE && !VIS_MODE) { try { save(); } catch (e4) {} }
 }
 
 // main window: ask the host to raise the settings window (it owns that WebView)
@@ -7738,20 +7748,21 @@ function buildSetPane() {
   var host = document.createElement('div');
   host.id = 'setPane';
   host.innerHTML =
-    '<div class="sp-rows">' +
-      '<div class="sp-row">' +
-        '<button id="sp_color" class="sp-key"><span class="sp-kn" id="t_spColor">颜色</span></button>' +
-        '<button id="sp_lang" class="sp-key sp-keylang"><b class="sp-v" id="spLangVal">EN</b></button>' +
+    // the key rows and the setup sections live in ONE scroll container
+    '<div class="sp-scroll">' +
+      '<div class="sp-rows">' +
+        '<div class="sp-row">' +
+          '<button id="sp_color" class="sp-key"><span class="sp-kn" id="t_spColor">颜色</span></button>' +
+          '<button id="sp_lang" class="sp-key sp-keylang"><b class="sp-v" id="spLangVal">EN</b></button>' +
+        '</div>' +
+        '<div class="sp-row">' +
+          '<button class="sp-tgl" data-card="engine"><span class="sw"><i></i></span><span class="sp-kn" id="t_spEngine">引擎仪表盘</span></button>' +
+          '<button class="sp-tgl" data-card="analysis"><span class="sw"><i></i></span><span class="sp-kn" id="t_spAnalysis">计算评估</span></button>' +
+          '<button class="sp-tgl" data-card="setup"><span class="sw"><i></i></span><span class="sp-kn" id="t_spSetup">对局设置</span></button>' +
+        '</div>' +
       '</div>' +
-      '<div class="sp-row">' +
-        '<button class="sp-tgl" data-card="engine"><span class="sw"><i></i></span><span class="sp-kn" id="t_spEngine">引擎仪表盘</span></button>' +
-        '<button class="sp-tgl" data-card="analysis"><span class="sw"><i></i></span><span class="sp-kn" id="t_spAnalysis">计算评估</span></button>' +
-        '<button class="sp-tgl" data-card="setup"><span class="sw"><i></i></span><span class="sp-kn" id="t_spSetup">对局设置</span></button>' +
-      '</div>' +
+      '<div class="sp-setup" id="spSetupBody"></div>' +
     '</div>' +
-    '<div class="sp-setup" id="spSetupBody"></div>' +
-    '<div class="sp-foot"><span class="sp-ver" id="t_spVer"></span>' +
-      '<button id="sp_close" class="btn">关闭</button></div>' +
     '<div class="sp-color" id="spColorBox">' +
       '<div class="sp-color-h"><button id="sp_back" class="btn sq2">&lt;</button>' +
         '<span class="sp-ttl" id="t_spColorTtl">颜色</span></div>' +
@@ -7793,9 +7804,6 @@ function syncSetLabels() {
   tx('t_spAnalysis', d.analysis);
   tx('t_spSetup', d.setup);
   tx('t_spColorTtl', d.color);
-  tx('t_spVer', 'Meter Gomoku  v' + APP_VERSION);
-  var cl = document.getElementById('sp_close');
-  if (cl) cl.textContent = d.cpClose;
   // the native window title follows the UI language too
   if (SET_MODE && HOST) { try { tellHost({ type: 'setTitle', txt: d.setWin }); } catch (eTT) {} }
 }
@@ -7814,11 +7822,7 @@ function wireSetPane() {
   if (ck) ck.onclick = function () { setColorView(true); };
   var bk = document.getElementById('sp_back');
   if (bk) bk.onclick = function () { setColorView(false); };
-  var cl = document.getElementById('sp_close');
-  if (cl) cl.onclick = function () {
-    if (HOST) { tellHost({ type: 'settingsClose' }); return; }
-    try { window.close(); } catch (e) {}
-  };
+  // no footer close key: the native title bar closes the window
   [].forEach.call(document.querySelectorAll('#setPane .sp-tgl'), function (b) {
     b.onclick = function () {
       var id = b.getAttribute('data-card');
@@ -7981,6 +7985,7 @@ function bootSet() {
   document.body.classList.add('setwin');
   document.title = 'Meter Gomoku - Settings';
   grab();                       // els table - the setup card wiring goes through it too
+  if (!G.board) G.board = newBoard();   // applyTheme() -> paint() needs a board even here
   try {
     var st = JSON.parse(localStorage.getItem(settingsKey()) || 'null');
     if (st && typeof st === 'object') {
@@ -8010,7 +8015,10 @@ function bootSet() {
     try {
       window.chrome.webview.addEventListener('message', function (ev) {
         var m = ev.data; if (!m || !m.type) return;
-        if (m.type === 'setSync') { try { syncSetSetup(); syncSetKeys(); } catch (eS1) {} return; }
+        if (m.type === 'setSync') { try { setPatchApply(m.patch || null); } catch (eS1) {} return; }
+        if (m.type === 'mainSync') {    // the main window changed something: follow it
+          try { setPatchApply(m.patch || null); } catch (eS2) {} return;
+        }
         if (m.type === 'host') {          // engine handshake: fills the threads/hash option lists
           G.host = { cpu: m.cpu || 4, threadsDefault: m.threadsDefault || 2, threadsMax: m.threadsMax || 3,
                      memMB: m.memMB || 0, native: !!m.native,
@@ -11606,6 +11614,15 @@ function save() {
   try {
     var k = settingsKey();
     localStorage.setItem(k, JSON.stringify(S));
+    // the main window is the master for play state: let the settings window follow it
+    if (HOST && !SET_MODE && !LINK_MODE && !RV_MODE && !VIS_MODE) {
+      var pMS = setPatchNow();
+      var jMS = JSON.stringify(pMS);
+      if (jMS !== __mainPatchLast) {
+        __mainPatchLast = jMS;
+        try { tellHost({ type: 'mainSync', patch: jMS }); } catch (eMS) {}
+      }
+    }
     var other = (k === 'gbcalc.settings.v1') ? 'gbcalc.settings.link.v1' : 'gbcalc.settings.v1';
     var ost = null;
     try { ost = JSON.parse(localStorage.getItem(other) || 'null'); } catch (e2) { ost = null; }
