@@ -14,6 +14,9 @@ var VIS_MODE = /(?:^|[?&])vis=1(?:&|$)/.test(window.location.search || '');
 
 var LINK_MODE = /(?:^|[?&])link=1(?:&|$)/.test(window.location.search || '');
 
+// ?set=1 - the preferences window: its own WebView, narrow fixed-ratio panel (host: OpenSetWindow).
+var SET_MODE = /(?:^|[?&])set=1(?:&|$)/.test(window.location.search || '');
+
 var HOST = !!(window.chrome && window.chrome.webview && window.chrome.webview.postMessage);
 
 var tellHostDefer = false;
@@ -234,11 +237,16 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     pinFixTtl: '固定这张卡片：设置里开其它卡片时它不再被收起',
     pinCloseTtl: '取消固定并关闭这张卡片',
     setWin: '设置', setLang: '语言', pinOff: '取消固定',
-    pinHint: '固定后关闭设置，「对局设置」仍显示在主界面',
-    pinOnHint: '已固定 · 关闭设置后「对局设置」留在主界面',
     cardOnTtl: '显示在主界面 · 点击隐藏',
     cardOffTtl: '已隐藏 · 点击显示在主界面',
     langTip: '点击切换到 English',
+    setHint: '选中后，这张卡片显示在主界面（棋盘旁的那一列）。',
+    setGrpUi: '界面', setGrpShow: '显示在主界面',
+    setDescLang: '界面文字：中文 / English',
+    setDescColor: '主题、棋子与背景配色',
+    setDescEngine: '深度、速度、节点、局面代码',
+    setDescAnalysis: '分析计算、平衡点、扫描防守',
+    setDescSetup: '模式、思考时间、规则、引擎参数',
     aiSideB: 'AI 执黑', aiSideW: 'AI 执白', aiTurnLbl: '思考时间',
     tagBal1: '一手平衡', tagBal2: '二手平衡', tagFwd: '前瞻推演', tagTen: '十打选点',
     eval: '评估', best: '最佳', curve: '评估曲线', blackCurve: '黑子', whiteCurve: '白子',
@@ -700,11 +708,16 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     pinFixTtl: 'Pin this card: it stays when other cards are opened from Settings',
     pinCloseTtl: 'Unpin and close this card',
     setWin: 'Settings', setLang: 'Language', pinOff: 'Unpin',
-    pinHint: 'When pinned, Game Setup stays on the main screen after Settings closes',
-    pinOnHint: 'Pinned - Game Setup stays on the main screen when Settings closes',
     cardOnTtl: 'Shown on the main screen - click to hide',
     cardOffTtl: 'Hidden - click to show on the main screen',
     langTip: 'Click to switch to 中文',
+    setHint: 'Tick a card to show it on the main screen, next to the board.',
+    setGrpUi: 'Interface', setGrpShow: 'Shown on the main screen',
+    setDescLang: 'Interface language: 中文 / English',
+    setDescColor: 'Theme, stones and background',
+    setDescEngine: 'Depth, speed, nodes, position code',
+    setDescAnalysis: 'Live analysis, balance, scan defence',
+    setDescSetup: 'Mode, think time, rules, engine knobs',
     aiSideB: 'AI Black', aiSideW: 'AI White', aiTurnLbl: 'Think time',
     tagBal1: 'Balance 1', tagBal2: 'Balance 2', tagFwd: 'Look-ahead', tagTen: 'Ten-call',
     eval: 'Eval', best: 'Best', curve: 'Eval curve', blackCurve: 'Black', whiteCurve: 'White',
@@ -1174,10 +1187,6 @@ function grab() {
    'cpPresetRow',
    't_cpTheme','t_cpTarget','t_cpHex','t_cpPreset',
    'btn_set','btn_settings','setPop','btn_aiside','aiSidePop','btn_ai_close',
-   'setWin','setWinHead','setWin_close','setBoxBody','setKeys',
-   'btn_set_lang','btn_set_color','btn_set_pin','setLangVal','setColorVal',
-   't_setWin','t_setBox','t_setLang','t_setColor','t_setEngine','t_setAnalysis',
-   't_setPin','t_setPinHint',
    'ai_side_b','ai_side_w','t_aiTurn','num_turn2','btn_live',
    't_analysis','btn_an_calc','btn_an_bal','btn_an_baln','btn_an_defend',
    'num_nbest','t_nbest','t_nbestHint',
@@ -6551,7 +6560,6 @@ function defaultLayout() {
   });
   CARD_IDS.forEach(function (id) {
     var c = document.querySelector('.card[data-id="' + id + '"]');
-    if (c && setupInWin(c)) return;
     if (c && c.parentNode !== els.dockR && c.parentNode !== els.dockL) els.dockR.appendChild(c);
   });
 }
@@ -6560,7 +6568,6 @@ function defaultLayoutLink() {
   if (!els.dockL) return;
   ['engine', 'setup', 'analysis'].forEach(function (id) {
     var c = document.querySelector('.card[data-id="' + id + '"]');
-    if (c && setupInWin(c)) return;
     if (c) els.dockL.appendChild(c);
   });
 }
@@ -6571,7 +6578,6 @@ function defaultLayoutLink() {
 function cardsToLeftDock() {
   if (!els.dockL) return;
   [].forEach.call(document.querySelectorAll('.card'), function (c) {
-    if (setupInWin(c)) return;
     if (c.parentNode !== els.dockL) els.dockL.appendChild(c);
   });
 }
@@ -6585,7 +6591,7 @@ function applyLayout() {
     if (!list || !els[dn]) return;
     list.forEach(function (id) {
       var card = document.querySelector('.card[data-id="' + id + '"]');
-      if (card && !setupInWin(card)) els[dn].appendChild(card);
+      if (card) els[dn].appendChild(card);
     });
   });
 
@@ -6765,10 +6771,6 @@ function applyLang() {
   if (!RV_MODE) {
     if (els.btn_color) els.btn_color.textContent = d.color;
     if (els.t_color) els.t_color.textContent = d.color;
-    if (els.setColorVal) {
-      var thC = (S.theme === 'dark') ? d.theme : (S.theme === 'custom') ? d.themeCustom : d.theme2;
-      els.setColorVal.textContent = thC;
-    }
     els.cp_close.textContent = d.cpClose;
     els.cp_reset.textContent = d.cpReset;
     els.t_cpTheme.textContent = d.cpTheme;
@@ -6784,20 +6786,8 @@ function applyLang() {
     if (ctt[1]) ctt[1].textContent = d.cpPage;
 
     if (els.btn_set) els.btn_set.textContent = d.btnSet;
-    if (els.btn_settings) els.btn_settings.textContent = d.setWin;
-    if (els.t_setWin) els.t_setWin.textContent = d.setWin;
-    if (els.setWin_close) els.setWin_close.textContent = d.cpClose;
-    if (els.t_setBox) els.t_setBox.textContent = d.setup;
-    if (els.t_setLang) els.t_setLang.textContent = d.setLang;
-    if (els.t_setColor) els.t_setColor.textContent = d.color;
-    if (els.t_setEngine) els.t_setEngine.textContent = d.engine;
-    if (els.t_setAnalysis) els.t_setAnalysis.textContent = d.analysis;
-    if (els.setLangVal) els.setLangVal.textContent = (S.lang === 'en') ? '中文' : 'EN';
-    if (els.btn_set_lang) els.btn_set_lang.title = d.langTip;
-    if (els.btn_settings) els.btn_settings.title = d.setWin;
+    if (els.btn_settings) { els.btn_settings.textContent = d.setWin; els.btn_settings.title = d.setWin; }
     buildCardMenu();
-    // Labels just changed, so the two column heights changed too.
-    if (setWinOpen()) setTimeout(function () { try { layoutSetColumns(); } catch (eLC) {} }, 0);
     if (els.btn_aiside) els.btn_aiside.textContent = d.btnAiside;
     if (els.ai_side_b && els.ai_side_b.querySelector('.tgl-txt')) els.ai_side_b.querySelector('.tgl-txt').textContent = d.aiSideB;
     if (els.ai_side_w && els.ai_side_w.querySelector('.tgl-txt')) els.ai_side_w.querySelector('.tgl-txt').textContent = d.aiSideW;
@@ -6987,12 +6977,8 @@ function applyTheme() {
   drawCurve();
   if (els.btn_color) els.btn_color.title = T('color');
   cpSyncSegs();
-  // keep the colour chip in the settings window in step with the theme
-  if (els.setColorVal) {
-    var dTH = I18N[S.lang] || I18N.zh;
-    els.setColorVal.textContent = (S.theme === 'dark') ? dTH.theme
-      : (S.theme === 'custom') ? dTH.themeCustom : dTH.theme2;
-  }
+  // the colour chip in the settings window follows the theme
+  try { syncSetKeys(); } catch (eSK) {}
 
   if (HOST) tellHost({ type: 'uiTheme', theme: themeKey(), bg: pageBgHex(), lang: S.lang, cssVars: S.cssVars });
 }
@@ -7580,159 +7566,489 @@ function cardVis() {
   return S.cards;
 }
 function applyCardVis() {
+  if (SET_MODE) return;   // the settings page has no card docks; its embedded copy stays visible
   var v = cardVis();
   CARD_IDS.forEach(function (id) {
     var el = document.querySelector('.card[data-id="' + id + '"]');
     if (el) el.hidden = !v[id];
   });
-  // The setup card has two homes: the settings window (while it is open) and its dock (only when
-  // pinned), so its visibility is decided here rather than by the plain hidden flag above.
-  if (setWinOpen()) mountSetupCard(); else restoreSetupCard();
   buildCardMenu();
   syncDocks();
 
   syncPinKeys();
 }
 
-// ---- settings window ------------------------------------------------------------------------
-// One floating window owns every preference: language, colours, which cards sit on the main
-// screen, and the whole game-setup card (two columns inside a dashed frame). The setup card is a
-// single DOM node: it lives in that dashed frame while the window is open, and only goes back to
-// the dock when the user pinned it - so there is never a second copy of the same controls.
-function setWinOpen() { return !!(els.setWin && !els.setWin.hidden); }
-function setupCardEl() { return document.querySelector('.card[data-id="setup"]'); }
-function setupPinned() { return !!cardVis().setup; }
-// True while the card is parked in the settings window (dock loops must leave it alone then).
-function setupInWin(c) { return !!(c && els.setBoxBody && c.parentNode === els.setBoxBody); }
-function setupHomeDock() { return (linkSessionOn() && els.dockL) ? els.dockL : els.dockR; }
+// ---- settings window (its own WebView, ?set=1) ------------------------------------------------
+// Preferences live in a second WebView window that the host creates (width = 0.4 of the main
+// window, same height, fixed ratio). The page runs this same file in SET_MODE: it shows the key
+// list and, behind the 颜色 key, the palette. Cards keep living in the main window - the keys
+// here only decide whether a card is visible there.
+//
+// State sharing: the settings page must never write the big gbcalc.settings.v1 snapshot (it would
+// clobber engine fields it never touched), so it writes a narrow patch that the main page applies
+// on the storage event. Writes are memoised, so an apply never echoes back.
+var SETKEY = 'gbcalc.setwin.v1';
+var __patchLast = '';
 
-function mountSetupCard() {
-  var c = setupCardEl();
-  if (!c || !els.setBoxBody) return;
-  if (c.parentNode !== els.setBoxBody) els.setBoxBody.appendChild(c);
-  c.hidden = false;
-  layoutSetColumns();
+function setPatchNow() {
+  var cv = cardVis();
+  return {
+    lang: S.lang,
+    theme: S.theme,
+    customBase: S.customBase || '',
+    cssVars: S.cssVars || null,
+    boardColor: S.boardColor || '',
+    pageBgColor: S.pageBgColor || '',
+    customColors: S.customColors || null,
+    cards: { engine: cv.engine ? 1 : 0, analysis: cv.analysis ? 1 : 0, setup: cv.setup ? 1 : 0 },
+    mode: S.mode, rule: +S.rule, turnMs: +S.turnMs,
+    aiB: !!S.aiB, aiW: !!S.aiW, bgThink: !!S.bgThink,
+    cores: +S.cores || 0, hashMB: +S.hashMB || 0,
+    variant: S.variant || '', weights: S.weights || '',
+    candRange: (S.candRange === undefined || S.candRange === null) ? null : +S.candRange,
+    nbest: +S.nbest || 3, maxDepth: +S.maxDepth || 0, maxNodes: +S.maxNodes || 0,
+    showNum: !!S.showNum, previewOn: S.previewOn !== false
+  };
 }
-// Two columns inside the dashed frame: sections keep their order but each one goes to whichever
-// column is currently shorter, so a tall "engine" block does not leave half a column empty.
-// Heights are only known while the window is visible; before that they fall back to alternating.
-function layoutSetColumns() {
-  var card = setupCardEl();
-  if (!card) return;
-  var body = card.querySelector('.card-b');
-  if (!body) return;
-  var secs = [].slice.call(body.querySelectorAll('.sec'));
-  if (!secs.length) return;
-  var cols = [].slice.call(body.querySelectorAll(':scope > .setcol'));
-  if (cols.length !== 2) {
-    cols = [document.createElement('div'), document.createElement('div')];
-    cols[0].className = 'setcol';
-    cols[1].className = 'setcol';
-    body.appendChild(cols[0]);
-    body.appendChild(cols[1]);
+// fields the settings window is allowed to write back into the stored snapshot
+function setSyncFields() {
+  return ['lang', 'theme', 'customBase', 'cssVars', 'boardColor', 'pageBgColor', 'customColors',
+          'mode', 'rule', 'turnMs', 'aiB', 'aiW', 'bgThink', 'cores', 'hashMB',
+          'variant', 'weights', 'candRange', 'nbest', 'maxDepth', 'maxNodes', 'showNum', 'previewOn'];
+}
+function setPatchWrite() {
+  if (!SET_MODE) return;   // patch key: settings window writes, main pages only read
+  try {
+    var p = setPatchNow();
+    var j = JSON.stringify(p);
+    if (j !== __patchLast) {
+      __patchLast = j;
+      p.seq = Date.now();
+      var pj = JSON.stringify(p);
+      localStorage.setItem(SETKEY, pj);
+      // deterministic channel: the host relays the patch to the other pages (the
+      // cross-window storage event proved unreliable between WebView2 controllers)
+      if (SET_MODE && HOST) { try { tellHost({ type: 'settingsPatch', patch: pj }); } catch (eP) {} }
+    }
+    // persistence: merge only the fields this window owns into the stored snapshot,
+    // so the main window's play state can never be clobbered from here
+    var st = null;
+    try { st = JSON.parse(localStorage.getItem(settingsKey()) || 'null'); } catch (e2) { st = null; }
+    if (!st || typeof st !== 'object') st = {};
+    var ch = false;
+    setSyncFields().forEach(function (k) {
+      if (S[k] === undefined) return;
+      if (JSON.stringify(st[k]) !== JSON.stringify(S[k])) { st[k] = S[k]; ch = true; }
+    });
+    if (ch) localStorage.setItem(settingsKey(), JSON.stringify(st));
+  } catch (e) {}
+}
+function setPatchApply(p) {
+  if (!p) return;
+  var langCh = false, lookCh = false, cardCh = false, setupCh = false, engCh = false;
+  var lg = (p.lang === 'en') ? 'en' : (p.lang === 'zh' ? 'zh' : '');
+  if (lg && lg !== S.lang) { S.lang = lg; langCh = true; }
+  if (p.theme && p.theme !== S.theme) { S.theme = p.theme; lookCh = true; }
+  if (p.customBase && p.customBase !== S.customBase) { S.customBase = p.customBase; lookCh = true; }
+  if (p.cssVars !== undefined &&
+      JSON.stringify(p.cssVars || null) !== JSON.stringify(S.cssVars || null)) { S.cssVars = p.cssVars; lookCh = true; }
+  if (typeof p.boardColor === 'string' && p.boardColor !== S.boardColor) { S.boardColor = p.boardColor; lookCh = true; }
+  if (typeof p.pageBgColor === 'string' && p.pageBgColor !== S.pageBgColor) { S.pageBgColor = p.pageBgColor; lookCh = true; }
+  if (p.customColors && JSON.stringify(p.customColors) !== JSON.stringify(S.customColors || null)) {
+    S.customColors = p.customColors; lookCh = true;
   }
-  secs.forEach(function (s, i) { if (s.__ord === undefined) s.__ord = i; });
-  secs.sort(function (a, b) { return a.__ord - b.__ord; });
-  var hs = secs.map(function (s) { return s.offsetHeight || 0; });
-  var measured = hs.some(function (v) { return v > 0; });
-  var hh = [0, 0];
-  secs.forEach(function (s, i) {
-    var k = measured ? (hh[0] <= hh[1] ? 0 : 1) : (i % 2);
-    cols[k].appendChild(s);
-    hh[k] += hs[i];
+  if (p.cards) {
+    var cv = cardVis();
+    ['engine', 'analysis', 'setup'].forEach(function (id) {
+      var want = p.cards[id] ? 1 : 0;
+      if ((cv[id] ? 1 : 0) !== want) { cv[id] = want; cardCh = true; }
+    });
+  }
+  // ---- setup fields (embedded setup card in the settings window) ----
+  if (p.mode === 'pve' || p.mode === 'place' || p.mode === 'endgame') {
+    if (S.mode !== p.mode) {
+      S.mode = p.mode; setupCh = true;
+      try { if (S.mode !== 'pve') { G.heat = []; G.nums = []; } } catch (eM) {}
+    }
+  }
+  if (p.rule !== undefined && p.rule !== null && +p.rule >= 0 && +p.rule <= 2 && +p.rule !== +S.rule) {
+    S.rule = +p.rule; setupCh = true;
+    try { saveRuleGlobal(S.rule); applyRuleHint(); forbiddenMarksInvalidate(); recomputeOver(); } catch (eR) {}
+  }
+  if (p.turnMs !== undefined && p.turnMs !== null && +p.turnMs >= 200 && +p.turnMs <= 300000 &&
+      Math.round(+p.turnMs) !== +S.turnMs) { S.turnMs = Math.round(+p.turnMs); setupCh = true; }
+  if (typeof p.aiB === 'boolean' || typeof p.aiW === 'boolean') {
+    var nb = (typeof p.aiB === 'boolean') ? p.aiB : !!S.aiB;
+    var nw = (typeof p.aiW === 'boolean') ? p.aiW : !!S.aiW;
+    if (nb !== !!S.aiB || nw !== !!S.aiW) { setAiSides(nb, nw); setupCh = true; }
+  }
+  if (p.bgThink !== undefined && p.bgThink !== null && !!p.bgThink !== !!S.bgThink) {
+    S.bgThink = !!p.bgThink; setupCh = true;
+    try { if (!S.bgThink) { bgThinkStop(); bgThinkHaltEngine(); } } catch (eB1) {}
+  }
+  if (p.cores !== undefined && +p.cores >= 1 && +p.cores !== +S.cores) { S.cores = +p.cores | 0; setupCh = true; engCh = true; }
+  if (p.hashMB !== undefined && +p.hashMB >= 16 && +p.hashMB !== +S.hashMB) { S.hashMB = +p.hashMB; setupCh = true; engCh = true; }
+  if (typeof p.variant === 'string' && p.variant && p.variant !== S.variant) {
+    S.variant = p.variant; setupCh = true; engCh = true;
+    try { variantPrefSet(S.variant); } catch (eV1) {}
+  }
+  if ((p.weights === 'nnue' || p.weights === 'classic') && p.weights !== S.weights) {
+    S.weights = p.weights; setupCh = true; engCh = true;
+    try { weightsPrefSet(S.weights); } catch (eW1) {}
+  }
+  if (p.candRange !== undefined && p.candRange !== null && isFinite(+p.candRange) && +p.candRange !== +S.candRange) {
+    S.candRange = +p.candRange; setupCh = true; engCh = true;
+  }
+  if (p.nbest !== undefined && +p.nbest >= 1 && +p.nbest <= 8 && Math.round(+p.nbest) !== +S.nbest) {
+    S.nbest = Math.round(+p.nbest); setupCh = true;
+  }
+  if (p.maxDepth !== undefined && isFinite(+p.maxDepth) && (+p.maxDepth | 0) !== +(S.maxDepth || 0)) {
+    S.maxDepth = +p.maxDepth | 0; setupCh = true; engCh = true;
+  }
+  if (p.maxNodes !== undefined && isFinite(+p.maxNodes) && (+p.maxNodes | 0) !== +(S.maxNodes || 0)) {
+    S.maxNodes = +p.maxNodes | 0; setupCh = true; engCh = true;
+  }
+  if (p.showNum !== undefined && p.showNum !== null && !!p.showNum !== !!S.showNum) { S.showNum = !!p.showNum; setupCh = true; }
+  if (p.previewOn !== undefined && p.previewOn !== null && !!p.previewOn !== (S.previewOn !== false)) { S.previewOn = !!p.previewOn; setupCh = true; }
+
+  if (!langCh && !lookCh && !cardCh && !setupCh) return;
+  if (SET_MODE) {   // settings page: light path (no board / engine on this side)
+    try { if (lookCh) applyTheme(); } catch (eS1) {}
+    try { syncSetSetup(); syncSetKeys(); } catch (eS2) {}
+    try { save(); } catch (eS3) {}
+    return;
+  }
+  try { if (lookCh) applyTheme(); } catch (e1) {}
+  try { if (cardCh) applyCardVis(); } catch (e2) {}
+  try { if (engCh) applyEngineConfig(); } catch (e5) {}
+  try { if (setupCh || langCh) { refreshUI(); syncSideUI(); } } catch (e3) {}
+  try { if (setupCh) { syncSetSetup(); paint(); } } catch (e6) {}
+  try { if (langCh) applyLang(); } catch (e7) {}
+  try { save(); } catch (e4) {}
+}
+
+// main window: ask the host to raise the settings window (it owns that WebView)
+function openSettingsWindow() {
+  if (HOST) { tellHost({ type: 'openSettings' }); return; }
+  try { window.open('calc.html?set=1', '_blank', 'width=512,height=900'); } catch (e) {}
+}
+
+// ---- settings page (?set=1) -------------------------------------------------------------------
+function buildSetPane() {
+  var host = document.createElement('div');
+  host.id = 'setPane';
+  host.innerHTML =
+    '<div class="sp-rows">' +
+      '<div class="sp-row">' +
+        '<button id="sp_color" class="sp-key"><span class="sp-kn" id="t_spColor">颜色</span></button>' +
+        '<button id="sp_lang" class="sp-key sp-keylang"><b class="sp-v" id="spLangVal">EN</b></button>' +
+      '</div>' +
+      '<div class="sp-row">' +
+        '<button class="sp-tgl" data-card="engine"><span class="sw"><i></i></span><span class="sp-kn" id="t_spEngine">引擎仪表盘</span></button>' +
+        '<button class="sp-tgl" data-card="analysis"><span class="sw"><i></i></span><span class="sp-kn" id="t_spAnalysis">计算评估</span></button>' +
+        '<button class="sp-tgl" data-card="setup"><span class="sw"><i></i></span><span class="sp-kn" id="t_spSetup">对局设置</span></button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="sp-setup" id="spSetupBody"></div>' +
+    '<div class="sp-foot"><span class="sp-ver" id="t_spVer"></span>' +
+      '<button id="sp_close" class="btn">关闭</button></div>' +
+    '<div class="sp-color" id="spColorBox">' +
+      '<div class="sp-color-h"><button id="sp_back" class="btn sq2">&lt;</button>' +
+        '<span class="sp-ttl" id="t_spColorTtl">颜色</span></div>' +
+    '</div>';
+  document.body.appendChild(host);
+  var cp = document.getElementById('colorPop');
+  var box = document.getElementById('spColorBox');
+  if (cp && box) box.appendChild(cp);
+  // the setup card ships in this very document: move it below the key rows and strip its header
+  var sc = document.querySelector('.card[data-id="setup"]');
+  var bodyBox = document.getElementById('spSetupBody');
+  if (sc && bodyBox) {
+    bodyBox.appendChild(sc);
+    sc.hidden = false;
+    sc.classList.add('sp-embed');
+  }
+}
+
+function setColorView(on) {
+  document.body.classList.toggle('sp-coloring', !!on);
+  if (on) openColorPop(); else closeColorPop();
+}
+
+function syncSetKeys() {
+  if (!document.getElementById('setPane')) return;
+  var cv = cardVis();
+  [].forEach.call(document.querySelectorAll('#setPane .sp-tgl'), function (b) {
+    b.classList.toggle('on', !!cv[b.getAttribute('data-card')]);
   });
+  var lv = document.getElementById('spLangVal');
+  if (lv) lv.textContent = (S.lang === 'en') ? '中' : 'EN';
 }
-function restoreSetupCard() {
-  var c = setupCardEl();
-  if (!c) return;
-  if (setupPinned()) {
-    var home = setupHomeDock();
-    if (home && c.parentNode !== home) home.appendChild(c);
-    c.hidden = false;
-  } else {
-    if (els.setBoxBody && c.parentNode !== els.setBoxBody) els.setBoxBody.appendChild(c);
-    c.hidden = true;
-  }
-  syncDocks();
+
+function syncSetLabels() {
+  var d = I18N[S.lang] || I18N.zh;
+  function tx(id, v) { var e = document.getElementById(id); if (e && v != null) e.textContent = v; }
+  tx('t_spColor', d.color);
+  tx('t_spEngine', d.engine);
+  tx('t_spAnalysis', d.analysis);
+  tx('t_spSetup', d.setup);
+  tx('t_spColorTtl', d.color);
+  tx('t_spVer', 'Meter Gomoku  v' + APP_VERSION);
+  var cl = document.getElementById('sp_close');
+  if (cl) cl.textContent = d.cpClose;
+  // the native window title follows the UI language too
+  if (SET_MODE && HOST) { try { tellHost({ type: 'setTitle', txt: d.setWin }); } catch (eTT) {} }
 }
 
 function buildCardMenu() {
-  var v = cardVis();
-  [].forEach.call(document.querySelectorAll('#setKeys .sk-tgl'), function (b) {
-    var id = b.getAttribute('data-card');
-    var on = !!v[id];
-    b.classList.toggle('on', on);
-    b.title = on ? T('cardOnTtl') : T('cardOffTtl');
-  });
-  if (els.btn_set_pin) {
-    var pin = !!v.setup;
-    els.btn_set_pin.classList.toggle('on', pin);
-    if (els.t_setPin) els.t_setPin.textContent = pin ? T('pinOff') : T('pinFix');
-    if (els.t_setPinHint) els.t_setPinHint.textContent = pin ? T('pinOnHint') : T('pinHint');
-  }
+  syncSetLabels();
+  syncSetKeys();
+  // NOTE: the main pages must never write the SETKEY patch - it is the settings window's
+  // outbound channel, and a main-side write would clobber it before the boot-time apply.
 }
 
-function openSettings() {
-  if (!els.setWin) return;
-  if (els.aiSidePop && !els.aiSidePop.hidden) {
-    els.aiSidePop.hidden = true;
-    if (els.btn_aiside) els.btn_aiside.classList.remove('on');
+function wireSetPane() {
+  var lk = document.getElementById('sp_lang');
+  if (lk) lk.onclick = function () { toggleLangNow(); };
+  var ck = document.getElementById('sp_color');
+  if (ck) ck.onclick = function () { setColorView(true); };
+  var bk = document.getElementById('sp_back');
+  if (bk) bk.onclick = function () { setColorView(false); };
+  var cl = document.getElementById('sp_close');
+  if (cl) cl.onclick = function () {
+    if (HOST) { tellHost({ type: 'settingsClose' }); return; }
+    try { window.close(); } catch (e) {}
+  };
+  [].forEach.call(document.querySelectorAll('#setPane .sp-tgl'), function (b) {
+    b.onclick = function () {
+      var id = b.getAttribute('data-card');
+      var cv = cardVis();
+      cv[id] = cv[id] ? 0 : 1;
+      save();            // rewired to setPatchWrite() in SET_MODE
+      syncSetKeys();
+    };
+  });
+  wireSetSetup();
+}
+
+// push the current S into the setup controls (settings window: embedded copy; main: dock card)
+function setupCardEl() {
+  return document.querySelector('.card.sp-embed') || document.querySelector('.card[data-id="setup"]');
+}
+function syncSetSetup() {
+  var sc = setupCardEl();
+  if (!sc) return;
+  function q(sel) { return sc.querySelector(sel); }
+  [].forEach.call(sc.querySelectorAll('#seg_mode button'), function (b) {
+    b.classList.toggle('on', b.getAttribute('data-mode') === S.mode);
+  });
+  [].forEach.call(sc.querySelectorAll('#seg_side button'), function (b) {
+    var k = b.getAttribute('data-ai');
+    var on = (k === 'b') ? !!S.aiB : !!S.aiW;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  var nt = q('#num_turn'); if (nt) nt.value = String(+(S.turnMs / 1000).toFixed(3));
+  var sr = q('#sel_rule'); if (sr) sr.value = String(+S.rule);
+  var bt = q('#btn_bgThink');
+  if (bt) { bt.classList.toggle('on', !!S.bgThink); bt.setAttribute('aria-pressed', S.bgThink ? 'true' : 'false'); }
+  var cn = q('#chk_num'); if (cn) cn.checked = !!S.showNum;
+  var cpv = q('#chk_preview'); if (cpv) cpv.checked = S.previewOn !== false;
+  function sel(id, v) { var e = q(id); if (e) e.value = String(v); }
+  sel('#sel_cores', S.cores); sel('#sel_hash', S.hashMB);
+  if (S.variant) sel('#sel_variant', S.variant);
+  if (S.weights) sel('#sel_weights', S.weights);
+  if (S.candRange !== undefined && S.candRange !== null) sel('#sel_candRange', S.candRange);
+  sel('#sel_multiPv', S.nbest || 3);
+  var md = +S.maxDepth || 0;
+  try { selSyncCustom(q('#sel_maxDepth'), md, function (x) { return String(x); }); } catch (e1) {}
+  var imd = q('#inp_maxDepth'); if (imd) imd.value = md ? String(md) : '';
+  var mn = +S.maxNodes || 0;
+  try { selSyncCustom(q('#sel_maxNodes'), mn, function (x) { return (x / 1000000) + 'M'; }); } catch (e2) {}
+  var imn = q('#inp_maxNodes'); if (imn) imn.value = mn ? String(+(mn / 1000000).toFixed(1)) : '';
+}
+
+// self-contained wiring for the embedded setup card: mutate S -> save (patch + merge)
+function wireSetSetup() {
+  var sc = document.querySelector('.card.sp-embed');
+  if (!sc) return;
+  function q(sel) { return sc.querySelector(sel); }
+  var segM = q('#seg_mode');
+  if (segM) segM.onclick = function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    S.mode = b.getAttribute('data-mode');
+    if (S.mode === 'endgame') { S.egLocked = false; S.egBase = null; }
+    save(); syncSetSetup();
+  };
+  var segS = q('#seg_side');
+  if (segS) segS.onclick = function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var k = b.getAttribute('data-ai'); if (!k) return;
+    var bOn = (k === 'b') ? !S.aiB : S.aiB;
+    var wOn = (k === 'w') ? !S.aiW : S.aiW;
+    setAiSides(bOn, wOn);
+    if (S.mode !== 'pve') S.mode = 'pve';
+    save(); syncSetSetup();
+  };
+  var nt = q('#num_turn');
+  if (nt) nt.onchange = function () {
+    var secs = Math.round((+nt.value || 2) * 1000) / 1000;
+    secs = Math.max(0.2, Math.min(300, secs));
+    S.turnMs = Math.round(secs * 1000);
+    nt.value = String(secs);
+    save();
+  };
+  var sr = q('#sel_rule');
+  if (sr) sr.onchange = function () {
+    S.rule = +sr.value;
+    try { saveRuleGlobal(S.rule); } catch (eR) {}
+    save();
+  };
+  var bt = q('#btn_bgThink');
+  if (bt) bt.onclick = function () { S.bgThink = !S.bgThink; save(); syncSetSetup(); };
+  var cr = q('#sel_cores');
+  if (cr) cr.onchange = function () {
+    S.cores = Math.max(MIN_THREADS, +cr.value | 0);
+    try { enginePrefSet(S.cores, S.hashMB); } catch (e1) {}
+    save();
+  };
+  var sh = q('#sel_hash');
+  if (sh) sh.onchange = function () {
+    S.hashMB = +sh.value;
+    try { enginePrefSet(S.cores, S.hashMB); } catch (e2) {}
+    save();
+  };
+  var sv = q('#sel_variant');
+  if (sv) sv.onchange = function () { S.variant = sv.value || ''; try { variantPrefSet(S.variant); } catch (e3) {} save(); };
+  var sw = q('#sel_weights');
+  if (sw) sw.onchange = function () {
+    if (sw.value !== 'nnue' && sw.value !== 'classic') return;
+    S.weights = sw.value;
+    try { weightsPrefSet(S.weights); } catch (e4) {}
+    save();
+  };
+  var scr = q('#sel_candRange');
+  if (scr) scr.onchange = function () { S.candRange = +scr.value; save(); };
+  var mp = q('#sel_multiPv');
+  if (mp) mp.onchange = function () { S.nbest = Math.max(1, Math.min(8, Math.round(+mp.value || 3))); save(); syncSetSetup(); };
+  var sMd = q('#sel_maxDepth'), iMd = q('#inp_maxDepth');
+  if (sMd) sMd.onchange = function () {
+    S.maxDepth = +sMd.value | 0;
+    if (iMd) iMd.value = S.maxDepth ? String(S.maxDepth) : '';
+    save();
+  };
+  if (iMd) iMd.onchange = iMd.onblur = function () {
+    var raw = String(iMd.value || '').trim(), v;
+    if (raw === '' || raw === '0') v = 0;
+    else {
+      v = parseInt(raw, 10);
+      if (!isFinite(v)) v = 72;
+      if (v > 0 && v < 4) v = 4;
+      if (v > 128) v = 128;
+    }
+    iMd.value = v ? String(v) : '';
+    S.maxDepth = v;
+    try { selSyncCustom(sMd, v, function (x) { return String(x); }); } catch (e5) {}
+    save();
+  };
+  var sMn = q('#sel_maxNodes'), iMn = q('#inp_maxNodes');
+  if (sMn) sMn.onchange = function () {
+    S.maxNodes = +sMn.value | 0;
+    if (iMn) iMn.value = S.maxNodes ? String(+(S.maxNodes / 1000000).toFixed(1)) : '';
+    save();
+  };
+  if (iMn) iMn.onchange = iMn.onblur = function () {
+    var raw = String(iMn.value || '').trim(), m;
+    if (raw === '' || raw === '0') m = 0;
+    else {
+      m = parseFloat(raw);
+      if (!isFinite(m) || m <= 0) m = 0.1;
+      if (m > 256) m = 256;
+      m = Math.round(m * 10) / 10;
+    }
+    iMn.value = m ? String(m) : '';
+    S.maxNodes = Math.round(m * 1000000);
+    try { selSyncCustom(sMn, S.maxNodes, function (x) { return (x / 1000000) + 'M'; }); } catch (e6) {}
+    save();
+  };
+  var cn = q('#chk_num');
+  if (cn) cn.onchange = function () { S.showNum = !!cn.checked; save(); };
+  var cpv = q('#chk_preview');
+  if (cpv) cpv.onchange = function () { S.previewOn = !!cpv.checked; save(); };
+}
+
+function bootSet() {
+  document.body.classList.add('setwin');
+  document.title = 'Meter Gomoku - Settings';
+  grab();                       // els table - the setup card wiring goes through it too
+  try {
+    var st = JSON.parse(localStorage.getItem(settingsKey()) || 'null');
+    if (st && typeof st === 'object') {
+      for (var k in st) if (st[k] !== undefined) S[k] = st[k];
+    }
+  } catch (e0) {}
+  document.body.setAttribute('data-theme', themeKey());
+  try { applyColorVars(S.cssVars); } catch (e1) {}
+
+  document.documentElement.style.fontSize = '13px';
+  buildSetPane();
+  wireSetPane();
+  try { buildSelects(); } catch (eS0) {}   // fill the engine selects (no host relay here)
+  try { wireColors(); } catch (e3) {}
+  // from now on every "save" in this page is the narrow patch + owned-field merge
+  save = function () { setPatchWrite(); };
+  try {
+    var pt = JSON.parse(localStorage.getItem(SETKEY) || 'null');
+    if (pt) setPatchApply(pt);
+  } catch (e2) {}
+  try { applyLang(); } catch (e4) {}
+  syncSetLabels();
+  syncSetKeys();
+  syncSetSetup();
+  setPatchWrite();
+  if (HOST) {
+    try {
+      window.chrome.webview.addEventListener('message', function (ev) {
+        var m = ev.data; if (!m || !m.type) return;
+        if (m.type === 'setSync') { try { syncSetSetup(); syncSetKeys(); } catch (eS1) {} return; }
+        if (m.type === 'host') {          // engine handshake: fills the threads/hash option lists
+          G.host = { cpu: m.cpu || 4, threadsDefault: m.threadsDefault || 2, threadsMax: m.threadsMax || 3,
+                     memMB: m.memMB || 0, native: !!m.native,
+                     userThreads: m.userThreads | 0, userHashMB: m.userHashMB | 0,
+                     physCores: m.physCores || 0, memAvailMB: m.memAvailMB || 0,
+                     cpuName: m.cpuName || '', variant: m.variant || '' };
+          if (typeof m.avx2 === 'boolean') {
+            G.host.sse = !!m.sse; G.host.avx2 = !!m.avx2; G.host.avx512 = !!m.avx512;
+            G.host.avx512vnni = !!m.avx512vnni; G.host.avxvnni = !!m.avxvnni;
+          }
+          G.host.variantBench = m.variantBench || '';
+          try { buildSelects(); } catch (eH1) {}
+          try { syncSetSetup(); } catch (eH2) {}
+          return;
+        }
+        if (m.type === 'sysInfo') { G.sysInfo = m; try { renderSysInfo(); } catch (eH3) {} return; }
+        if (m.type === 'sysMem') {
+          if (G.sysInfo) {
+            G.sysInfo.memTotalMB = m.memTotalMB | 0;
+            G.sysInfo.memAvailMB = m.memAvailMB | 0;
+            G.sysInfo.memLoad = m.memLoad | 0;
+          }
+          try { renderSysInfo(); renderHashInfo(); } catch (eH4) {}
+          return;
+        }
+      });
+      window.chrome.webview.postMessage({ type: 'ready', theme: themeKey(), bg: pageBgHex(), lang: S.lang });
+    } catch (eH) {}
   }
-  els.setWin.hidden = false;
-  mountSetupCard();
-  buildCardMenu();
-  if (els.btn_set) els.btn_set.classList.add('on');
-  if (els.btn_settings) els.btn_settings.classList.add('on');
-  layoutBoard();
+  try { var b = document.querySelector('#boot'); if (b) b.style.display = 'none'; } catch (e5) {}
 }
-function closeSettings() {
-  if (!els.setWin) return;
-  els.setWin.hidden = true;
-  var sc = els.setWin.querySelector('.setwin-card');
-  if (sc) { sc.style.transform = ''; delete sc.dataset.dx; delete sc.dataset.dy; }
-  if (els.btn_set) els.btn_set.classList.remove('on');
-  if (els.btn_settings) els.btn_settings.classList.remove('on');
-  closeColorPop();
-  restoreSetupCard();
-  persistLayout();
-  layoutBoard();
-}
-function toggleSettings() { if (setWinOpen()) closeSettings(); else openSettings(); }
-function toggleSetPop() { toggleSettings(); }
 
 function toggleLangNow() {
   S.lang = (S.lang === 'zh') ? 'en' : 'zh';
   save();
   applyLang();
+  if (SET_MODE) { syncSetLabels(); syncSetKeys(); try { syncSetSetup(); } catch (eL1) {} return; }
   refreshUI();
-}
-// The window is centred by the modal backdrop; dragging the title bar offsets it so the user can
-// push it aside and watch the board while tuning (cleared again on close).
-function wireSetWinDrag() {
-  if (!els.setWinHead || !els.setWin) return;
-  var card = els.setWin.querySelector('.setwin-card');
-  if (!card) return;
-  var d = null;
-  els.setWinHead.addEventListener('mousedown', function (e) {
-    if (e.button !== 0) return;
-    if (e.target && e.target.closest && e.target.closest('.btn')) return;
-    d = { x: e.clientX, y: e.clientY,
-          ox: parseFloat(card.dataset.dx || '0') || 0,
-          oy: parseFloat(card.dataset.dy || '0') || 0 };
-    document.body.classList.add('setwin-drag');
-    e.preventDefault();
-  });
-  window.addEventListener('mousemove', function (e) {
-    if (!d) return;
-    var dx = d.ox + (e.clientX - d.x), dy = d.oy + (e.clientY - d.y);
-    card.dataset.dx = String(dx); card.dataset.dy = String(dy);
-    card.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-  });
-  window.addEventListener('mouseup', function () {
-    if (!d) return;
-    d = null;
-    document.body.classList.remove('setwin-drag');
-  });
 }
 
 function cardOrderBySelect(id) {
@@ -7778,35 +8094,11 @@ function pinKeySync(pk, id) {
 function wireCards() {
 
   if (els.btn_set) {
-    els.btn_set.onclick = function (e) { e.stopPropagation(); toggleSettings(); };
+    els.btn_set.onclick = function (e) { e.stopPropagation(); openSettingsWindow(); };
   }
   if (els.btn_settings) {
-    els.btn_settings.onclick = function (e) { e.stopPropagation(); toggleSettings(); };
+    els.btn_settings.onclick = function (e) { e.stopPropagation(); openSettingsWindow(); };
   }
-  if (els.setWin_close) els.setWin_close.onclick = closeSettings;
-  if (els.setWin) {
-    els.setWin.addEventListener('click', function (e) { if (e.target === els.setWin) closeSettings(); });
-  }
-  [].forEach.call(document.querySelectorAll('#setKeys .sk-tgl'), function (b) {
-    b.onclick = function () { toggleCardFromMenu(b.getAttribute('data-card')); };
-  });
-  if (els.btn_set_lang) els.btn_set_lang.onclick = function () { toggleLangNow(); };
-  if (els.btn_set_color) els.btn_set_color.onclick = function () { openColorPop(); };
-  if (els.btn_set_pin) els.btn_set_pin.onclick = function () {
-    var v = cardVis();
-    v.setup = v.setup ? 0 : 1;
-    if (!v.setup) delete CARD_PIN.setup;
-    save();
-    applyCardVis();
-    persistLayout();
-    layoutBoard();
-  };
-  wireSetWinDrag();
-  document.addEventListener('keydown', function (e) {
-    if (e.key !== 'Escape' || !setWinOpen()) return;
-    e.stopPropagation();
-    closeSettings();
-  });
 }
 
 function anaTierOf(i) { return Math.min(ANA_PAL.length - 1, i); }
@@ -10465,6 +10757,15 @@ function boot() {
 
   // Move numbers are the default now, so switch existing profiles on once.
   if (!migFlag('showNumOn')) { S.showNum = true; try { save(); } catch (eSN) {} }
+  // Card visibility moved into the settings window. Profiles coming from the old build had the
+  // setup and analysis cards docked, so put them back once instead of silently hiding them.
+  if (!migFlag('cardsOn')) {
+    try {
+      var cv0 = cardVis();
+      cv0.setup = 1; cv0.analysis = 1;
+      save();
+    } catch (eCV) {}
+  }
   S.coach = false;   // coach view retired from the UI: never paint its heat marks again
 
   if (!G.board) G.board = newBoard();
@@ -10912,6 +11213,8 @@ function boot() {
   function onHostMsg(ev) {
     var m = ev.data; if (!m) return;
 
+    // the settings window pushed a patch through the host relay
+    if (m.type === 'setSync') { try { setPatchApply(m.patch || null); } catch (eSS) {} return; }
     if (m.type === 'engineOut' || m.type === 'engineAck' || m.type === 'engineAsk') {
       try { LocalAI.relay(m); } catch (e) {}
       return;
@@ -11056,6 +11359,12 @@ function boot() {
   applyLang();
   layoutBoard();
   refreshUI();
+
+  // state pushed from the settings window while this page was closed
+  try {
+    var spt = JSON.parse(localStorage.getItem(SETKEY) || 'null');
+    if (spt) setPatchApply(spt);
+  } catch (eSP) {}
 
   bootDone();
   setTimeout(function () { renderDrawer(); }, 0);
@@ -11459,11 +11768,21 @@ try {
   };
 } catch (e) {}
 
-var GB_BOOT = LINK_MODE ? bootLink : (VIS_MODE ? bootVis : (RV_MODE ? bootReview : boot));
+var GB_BOOT = SET_MODE ? bootSet
+  : (LINK_MODE ? bootLink : (VIS_MODE ? bootVis : (RV_MODE ? bootReview : boot)));
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', GB_BOOT);
 } else {
   GB_BOOT();
+}
+
+// Cross-window state: the settings WebView writes gbcalc.setwin.v1, this page applies it. The
+// storage event only fires in the *other* document, so there is no echo loop.
+if (!SET_MODE) {
+  window.addEventListener('storage', function (e) {
+    if (!e || e.key !== SETKEY) return;
+    try { setPatchApply(JSON.parse(e.newValue || 'null')); } catch (err) {}
+  });
 }
 
 var LK = { frame: 'none', b: 0, w: 0, board: null, curve: [], canvas: null, curveCv: null,
@@ -12604,6 +12923,7 @@ function bootLink() {
 
   function onLinkHostMsg(ev) {
     var m = ev.data; if (!m) return;
+    if (m.type === 'setSync') { try { setPatchApply(m.patch || null); } catch (eSL) {} return; }
     if (m.type === 'uiTheme') {
 
       if (m.lang === 'zh' || m.lang === 'en') { S.lang = m.lang; }      if (m.theme === 'light' || m.theme === 'dark') { S.theme = m.theme; document.body.setAttribute('data-theme', S.theme); }
