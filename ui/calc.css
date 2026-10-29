@@ -327,8 +327,9 @@ body.rv #boardWrap{padding:0; border:0; background:transparent}
   padding:.3rem .6rem; border-radius:8px; font-size:.9rem;
   background:var(--missbox-bg); color:var(--missbox-ink); border:1px solid var(--missbox-bd);
 }
-#codeRow{margin-top:.55rem !important; padding-top:.5rem; border-top:1px dashed var(--border)}
+#codeRow{margin-top:.5rem !important; padding-top:.5rem; border-top:1px dashed var(--border)}
 #codeRow>label{flex:0 0 auto !important}
+#codeRow #inp_code{min-height:3.2em; max-height:12em}
 
 .codeHead{display:flex; flex-wrap:wrap; align-items:center; gap:.32rem; row-gap:.3rem}
 
@@ -557,9 +558,17 @@ input[type=checkbox].chk-dot:focus-visible{outline:2px solid var(--accent); outl
 .stat .v{font-variant-numeric:tabular-nums; font-size:1.02rem; font-weight:600}
 .eng-msg{
   border:1px dashed var(--border); border-radius:9px;
-  padding:.28rem .45rem; margin:.36rem 0 .2rem;
-  height:8.61rem;
+  padding:.22rem .45rem .2rem; margin:.36rem 0 .2rem;
+  height:4.4rem;
   overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain;
+}
+/* live readout pinned at the top of the log: depth / speed / nodes */
+#st_live{
+  position:sticky; top:-.22rem; z-index:1;
+  margin:0 -.45rem .1rem; padding:.2rem .45rem .12rem;
+  background:var(--card); border-bottom:1px dashed var(--border);
+  color:var(--ink); font-size:.78rem; line-height:1.35;
+  font-variant-numeric:tabular-nums; word-break:keep-all;
 }
 #st_line{color:var(--sub); font-size:.8rem; line-height:1.32; word-break:break-all}
 #st_line .em-line{margin:0}

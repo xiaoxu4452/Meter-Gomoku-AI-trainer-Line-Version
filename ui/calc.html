@@ -443,22 +443,6 @@
         </div>
           </div>
         </div>
-
-        <div class="sec" data-sec="code">
-          <div class="sec-h"><span class="sec-t" id="t_secCode">局面</span></div>
-          <div class="sec-b">
-        <div class="row col" id="codeRow">
-          <div class="codeHead">
-            <label id="t_code">局面代码</label>
-            <span class="grow"></span>
-            <button id="btn_copy" class="btn sq2">复制</button>
-            <button id="btn_paste" class="btn sq2">粘贴</button>
-            <button id="btn_load" class="btn sq2 accent">载入</button>
-          </div>
-          <textarea id="inp_code" rows="5" spellcheck="false" placeholder="h8h9g7…" data-tip="codeTip" title="局面代码：小写列字母 + 行号，逐手拼接（与 gomocalc.com 同格式）"></textarea>
-        </div>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -574,9 +558,21 @@
         </div>
 
         <div class="eng-msg" id="engMsg">
+          <div class="em-live" id="st_live">-</div>
           <div class="line" id="st_line"></div>
 
           <div class="pv-box" id="pvBox" hidden></div>
+        </div>
+
+        <div class="row col codeRow" id="codeRow">
+          <div class="codeHead">
+            <label id="t_code">局面代码</label>
+            <span class="grow"></span>
+            <button id="btn_copy" class="btn sq2">复制</button>
+            <button id="btn_paste" class="btn sq2">粘贴</button>
+            <button id="btn_load" class="btn sq2 accent">载入</button>
+          </div>
+          <textarea id="inp_code" rows="4" spellcheck="false" placeholder="h8h9g7…" data-tip="codeTip" title="局面代码：小写列字母 + 行号，逐手拼接（与 gomocalc.com 同格式）"></textarea>
         </div>
 
       </div>

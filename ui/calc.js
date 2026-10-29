@@ -958,7 +958,7 @@ var S = {
 
   bgThink: false,
 
-  showNum: false,
+  showNum: true,
 
   rvNum: false,
   rvSpeedSec: 1,
@@ -1131,7 +1131,7 @@ function grab() {
    'fwdBox','btn_fwd','btn_fwd_vcf','btn_fwd_vct','btn_fwd_ok','btn_fwd_prev','btn_fwd_next','fwdBody','fwdMsg','fwdSeq','fwdLg','fwdLgB','fwdLgW','btn_fwd_clear',
    'vcxPop','vcxPopBody','vcxPop_close','t_vcxPop',
    't_engine','t_depth','t_speed','t_nodes','t_time','t_eval','t_best',
-   'st_depth','st_speed','st_nodes','st_time','st_eval','st_best','st_line','pvBox',
+   'st_depth','st_speed','st_nodes','st_time','st_eval','st_best','st_line','st_live','pvBox',
 
   'turnPill',
    't_curve','t_curveTtl','curve','curveAxis','curveScroll','curveWrap','curveHover','curveInfo',
@@ -1225,6 +1225,7 @@ function layoutApply(map) {
   G.missRings = [];
   if (G.fwd && G.fwd.on && !G.fwd.hold) fwdQueue();
   paint();
+  syncCodeUI();
   return true;
 }
 
@@ -1333,9 +1334,9 @@ function paint() {
     var px = pad + x * gap, py = pad + y * gap;
     ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
     if (c === 1) { ctx.fillStyle = css('--blk'); ctx.fill(); ctx.strokeStyle = css('--blk-edge'); }
-    else { ctx.fillStyle = css('--wht'); ctx.fill(); ctx.strokeStyle = css('--wht-edge'); }
+    else { ctx.fillStyle = css('--wht'); ctx.fill(); ctx.strokeStyle = css('--blk'); }
 
-    ctx.lineWidth = (c === 1) ? Math.max(0.9, gap * 0.026) : Math.max(0.7, gap * 0.016);
+    ctx.lineWidth = Math.max(0.9, gap * 0.026);
     ctx.stroke();
   }
 
@@ -1346,7 +1347,7 @@ function paint() {
       ctx.globalAlpha = 0.45;
       ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
       if (gp.c === 1) { ctx.fillStyle = css('--blk'); ctx.fill(); ctx.strokeStyle = css('--blk-edge'); }
-      else { ctx.fillStyle = css('--wht'); ctx.fill(); ctx.strokeStyle = css('--wht-edge'); }
+      else { ctx.fillStyle = css('--wht'); ctx.fill(); ctx.strokeStyle = css('--blk'); }
       ctx.lineWidth = Math.max(0.9, gap * 0.026);
       ctx.stroke();
       ctx.restore();
@@ -3247,9 +3248,6 @@ function fmtNodes(n) { return fmtSpeed(n); }
 function paintLiveDash() {
   if (RV_MODE) return;
   var a = liveAgg();
-  var busyUI = !!(a || G.busy || G.ana.busy || (G.fwd && G.fwd.busy) || (LIVE_AN.on && LIVE_AN.t0));
-
-  if (busyUI && a && a.tag) engMsgAdd(T('calcOn') + ' · ' + a.tag);
   if (!a) return;
   if (a.depth) els.st_depth.textContent = String(a.depth);
   els.st_speed.textContent = fmtSpeed(a.speed);
@@ -3257,7 +3255,7 @@ function paintLiveDash() {
 
   var tShow = a.t0 || (LIVE_AN.on ? LIVE_AN.t0 : 0) || Date.now();
   els.st_time.textContent = ((Date.now() - tShow) / 1000).toFixed(1) + ' s';
-  if (a.tag) engMsgAdd(T('calcOn') + ' · ' + a.tag);
+  setLiveLine(a.depth, a.speed, a.nodes);
 
   if (linkSessionOn()) {
     tellHost({ type: 'linkStats',
@@ -3267,7 +3265,7 @@ function paintLiveDash() {
   }
 }
 
-var ENG_MSG_MAX = 200;
+var ENG_MSG_MAX = 60;
 function engMsgAdd(msg) {
   var box = els.st_line;
   if (!box || msg == null) return;
@@ -3444,6 +3442,29 @@ function dashEvalRefresh() {
   else dashEvalSet(null, 0);
 }
 
+// Compact live readout pinned at the top of the log: depth / speed / nodes only.
+var LIVE_RAW = { d: null, sp: null, nd: null };
+function shortNum(n) {
+  if (n == null || !isFinite(n)) return '-';
+  if (n >= 1e8) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e4) return (n / 1e3).toFixed(1) + 'K';
+  return String(Math.round(n));
+}
+function setLiveLine(depth, speed, nodes) {
+  if (depth !== undefined) LIVE_RAW.d = depth;
+  if (speed !== undefined) LIVE_RAW.sp = speed;
+  if (nodes !== undefined) LIVE_RAW.nd = nodes;
+  if (!els.st_live) return;
+  if (LIVE_RAW.d == null && LIVE_RAW.sp == null && LIVE_RAW.nd == null) {
+    els.st_live.textContent = '-';
+    return;
+  }
+  els.st_live.textContent = T('depth') + ' ' + (LIVE_RAW.d != null ? LIVE_RAW.d : '-') +
+    ' · ' + T('speed') + ' ' + shortNum(LIVE_RAW.sp) +
+    ' · ' + T('nodes') + ' ' + shortNum(LIVE_RAW.nd);
+}
+
 function setStat(c0, msg) {
   if (c0) {
     els.st_depth.textContent = c0.depth != null ? c0.depth : '-';
@@ -3456,6 +3477,7 @@ function setStat(c0, msg) {
     dashEvalSet(c0.eval, c0.side);
     els.st_best.textContent = (c0.x != null) ? coordName(c0.x, c0.y) : '-';
     setPvLine(c0.line || [], (c0.side === 1 || c0.side === 2) ? c0.side : 0);
+    setLiveLine(c0.depth, c0.speed, c0.nodes);
 
     if (linkSessionOn()) {
       tellHost({ type: 'linkStats',
@@ -3548,10 +3570,7 @@ function refreshUI() {
   els.btn_prev.disabled = openActive() || G.moves.length === 0;
   els.btn_next.disabled = openActive() || !G.redo.length;
 
-  if (document.activeElement !== els.inp_code) {
-    var codeTxt = buildCode();
-    if (els.inp_code.value !== codeTxt) els.inp_code.value = codeTxt;
-  }
+  syncCodeUI();
   drawCurve();
   bgThinkKick(200);
 }
@@ -6262,6 +6281,13 @@ function buildCode() {
   return movesToCode(G.moves);
 }
 
+// The code mirrors what is on screen, so rotating / mirroring the layout rewrites it too.
+function syncCodeUI() {
+  if (!els.inp_code || document.activeElement === els.inp_code) return;
+  var txt = buildCode();
+  if (els.inp_code.value !== txt) els.inp_code.value = txt;
+}
+
 function movesToCode(mv) {
   return (mv || []).map(function (m) {
     if (m == null) return '';
@@ -6650,6 +6676,7 @@ function applyLang() {
     if (el) el.textContent = d[k];
   });
   try { dashEvalRefresh(); } catch (eEV) {}
+  try { setLiveLine(); } catch (eLV) {}
   try { if (els.t_bgThinkHint) els.t_bgThinkHint.removeAttribute('data-base'); } catch (eBH1) {}
   try { bgThinkHintSync(); } catch (eBH2) {}
   els.btn_reset.textContent = d.reset;
@@ -8170,7 +8197,6 @@ function bgThinkIntroOnce() {
     if (sessionStorage.getItem('gb.bgThinkIntro')) return;
     sessionStorage.setItem('gb.bgThinkIntro', '1');
   } catch (e) { return; }
-  try { engMsgAdd(T('bgThinkHint')); } catch (e2) {}
 }
 
 function bgThinkWanted() {
@@ -10063,6 +10089,9 @@ function boot() {
     if (aiVsAi()) S.paused = false;
   } catch (e) {}
 
+  // Move numbers are the default now, so switch existing profiles on once.
+  if (!migFlag('showNumOn')) { S.showNum = true; try { save(); } catch (eSN) {} }
+
   if (!G.board) G.board = newBoard();
   enginePrefEnsure();    // seed the engine key from legacy saves (one-time)
   enginePrefApplyToS();  // threads/hash: the engine key is the source of truth
@@ -11175,12 +11204,14 @@ function lkPaintBoard() {
     stoneN++;
     ctx.beginPath(); ctx.arc(ox + x * cell, oy + y * cell, r, 0, Math.PI * 2);
     if (st === 1) { ctx.fillStyle = css('--blk', '#111111'); ctx.fill(); ctx.strokeStyle = css('--blk-edge', '#e8ecf5'); }
-    else { ctx.fillStyle = css('--wht', '#fcfcfc'); ctx.fill(); ctx.strokeStyle = css('--wht-edge', '#969aa3'); }
+    else { ctx.fillStyle = css('--wht', '#fcfcfc'); ctx.fill(); ctx.strokeStyle = css('--blk', '#111111'); }
     ctx.lineWidth = Math.max(1, cell * R.line);
     ctx.stroke();
   }
 
-  if (S.showNum && bd) {
+  // The link board is rebuilt from recognition, so it has no move order: numbering it would
+  // just count scan order. Off by default, opt in through LK.nums.
+  if (LK.nums && bd) {
     var bn = 0, wn = 0;
     ctx.font = (cell * 0.42).toFixed(0) + 'px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
