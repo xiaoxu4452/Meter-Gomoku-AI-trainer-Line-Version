@@ -255,6 +255,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     impFail: '读取 txt 失败',
     renamed: '已重命名',
     code: '局面代码', copy: '复制', paste: '粘贴', load: '载入',
+    pasteLoad: '粘贴并载入（回车也可载入）',
     copied: '局面代码已复制', codeLoaded: '局面代码已载入棋盘', clipEmpty: '剪贴板里没有文本',
     codeBad: '局面代码读不出来：形如 h8h9g7（小写列字母 + 行号，逐手拼接）',
     reset: '重新开始', redo: '重来',
@@ -704,6 +705,7 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     impFail: 'Cannot read that txt',
     renamed: 'Renamed',
     code: 'Position code', copy: 'Copy', paste: 'Paste', load: 'Load',
+    pasteLoad: 'Paste and load (Enter also loads)',
     copied: 'Position code copied', codeLoaded: 'Position code loaded', clipEmpty: 'Clipboard is empty',
     codeBad: 'Cannot read the position code: it looks like h8h9g7 (lowercase column letter + row, moves concatenated)',
     reset: 'Restart', redo: 'Redo',
@@ -1131,7 +1133,7 @@ function grab() {
    'fwdBox','btn_fwd','btn_fwd_vcf','btn_fwd_vct','btn_fwd_ok','btn_fwd_prev','btn_fwd_next','fwdBody','fwdMsg','fwdSeq','fwdLg','fwdLgB','fwdLgW','btn_fwd_clear',
    'vcxPop','vcxPopBody','vcxPop_close','t_vcxPop',
    't_engine','t_depth','t_speed','t_nodes','t_time','t_eval','t_best',
-   'st_depth','st_speed','st_nodes','st_time','st_eval','st_best','st_line','st_live','pvBox',
+   'st_depth','st_speed','st_nodes','st_time','st_eval','st_best','st_line','pvBox',
 
   'turnPill',
    't_curve','t_curveTtl','curve','curveAxis','curveScroll','curveWrap','curveHover','curveInfo',
@@ -1180,6 +1182,15 @@ function geom() {
 }
 
 function numShown() { return RV_MODE ? !!S.rvNum : !!S.showNum; }
+
+// Move numbers: serif face (Source Han Serif / Noto Serif SC), centred by glyph box instead of
+// the em box - with a serif face the em middle sits visibly high inside the stone.
+var NUM_FONT = '"Source Han Serif SC","Noto Serif SC","Noto Serif CJK SC","思源宋体","SimSun",serif';
+function numGlyphDy(ctx, txt) {
+  var m = ctx.measureText(txt);
+  var a = m.actualBoundingBoxAscent, d = m.actualBoundingBoxDescent;
+  return (isFinite(a) && isFinite(d)) ? (a - d) / 2 : 0;
+}
 
 function pxy(p) { return p.x !== undefined ? [p.x, p.y] : [p[0], p[1]]; }
 function pset(p, x, y) { if (p.x !== undefined) { p.x = x; p.y = y; } else { p[0] = x; p[1] = y; } }
@@ -1336,7 +1347,7 @@ function paint() {
     if (c === 1) { ctx.fillStyle = css('--blk'); ctx.fill(); ctx.strokeStyle = css('--blk-edge'); }
     else { ctx.fillStyle = css('--wht'); ctx.fill(); ctx.strokeStyle = css('--blk'); }
 
-    ctx.lineWidth = Math.max(0.9, gap * 0.026);
+    ctx.lineWidth = Math.max(0.68, gap * 0.0195);
     ctx.stroke();
   }
 
@@ -1348,7 +1359,7 @@ function paint() {
       ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
       if (gp.c === 1) { ctx.fillStyle = css('--blk'); ctx.fill(); ctx.strokeStyle = css('--blk-edge'); }
       else { ctx.fillStyle = css('--wht'); ctx.fill(); ctx.strokeStyle = css('--blk'); }
-      ctx.lineWidth = Math.max(0.9, gap * 0.026);
+      ctx.lineWidth = Math.max(0.68, gap * 0.0195);
       ctx.stroke();
       ctx.restore();
     });
@@ -1394,16 +1405,17 @@ function paint() {
   drawForbiddenMarks(ctx, g);
 
   if (numShown() && G.moves.length) {
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
 
-    ctx.font = '600 ' + Math.max(7, gap * 0.42) + 'px "Segoe UI",system-ui,sans-serif';
+    ctx.font = '600 ' + Math.max(8, gap * 0.5) + 'px ' + NUM_FONT;
+    var numDy = numGlyphDy(ctx, '0');
     G.moves.forEach(function (m, i) {
 
       if (i === G.moves.length - 1) return;
       var sx = pad + m.x * gap, sy = pad + m.y * gap;
 
       ctx.fillStyle = (m.c === 1) ? '#ffffff' : '#1a1a1a';
-      ctx.fillText(String(i + 1), sx, sy);
+      ctx.fillText(String(i + 1), sx, sy + numDy);
     });
   }
 
@@ -1443,16 +1455,12 @@ function paint() {
     var lm = G.moves[G.moves.length - 1];
     var lx = pad + lm.x * gap, ly = pad + lm.y * gap;
     if (numShown()) {
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.lineJoin = 'round';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
 
-      ctx.font = '700 ' + Math.max(9, gap * 0.42) + 'px "Segoe UI",system-ui,sans-serif';
-      ctx.lineWidth = Math.max(1.6, gap * 0.05);
-      ctx.strokeStyle = 'rgba(15,40,60,.35)';
-      ctx.strokeText(String(G.moves.length), lx, ly);
-
+      ctx.font = '700 ' + Math.max(10, gap * 0.5) + 'px ' + NUM_FONT;
+      var lmTxt = String(G.moves.length), lmDy = numGlyphDy(ctx, lmTxt);
       ctx.fillStyle = css('--winline');
-      ctx.fillText(String(G.moves.length), lx, ly);
+      ctx.fillText(lmTxt, lx, ly + lmDy);
     } else {
       ctx.fillStyle = css('--winline');
       ctx.beginPath();
@@ -3255,7 +3263,6 @@ function paintLiveDash() {
 
   var tShow = a.t0 || (LIVE_AN.on ? LIVE_AN.t0 : 0) || Date.now();
   els.st_time.textContent = ((Date.now() - tShow) / 1000).toFixed(1) + ' s';
-  setLiveLine(a.depth, a.speed, a.nodes);
 
   if (linkSessionOn()) {
     tellHost({ type: 'linkStats',
@@ -3442,29 +3449,6 @@ function dashEvalRefresh() {
   else dashEvalSet(null, 0);
 }
 
-// Compact live readout pinned at the top of the log: depth / speed / nodes only.
-var LIVE_RAW = { d: null, sp: null, nd: null };
-function shortNum(n) {
-  if (n == null || !isFinite(n)) return '-';
-  if (n >= 1e8) return (n / 1e6).toFixed(1) + 'M';
-  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
-  if (n >= 1e4) return (n / 1e3).toFixed(1) + 'K';
-  return String(Math.round(n));
-}
-function setLiveLine(depth, speed, nodes) {
-  if (depth !== undefined) LIVE_RAW.d = depth;
-  if (speed !== undefined) LIVE_RAW.sp = speed;
-  if (nodes !== undefined) LIVE_RAW.nd = nodes;
-  if (!els.st_live) return;
-  if (LIVE_RAW.d == null && LIVE_RAW.sp == null && LIVE_RAW.nd == null) {
-    els.st_live.textContent = '-';
-    return;
-  }
-  els.st_live.textContent = T('depth') + ' ' + (LIVE_RAW.d != null ? LIVE_RAW.d : '-') +
-    ' · ' + T('speed') + ' ' + shortNum(LIVE_RAW.sp) +
-    ' · ' + T('nodes') + ' ' + shortNum(LIVE_RAW.nd);
-}
-
 function setStat(c0, msg) {
   if (c0) {
     els.st_depth.textContent = c0.depth != null ? c0.depth : '-';
@@ -3477,7 +3461,6 @@ function setStat(c0, msg) {
     dashEvalSet(c0.eval, c0.side);
     els.st_best.textContent = (c0.x != null) ? coordName(c0.x, c0.y) : '-';
     setPvLine(c0.line || [], (c0.side === 1 || c0.side === 2) ? c0.side : 0);
-    setLiveLine(c0.depth, c0.speed, c0.nodes);
 
     if (linkSessionOn()) {
       tellHost({ type: 'linkStats',
@@ -6676,7 +6659,6 @@ function applyLang() {
     if (el) el.textContent = d[k];
   });
   try { dashEvalRefresh(); } catch (eEV) {}
-  try { setLiveLine(); } catch (eLV) {}
   try { if (els.t_bgThinkHint) els.t_bgThinkHint.removeAttribute('data-base'); } catch (eBH1) {}
   try { bgThinkHintSync(); } catch (eBH2) {}
   els.btn_reset.textContent = d.reset;
@@ -6701,9 +6683,9 @@ function applyLang() {
   els.btn_mv_left.title = d.mvLeftT; els.btn_mv_right.title = d.mvRightT;
   els.btn_save.textContent = d.savePos;
   els.btn_review.textContent = d.review;
-  els.btn_copy.textContent = d.copy;
-  els.btn_paste.textContent = d.paste;
-  els.btn_load.textContent = d.load;
+  els.btn_copy.title = d.copy; els.btn_copy.setAttribute('aria-label', d.copy);
+  els.btn_paste.title = d.pasteLoad || d.paste;
+  els.btn_paste.setAttribute('aria-label', els.btn_paste.title);
   if (els.btn_vis_codecopy) els.btn_vis_codecopy.textContent = d.copy;
   els.btn_recite.textContent = d.recite;
   els.btn_replay.textContent = d.replay;
@@ -10243,7 +10225,15 @@ function boot() {
       els.inp_code.focus();
     }
   };
-  els.btn_load.onclick = function () { loadFromCode(els.inp_code.value); };
+  // No separate Load button any more: paste loads straight away, and Enter loads a typed code.
+  if (els.inp_code && !els.inp_code.__codeEnter) {
+    els.inp_code.__codeEnter = 1;
+    els.inp_code.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' || ev.shiftKey) return;
+      ev.preventDefault();
+      loadFromCode(els.inp_code.value);
+    });
+  }
 
   els.seg_mode.onclick = function (e) {
     var b = e.target.closest('button'); if (!b) return;
@@ -11205,7 +11195,7 @@ function lkPaintBoard() {
     ctx.beginPath(); ctx.arc(ox + x * cell, oy + y * cell, r, 0, Math.PI * 2);
     if (st === 1) { ctx.fillStyle = css('--blk', '#111111'); ctx.fill(); ctx.strokeStyle = css('--blk-edge', '#e8ecf5'); }
     else { ctx.fillStyle = css('--wht', '#fcfcfc'); ctx.fill(); ctx.strokeStyle = css('--blk', '#111111'); }
-    ctx.lineWidth = Math.max(1, cell * R.line);
+    ctx.lineWidth = Math.max(0.75, cell * R.line * 0.75);
     ctx.stroke();
   }
 
