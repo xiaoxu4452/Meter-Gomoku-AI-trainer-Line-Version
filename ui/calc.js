@@ -455,11 +455,13 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     anBalFail: '平衡搜索失败：',
     anBalnSet: '平衡点数已设为 {n}（空盘固定 3）',
     anBalnHint: '平衡点数（1~6，空盘固定 3）',
-    balStart: '官方平衡搜索运行中（YXBALANCETWO）—— 棋盘标记每轮刷新；再点「平衡点」停止并自动落子',
-    balRunStat: '平衡计算中 · 第 {r} 轮 · 深度 {d} · 已用 {t}s',
+    balStart: '平衡搜索开始：标记随计算微调；再点「平衡点」停止并自动落子',
+    balRunStat: '平衡计算中 · 深度 {d} · 已用 {t}s',
     balStopShow: '停止并落子',
-    balRunTip: '引擎官方平衡搜索（YXBALANCETWO）：每轮把预算加大再算一轮，越算越准，棋盘标记会随搜索结果变动；再点一次停止，并把最后结果直接落到棋盘上',
-    balShown: '已自动落子 {n} 手 · 平衡深度 {d}',
+    balRunTip: '再点一次：停止并落子',
+    balTip: '持续平衡搜索；再点一次自动落子',
+    balOpenDone: '空盘：官方平衡开局 3 手已就绪，再点「平衡点」自动落子',
+    balShown: '已自动落子 {n} 手 · 深度 {d}',
     balNoPlay: '（当前是开局 / 交换流程：标记已保留在棋盘上，未自动落子）',
     anBalLabel: '点数',
     anBalColor: '（蓝色 = 白子，紫色 = 黑子）',
@@ -900,11 +902,13 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     anBalFail: 'Balance search failed: ',
     anBalnSet: 'Balance point count set to {n} (3 fixed on empty board)',
     anBalnHint: 'Balance point count (1-6, 3 fixed on empty board)',
-    balStart: 'Official balance search running (YXBALANCETWO) — the marks on the board refresh every round; press Balance again to stop and play the stones',
-    balRunStat: 'Balancing · round {r} · depth {d} · {t}s',
+    balStart: 'Balance search started: the marks refine as it runs; press Balance again to stop and play them',
+    balRunStat: 'Balancing · depth {d} · {t}s',
     balStopShow: 'Stop & play',
-    balRunTip: 'Engine-native balance search (YXBALANCETWO): every round re-runs with a larger budget, so it keeps getting more accurate and the marks keep moving; press again to stop and play the last result straight onto the board',
-    balShown: 'Played {n} stones · balance depth {d}',
+    balRunTip: 'Press again: play the stones',
+    balTip: 'Continuous balance search; press again to play',
+    balOpenDone: 'Empty board: the official 3-move balanced opening is ready; press Balance again to play it',
+    balShown: 'Played {n} stones · depth {d}',
     balNoPlay: ' (opening / swap flow active: marks kept on the board, nothing played automatically)',
     anBalLabel: 'Points',
     anBalColor: ' (Blue = White, Purple = Black)',
@@ -2206,7 +2210,7 @@ var LocalAI = (function () {
       q.pondering = !b.noPonder;
       if (b.scan) q.mode = 3;
     }
-    if (op === 'live') { q.live = true; q.pondering = false; }
+    if (op === 'live' || b.live) { q.live = true; q.pondering = false; }
     return { id: ++seq, timer: null, res: res, rej: rej, op: op || 'ask',
              liveId: (b.liveId == null ? null : b.liveId), tag: b.tag || '', cid: b.cid || '',
              exclusive: !!b.exclusive, timeoutMs: timeoutMs || 20000, t0: Date.now(), q: q };
@@ -2347,6 +2351,18 @@ var LocalAI = (function () {
         return { stop: function () {} };
       }
       var job = makeJob(body, 0, function () {}, function () {}, 'live');
+      job.onTick = onTick || null; job.onEnd = onEnd || null;
+      submit(job);
+      return { stop: function () { stopLiveJob(job); } };
+    },
+    // Balance search that keeps running: op=balance with q.live so the host drops the budget cap,
+    // plus tick callbacks - the picks are re-read from every streamed PV block.
+    balanceLive: function (body, onTick, onEnd) {
+      if (window.__GB_TEST__ || !HOST) {
+        if (onEnd) { try { onEnd({ error: 'engine unavailable', stopped: true }); } catch (e) {} }
+        return { stop: function () {} };
+      }
+      var job = makeJob(body, 3700000, function () {}, function () {}, 'balance');
       job.onTick = onTick || null; job.onEnd = onEnd || null;
       submit(job);
       return { stop: function () { stopLiveJob(job); } };
@@ -2727,6 +2743,7 @@ function place(x, y, fromRedo, byAI) {
     anaReset();
   }
   liveAnaBoardChanged();
+  balBoardChanged();
   bgThinkKick(140);
   paint();
 
@@ -9641,119 +9658,206 @@ function balOpenHintTxt() {
   return '\n　※ ' + out.join('\n　※ ');
 }
 
-// ---- balance points: keep refining, picks live on the board, second press plays them ----------
-// Rapfi's YXBALANCETWO is a one-shot command (see command/gomocup.cpp balance()), so "keep
-// computing" means: run the same official balance search again on the same board with a larger
-// INFO TIMEOUT_TURN each round. The transposition table stays warm between rounds, so every round
-// searches deeper and the picks visibly drift - exactly like the official bundle, where the marks
-// keep moving while the search deepens. The current picks are drawn after every round; pressing
-// the key a second time stops the search and plays the last (deepest) set as real moves.
-var BAL = { on: false, last: null, round: 0, depth: 0, t0: 0, logT: 0, logD: -1 };
+// ---- balance points: one uninterrupted balance search, picks live on the board ----------------
+// Rapfi's YXBALANCETWO is a search, not a "compute N times" API: with a long INFO TIMEOUT_TURN it
+// simply keeps deepening and streams INFO PV blocks while it runs. So the page starts ONE search
+// (op=balance with live=1, so the host does not cap the budget) and rebuilds the marks from every
+// tick - the picks drift exactly like the official bundle, and nothing ever restarts. Pressing the
+// key a second time stops the search and plays the last picks as real moves.
+var BAL = { on: false, job: null, acc: [], cur: [], need: 2, depth: 0, t0: 0,
+            logT: 0, logD: -1, fails: 0, stageT: 0, lastPaint: 0, watch: 0 };
 
 function balUI() {
   if (!els.btn_an_bal) return;
-  els.btn_an_bal.classList.toggle('on', BAL.on);
-  els.btn_an_bal.textContent = BAL.on ? T('balStopShow') : T('anBal');
-  els.btn_an_bal.title = BAL.on ? T('balRunTip') : T('anBalnHint');
+  var on = !!(typeof BAL !== 'undefined' && BAL && BAL.on);
+  els.btn_an_bal.classList.toggle('on', on);
+  els.btn_an_bal.textContent = on ? T('balStopShow') : T('anBal');
+  els.btn_an_bal.title = on ? T('balRunTip') : T('balTip');
 }
 
 function balAbort() {
   if (typeof BAL === 'undefined' || !BAL || !BAL.on) return;
-  BAL.on = false; BAL.last = null;
+  BAL.on = false; BAL.acc = []; BAL.cur = [];
+  balLiveStop();
   if (els.btn_an_baln) els.btn_an_baln.disabled = false;
   balUI();
 }
 
-// One log line per visible improvement (or every 6 s): the engine log has 60 lines of history and
-// a round can finish in 1.5 s, so logging every round would flush everything else out.
+// A real move (human or AI) invalidates the picks - stop quietly instead of leaving a dead job.
+function balBoardChanged() {
+  if (typeof BAL === 'undefined' || !BAL || !BAL.on) return;
+  balAbort();
+}
+
+// One log line per visible improvement (or every 6 s): the engine log has 60 lines of history, and
+// a live search ticks several times a second.
 function balLogStat() {
   var now = Date.now();
   if (now - BAL.logT < 6000 && (BAL.depth || 0) <= BAL.logD) return;
   BAL.logT = now; BAL.logD = BAL.depth || 0;
   renderAna(T('balRunStat')
-    .replace('{r}', String(BAL.round || 1))
     .replace('{d}', String(BAL.depth || 0))
     .replace('{t}', String(Math.max(0, Math.round((now - BAL.t0) / 1000)))));
 }
 
-// One round of the official pair chain (YXBALANCETWO) at a fixed per-call budget.
-async function balPass(need, qMs, gen) {
-  if (!G.moves.length) {
-    var marksE = await openBalChain(engineRule(), Math.max(2000, S.turnMs || 2000), gen);
-    if (gen !== G.ana.gen) return null;
-    if (marksE.length < 3) {
-      var cyB = (N - 1) >> 1;
-      marksE = [{ x: cyB, y: cyB, color: 'b', seq: '1' }];
-      var fbk = BAL_OPEN_TJ[Math.floor(Math.random() * BAL_OPEN_TJ.length)];
-      marksE.push({ x: fbk[1][0], y: fbk[1][1], color: 'w', seq: '2' });
-      marksE.push({ x: fbk[2][0], y: fbk[2][1], color: 'b', seq: '3' });
-      G.ana.balEval = null;
-    }
-    return { marks: marksE, names: marksE.map(function (m) { return coordName(m.x, m.y); }),
-             eval: G.ana.balEval, depth: 0 };
-  }
-  var bmB = G.board.map(function (r) { return r.slice(); });
-  var plyB = G.moves.length;
-  var marksArr = [], namesB = [], evB = null, depthB = 0;
-  while (marksArr.length < need) {
-    var qi = marksArr.length;
-    var curB = ((plyB + qi) % 2 === 0);
-    var jQ = null;
-    try {
-      jQ = await apiBalance({
-        board: bmB, moveList: [], n: 1, mode: 'two', rule: engineRule(),
-        turnMs: qMs, lane: 'main', cid: 'calc-balpts-' + G.moves.length + '-' + qi,
-        side: curB ? 1 : 2,
-      }, qMs + 20000);
-    } catch (eQ) { jQ = null; }
-    if (gen !== G.ana.gen) return null;
-    if (jQ && jQ.swap) return { swap: true };
-    if (jQ && jQ.eval != null) evB = jQ.eval;
-    if (jQ && jQ.depth) depthB = Math.max(depthB, jQ.depth);
-    var ptsQ = (jQ && jQ.moves) || [];
-    if (!ptsQ.length) break;
-    var addedQ = 0;
-    for (var pk = 0; pk < ptsQ.length && marksArr.length < need; pk++) {
-      if (bmB[ptsQ[pk][1]][ptsQ[pk][0]]) continue;
-      var sideQ = ((plyB + marksArr.length) % 2 === 0) ? 1 : 2;
-      bmB[ptsQ[pk][1]][ptsQ[pk][0]] = sideQ;
-      marksArr.push({ x: ptsQ[pk][0], y: ptsQ[pk][1],
-                      color: sideQ === 1 ? 'b' : 'w', seq: String(marksArr.length + 1) });
-      namesB.push(coordName(ptsQ[pk][0], ptsQ[pk][1]));
-      addedQ++;
-    }
-    if (!addedQ) break;
-  }
-  return { marks: marksArr, names: namesB, eval: evB, depth: depthB };
+function balLiveStop() {
+  if (BAL.watch) { clearTimeout(BAL.watch); BAL.watch = 0; }
+  if (BAL.job) { try { BAL.job.stop(); } catch (e) {} BAL.job = null; }
 }
 
-function balWait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function balLiveRun(body, onTick, onEnd) {
+  return LocalAI.balanceLive(body, onTick, onEnd);
+}
 
-async function balLoop(gen) {
-  var need = !G.moves.length ? 3 : Math.max(1, Math.min(6, balPN()));
-  // One round = need pair searches; keep a round near a few seconds whatever the point count.
-  var capMs = Math.max(700, Math.min(2600, Math.round(5200 / need)));
-  var budget = Math.min(500, capMs), fails = 0;
-  while (BAL.on && gen === G.ana.gen) {
-    var r = null;
-    try { r = await balPass(need, budget, gen); } catch (eB) { r = null; }
-    if (gen !== G.ana.gen || !BAL.on) return;
-    if (r && r.swap) { balFinish(); renderAna(T('balSwapNow')); paint(); return; }
-    if (!r || !r.marks || !r.marks.length) {
-      // A superseded / timed-out round is not fatal: the engine may have been pulled away by a
-      // move or the AI. Retry a couple of times before reporting the sub-engine as unavailable.
-      if (++fails <= 2) { budget = Math.min(capMs, budget + 400); await balWait(450); continue; }
-      balFinish(); renderAna(T('anBalNoEngine')); paint(); return;
-    }
-    fails = 0;
-    BAL.last = r;
-    BAL.round++;
-    BAL.depth = Math.max(BAL.depth, r.depth || 0);
-    balSetMarks(r.marks);            // current picks go on the board right away
-    paint();
-    balLogStat();
-    budget = Math.min(capMs, Math.round(budget * 1.6));
+// The board the current stage searches: the real position plus the points already committed.
+function balStageBoard() {
+  var b = G.board.map(function (r) { return r.slice(); });
+  for (var i = 0; i < BAL.acc.length; i++) {
+    var m = BAL.acc[i];
+    if (m && m.x != null) b[m.y][m.x] = (m.color === 'b') ? 1 : 2;
   }
+  return b;
+}
+
+// BALANCE_TWO answers with a pair: the root move plus its balanced reply, which are the first two
+// coordinates of the streamed BESTLINE.
+function balPairOf(res) {
+  var c = (res && res.candidates) ? res.candidates[0] : null;
+  if (!c || !c.line || c.line.length < 2) return null;
+  var a = c.line[0], b = c.line[1];
+  if (!a || !b) return null;
+  var bd = balStageBoard();
+  if (!bd[a[1]] || !bd[b[1]]) return null;
+  if (bd[a[1]][a[0]] || bd[b[1]][b[0]]) return null;
+  return [a, b];
+}
+
+function balMarksAll() {
+  var out = BAL.acc.slice();
+  var base = G.moves.length + out.length;
+  for (var i = 0; i < BAL.cur.length; i++) {
+    var p = BAL.cur[i];
+    out.push({ x: p[0], y: p[1], seq: String(out.length + 1),
+               color: ((base + i) % 2 === 0) ? 'b' : 'w' });
+  }
+  // Never show more points than the user asked for (the pair can overshoot by one).
+  return out.slice(0, Math.max(1, BAL.need || out.length));
+}
+
+function balCommitCur() {
+  if (!BAL.cur.length) return;
+  BAL.acc = balMarksAll();
+  BAL.cur = [];
+}
+
+function balOnTick(res, gen, bv) {
+  if (!BAL.on || gen !== G.ana.gen) return;
+  if (BAL.watch) { clearTimeout(BAL.watch); BAL.watch = 0; }
+  if (G.moves.length !== bv) { balLiveStop(); return; }
+  var d = (res && res.depth) || 0;
+  if (d > BAL.depth) { BAL.depth = d; BAL.stageT = Date.now(); }
+  var pr = balPairOf(res);
+  var now = Date.now();
+  if (pr) {
+    BAL.cur = pr;
+    if (now - BAL.lastPaint >= 150) {
+      BAL.lastPaint = now;
+      balSetMarks(balMarksAll());
+      paint();
+    }
+  }
+  balLogStat();
+  balMaybeAdvance(gen);
+}
+
+// More points than one pair: once the current stage has stopped improving for a few seconds, take
+// its pair, extend the board and let the same live search continue on the new position. Invisible
+// to the user (no round counter), and never triggered for the default 2-point setting.
+function balMaybeAdvance(gen) {
+  if (BAL.acc.length + 2 >= BAL.need) return;
+  if (!BAL.cur.length) return;
+  if (Date.now() - BAL.stageT < 4000) return;
+  balCommitCur();
+  balSetMarks(balMarksAll());
+  paint();
+  balLiveStop();
+  balLiveStart(gen);
+}
+
+function balLiveStart(gen) {
+  var bv = G.moves.length;                 // the real game must not move under us
+  var mvN = bv + BAL.acc.length;
+  var side = (mvN % 2 === 0) ? 1 : 2;
+  BAL.cur = [];
+  BAL.stageT = Date.now();
+  BAL.job = balLiveRun({
+    board: balStageBoard(), moveList: [], n: 1, mode: 'two', rule: engineRule(),
+    live: 1, side: side, lane: 'main', cid: 'calc-bal-live-' + mvN + '-' + BAL.acc.length,
+  }, function (res) { balOnTick(res, gen, bv); }, function (ev) { balOnEnd(ev, gen); });
+  // Safety net: if the engine does not stream anything within a couple of seconds, this build's
+  // answer path is one-shot - fall back to plain pair requests instead of sitting there silently.
+  if (BAL.watch) clearTimeout(BAL.watch);
+  BAL.watch = setTimeout(function () {
+    BAL.watch = 0;
+    if (!BAL.on || gen !== G.ana.gen) return;
+    if (BAL.depth || BAL.cur.length) return;
+    balLiveStop();
+    BAL.fails = 99;
+    balFallback(gen);
+  }, 2500);
+}
+
+// Fell back to one-shot pair requests (engine did not stream): same picks, no live drift.
+async function balFallback(gen) {
+  var need = BAL.need;
+  var bm = balStageBoard();
+  var ply = G.moves.length + BAL.acc.length;
+  var out = BAL.acc.slice();
+  var depth = BAL.depth;
+  while (out.length < need && BAL.on && gen === G.ana.gen) {
+    var cur = out.length;
+    var j = null;
+    try {
+      j = await apiBalance({
+        board: bm, moveList: [], n: 1, mode: 'two', rule: engineRule(),
+        turnMs: 1200, lane: 'main', cid: 'calc-bal-fb-' + ply + '-' + cur,
+        side: ((ply + cur) % 2 === 0) ? 1 : 2,
+      }, 30000);
+    } catch (e) { j = null; }
+    if (!BAL.on || gen !== G.ana.gen) return;
+    if (!j || !j.moves || !j.moves.length) break;
+    depth = Math.max(depth, j.depth || 0);
+    var added = 0;
+    for (var k = 0; k < j.moves.length && out.length < need; k++) {
+      var p = j.moves[k];
+      if (!p || bm[p[1]][p[0]]) continue;
+      var sideK = ((ply + out.length) % 2 === 0) ? 1 : 2;
+      bm[p[1]][p[0]] = sideK;
+      out.push({ x: p[0], y: p[1], seq: String(out.length + 1), color: sideK === 1 ? 'b' : 'w' });
+      added++;
+    }
+    if (!added) break;
+  }
+  if (!BAL.on || gen !== G.ana.gen) return;
+  BAL.acc = out;
+  BAL.depth = depth;
+  balSetMarks(balMarksAll());
+  paint();
+  balLogStat();
+  if (!out.length) { balFinish(); renderAna(T('anBalNoEngine')); paint(); }
+}
+
+function balOnEnd(ev, gen) {
+  BAL.job = null;
+  if (!BAL.on || gen !== G.ana.gen) return;
+  // Superseded by a move / the AI, or the engine dropped the search: retry, then report.
+  if (++BAL.fails <= 2) {
+    setTimeout(function () { if (BAL.on && gen === G.ana.gen && !BAL.job) balLiveStart(gen); }, 400);
+    return;
+  }
+  balFinish();
+  renderAna(T('anBalNoEngine'));
+  paint();
 }
 
 function balFinish() {
@@ -9764,8 +9868,8 @@ function balFinish() {
   anaMark(null);
 }
 
-// Play the last set of picks as real moves (same order the marks are numbered). `place()` is the
-// normal move path, so the side to move alternates exactly as it does for a human click.
+// Play the picks as real moves (same order the marks are numbered). `place()` is the normal move
+// path, so the side to move alternates exactly as it does for a human click.
 function balPlayOut(r) {
   if (!r || !r.marks || !r.marks.length) return 0;
   var n = 0;
@@ -9783,26 +9887,50 @@ function balPlayOut(r) {
   return n;
 }
 
+// Empty board: the balanced opening comes from the official opening chain, not from a deep search,
+// so it is a single quick pass - the second press still plays it.
+async function balOpenStart(gen) {
+  var marksE = [];
+  try { marksE = await openBalChain(engineRule(), Math.max(2000, S.turnMs || 2000), gen); } catch (e) { marksE = []; }
+  if (!BAL.on || gen !== G.ana.gen) return;
+  if (marksE.length < 3) {
+    var cyB = (N - 1) >> 1;
+    marksE = [{ x: cyB, y: cyB, color: 'b', seq: '1' }];
+    var fbk = BAL_OPEN_TJ[Math.floor(Math.random() * BAL_OPEN_TJ.length)];
+    marksE.push({ x: fbk[1][0], y: fbk[1][1], color: 'w', seq: '2' });
+    marksE.push({ x: fbk[2][0], y: fbk[2][1], color: 'b', seq: '3' });
+  }
+  BAL.acc = marksE.slice(0, BAL.need);
+  balSetMarks(BAL.acc);
+  paint();
+  renderAna(T('balOpenDone'));
+}
+
 function balToggle() {
   if (BAL.on) {
-    var last = BAL.last;
-    G.ana.gen++;                       // whatever round is in flight is dropped now
+    var picks;
+    G.ana.gen++;                       // drop whatever tick is in flight
+    BAL.on = false;
+    balLiveStop();
+    balCommitCur();
+    picks = BAL.acc.slice(0, BAL.need);
     balFinish();
-    if (!last || !last.marks || !last.marks.length) {
+    if (!picks.length) {
       renderAna(T('anBalNoEngine'));
       paint();
       return;
     }
     if (openActive()) {                // opening / swap flow: never auto-play into it
-      balSetMarks(last.marks);
+      balSetMarks(picks);
       paint();
-      renderAna(balDoneMsg(last.marks.length, last.names, last.eval) + T('anBalColor') + T('balNoPlay'));
+      renderAna(balDoneMsg(picks.length, picks.map(function (m) { return coordName(m.x, m.y); }), null) +
+        T('anBalColor') + T('balNoPlay'));
       return;
     }
-    var n = balPlayOut(last);
+    var n = balPlayOut({ marks: picks });
     if (n) {
-      renderAna(balDoneMsg(last.marks.length, last.names, last.eval) + T('anBalColor') + balOpenHintTxt() +
-        '\n' + T('balShown').replace('{n}', String(n)).replace('{d}', String(BAL.depth || 0)));
+      renderAna(balDoneMsg(picks.length, picks.map(function (m) { return coordName(m.x, m.y); }), null) +
+        T('anBalColor') + (BAL.depth ? '\n' + T('balShown').replace('{n}', String(n)).replace('{d}', String(BAL.depth)) : ''));
     } else {
       renderAna(T('anBalNoEngine'));
     }
@@ -9810,8 +9938,9 @@ function balToggle() {
   }
   if (!anaGuard(0)) return;
   aiStandDown();
-  BAL.on = true; BAL.last = null; BAL.round = 1; BAL.depth = 0;
-  BAL.t0 = Date.now(); BAL.logT = 0; BAL.logD = -1;
+  BAL.on = true; BAL.acc = []; BAL.cur = []; BAL.depth = 0;
+  BAL.t0 = Date.now(); BAL.logT = 0; BAL.logD = -1; BAL.fails = 0; BAL.lastPaint = 0;
+  BAL.need = !G.moves.length ? 3 : Math.max(1, Math.min(6, balPN()));
   var gen = ++G.ana.gen;
   if (els.btn_an_baln) els.btn_an_baln.disabled = true;
   G.ana.busy = true; G.ana.kind = 'bal';
@@ -9821,7 +9950,7 @@ function balToggle() {
   balUI();
   renderAna(T('balStart'));
   paint();
-  balLoop(gen);
+  if (!G.moves.length) balOpenStart(gen); else balLiveStart(gen);
 }
 
 function balSetMarks(arr) {
@@ -9886,6 +10015,7 @@ function wireAnalysis() {
     aiStandDown(); anaDefend(true);
   };
   els.btn_an_bal.onclick = function () { balToggle(); };
+  balUI();
   if (els.btn_an_baln) els.btn_an_baln.onchange = function () {
     var n = parseInt(els.btn_an_baln.value, 10);
     if (isNaN(n) || n < 1 || n > 6) n = 2;
