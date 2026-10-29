@@ -8159,10 +8159,13 @@ static void CreateSetWindow() {
   RECT d;
   SetWinDesiredRect(&d);
   DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN;
-  // TOPMOST: the settings window is the master panel - it stays above every other window
+  // TOPMOST: the settings window is the master panel - it stays above every other window.
+  // NO owner (same as the link / vision windows): an owned window would merge into the main
+  // window's taskbar entry, but the settings panel is a second interface of its own and needs
+  // its own taskbar button (minimize/restore via the taskbar works per window).
   g_setHwnd = CreateWindowExW(WS_EX_TOPMOST, kSetCls, kSetTitle, style,
                               d.left, d.top, d.right - d.left, d.bottom - d.top,
-                              g_hwnd, nullptr, g_hInst, nullptr);
+                              nullptr, nullptr, g_hInst, nullptr);
   if (!g_setHwnd) { LogMsg("[set] CreateWindowEx failed"); return; }
   g_setCreating = true;
   g_setPageReady = false;
