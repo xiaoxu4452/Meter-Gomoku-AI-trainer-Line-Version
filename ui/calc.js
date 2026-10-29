@@ -7688,7 +7688,14 @@ function setPatchApply(p) {
   if (typeof p.aiB === 'boolean' || typeof p.aiW === 'boolean') {
     var nb = (typeof p.aiB === 'boolean') ? p.aiB : !!S.aiB;
     var nw = (typeof p.aiW === 'boolean') ? p.aiW : !!S.aiW;
-    if (nb !== !!S.aiB || nw !== !!S.aiW) { setAiSides(nb, nw); setupCh = true; }
+    if (nb !== !!S.aiB || nw !== !!S.aiW) {
+      setAiSides(nb, nw); setupCh = true;
+      // same semantics as the main window's own aiSideToggle: back to pve, unpause a
+      // both-AI game, so the change actually DRIVES the engine, not just the labels
+      try { if (S.mode !== 'pve') S.mode = 'pve'; } catch (eA1) {}
+      try { if (aiVsAi()) S.paused = false; } catch (eA2) {}
+      try { coachPauseByAiVsAi(); } catch (eA3) {}
+    }
   }
   if (p.bgThink !== undefined && p.bgThink !== null && !!p.bgThink !== !!S.bgThink) {
     S.bgThink = !!p.bgThink; setupCh = true;
@@ -7731,6 +7738,8 @@ function setPatchApply(p) {
   try { if (engCh) applyEngineConfig(); } catch (e5) {}
   try { if (setupCh || langCh) { refreshUI(); syncSideUI(); } } catch (e3) {}
   try { if (setupCh) { syncSetSetup(); paint(); } } catch (e6) {}
+  // a settings-driven change can hand the move to an engine side: make it move NOW
+  try { if (setupCh && !G.busy) maybeAi(); } catch (e8) {}
   try { if (langCh) applyLang(); } catch (e7) {}
   // the review / vision windows only FOLLOW the settings visually - they must never write
   // their own (stale, theme-normalised) snapshot back over the master state
