@@ -16,14 +16,14 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "Meter"
             VALUE "FileDescription",  "Desktop Gomoku Trainer"
-            VALUE "FileVersion",      "4.46.0.0"
+            VALUE "FileVersion",      "4.47.0.0"
             VALUE "InternalName",     "Desktop GomokuTrainer"
             VALUE "LegalCopyright",   "Meter"
             VALUE "LegalTrademarks",  "Meter Gomoku Link"
             VALUE "OriginalFilename", "Desktop GomokuTrainer.exe"
             VALUE "ProductName",      "Meter Gomoku Trainer"
-            VALUE "ProductVersion",   "4.46.0.0"
-            VALUE "Comments",         "Meter Gomoku Link 4.46 - on-screen board link with built-in Rapfi 0.44.1 analysis"
+            VALUE "ProductVersion",   "4.47.0.0"
+            VALUE "Comments",         "Meter Gomoku Link 4.47 - on-screen board link with built-in Rapfi 0.44.1 analysis"
         END
     END
     BLOCK "VarFileInfo"

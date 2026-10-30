@@ -1347,6 +1347,7 @@ static void DoAsk(const AskRequest& req, int id, bool fromLink) {
        " " + std::to_string(NowMs() - g_cur.t0) + "ms nodes=" + std::to_string(g_cur.ps.totalNodes) +
        " speed=" + std::to_string(g_cur.ps.speed) +
        " ttime=" + std::to_string(g_cur.ps.timeMs) +
+       " cands=" + std::to_string(g_cur.ps.cands.size()) + " numPv=" + std::to_string(g_cur.ps.numPv) +
        (g_cur.opName == "balance" ? (" pts=" + std::to_string(g_cur.ps.movePts.size())) : std::string()) +
        (g_cur.superseded ? " [superseded]" : ""));
 }

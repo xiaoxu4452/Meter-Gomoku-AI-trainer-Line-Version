@@ -5,7 +5,7 @@
 
   var S = window.GB_S || (window.GB_S = {});
 
-  var GB_VER = 'v4.46';
+  var GB_VER = 'v4.47';
   try { window.__gbTacTest = engineTacTest; } catch (e) {}
   var UI = window.GBUI || {};
   var N = 15;

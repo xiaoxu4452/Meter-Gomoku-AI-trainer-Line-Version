@@ -188,6 +188,13 @@ var I18N = {
     aboutVer: '版本', aboutFeat: '功能', aboutOss: '开源组件', aboutLic: '许可',
     aboutUpdates: '最近更新',
     aboutUpdateList: [
+      { v: '4.47', items: [
+        '设置窗成为独立主控窗：常驻置顶、固定比例（宽:高 = 1:1.618）随屏幕自适应、启动预热点开即现、最小化直接进任务栏并拥有独立任务栏入口；加载画面只显示 Gomoku Settings',
+        '主窗与设置窗双向实时联动：在设置窗里改 AI 执子会立即让引擎行棋，线程 / 哈希 / 选点范围 / 分析点数 / 主题 / 语言全部即时同步到所有窗口；打开连线窗不再收纳主窗卡片、也不再写独立的连线存档 —— 连线里的 AI 参数初始一律听从主窗当前设置',
+        '棋盘下方「设置」键移除，顶栏「设置」为唯一入口；「恢复默认」配色键不再换行',
+        '棋盘标线 / 坐标按设备像素对齐（近黑深灰高清），局面代码框并入引擎仪表盘日志下方，棋子默认显示手数序号（思源宋体）',
+        '「分析计算」统一为一个开关（棋盘下方与计算评估卡同一状态），平衡点改为一次不间断的持续搜索并实时标记成对落点，再次点击自动落子',
+      ]},
       { v: '4.46', items: [
         '识别参数真正生效：5 项阈值（灰度 / 黑白偏移、黑 / 白百分比）任意一项偏离默认值就切换到严格判定 —— 结果按你设的参数出，底层的「松阈值重判 / 自制读子 / 局部对比」整条兜底链不再静默改写；只有全部保持默认时才启用兜底',
         '后台思考重做：改用引擎原生 pondering（与官方整合包同一套节奏）—— 开着时对手思考期间引擎就在算我方应对，你一落子它已就绪；关着时引擎落子后立刻停，不再空转（CPU 常年高占用的一大来源）',
@@ -660,6 +667,13 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     aboutVer: 'Version', aboutFeat: 'Features', aboutOss: 'Open-source components', aboutLic: 'Licence',
     aboutUpdates: 'Recent updates',
     aboutUpdateList: [
+      { v: '4.47', items: [
+        'The settings window is now a standalone master panel: always on top, fixed 1:1.618 ratio that scales with the screen, pre-created at boot (opens instantly), minimizes straight into its own taskbar entry; the splash shows only Gomoku Settings',
+        'Two-way live sync between the main and settings windows: switching AI sides there makes the engine move immediately; threads / hash / candidate range / analysis points / theme / language apply to every window at once. Opening a link session no longer reshapes the main window and no longer keeps its own settings archive - link AI parameters start from the main window\'s current settings',
+        'The board-foot settings button is gone (the top-bar key is the only entry); the colour reset key no longer wraps',
+        'Board lines / coordinates are device-pixel aligned (crisp near-black), the position-code box moved under the engine dashboard log, move numbers on by default (Noto Serif SC)',
+        'Analysis is one single toggle (the board-foot key and the analysis card share state); the balance point now runs one continuous search with live paired marks - tap again to play them out',
+      ]},
       { v: '4.46', items: [
         'Recognition params now really take effect: if any of the five thresholds (grey level, black / white offset, black / white percentage) differs from its default, the strict path is used - results follow exactly what you set, and the whole fallback chain (relaxed re-read, home-grown reader, local-contrast pass) no longer silently overrides it; the fallbacks only run while every value is still at its default',
         'Background thinking rebuilt on the engine-native pondering used by the official bundle - while it is on, the engine is already working out your reply during the opponent turn; while it is off the engine stops the moment it moves instead of spinning idle (a major source of constant high CPU)',
@@ -4327,7 +4341,7 @@ function toast(msg) {
   setStat(null, msg);
 }
 
-var APP_VERSION = '4.46';
+var APP_VERSION = '4.47';
 
 var UPDATE_URL = 'https://wwbbj.lanzout.com/b016l49aqj';
 var UPDATE_PWD = '15';
@@ -7597,6 +7611,7 @@ function applyCardVis() {
 var SETKEY = 'gbcalc.setwin.v1';
 var __patchLast = '';
 var __mainPatchLast = '';   // memo for the mainSync broadcast (main -> settings window)
+var __linkPatchLast = '';   // memo for the link window's settingsPatch (link -> main)
 
 function setPatchNow() {
   var cv = cardVis();
@@ -10756,6 +10771,7 @@ function boot() {
   LocalAI.boot();
 
   try {
+    try { localStorage.removeItem('gbcalc.settings.link.v1'); } catch (eOld) {}   // legacy link key
     var st = JSON.parse(localStorage.getItem(settingsKey()) || '{}');
     for (var k in st) if (S.hasOwnProperty(k)) S[k] = st[k];
     var rgBoot = loadRuleGlobal();
@@ -11620,6 +11636,16 @@ function save() {
   // window can never write an old cores/hashMB again.
   enginePrefApplyToS();
   prefsSyncFromS();
+  // The link window NEVER writes the big snapshot itself: it posts its patch, the host
+  // relays it as setSync and the MAIN window applies + persists it (single authority).
+  // This keeps the main window's stored state untouched by a link session.
+  if (LINK_MODE && HOST) {
+    try {
+      var jLK = JSON.stringify(setPatchNow());
+      if (jLK !== __linkPatchLast) { __linkPatchLast = jLK; tellHost({ type: 'settingsPatch', patch: jLK }); }
+    } catch (eLK) {}
+    return;
+  }
   try {
     var k = settingsKey();
     localStorage.setItem(k, JSON.stringify(S));
@@ -11632,15 +11658,7 @@ function save() {
         try { tellHost({ type: 'mainSync', patch: jMS }); } catch (eMS) {}
       }
     }
-    var other = (k === 'gbcalc.settings.v1') ? 'gbcalc.settings.link.v1' : 'gbcalc.settings.v1';
-    var ost = null;
-    try { ost = JSON.parse(localStorage.getItem(other) || 'null'); } catch (e2) { ost = null; }
-    if (!ost || typeof ost !== 'object') return;
-    var changed = false;
-    GLOBAL_LOOK_KEYS().forEach(function (kk) {
-      if (S[kk] !== undefined && ost[kk] !== S[kk]) { ost[kk] = S[kk]; changed = true; }
-    });
-    if (changed) localStorage.setItem(other, JSON.stringify(ost));
+    // (the old settings.v1 <-> link.v1 look-key mirror is gone: the patch channel owns sync)
   } catch (e) {}
 }
 
@@ -11672,14 +11690,8 @@ function setLinkMode(on) {
   S.theme = keepTheme; S.cssVars = keepCssVars; S.customBase = keepCustomBase;
   S.lang = keepLang;
 
-  if (on && LINK_CFG_LAST) {
-    var lc = LINK_CFG_LAST;
-    if (typeof lc.aiB === 'boolean' && typeof lc.aiW === 'boolean') setAiSides(lc.aiB, lc.aiW);
-    if (lc.turnMs >= 500 && lc.turnMs <= 300000) S.turnMs = lc.turnMs;
-    if (lc.rule >= 0 && lc.rule <= 2) S.rule = +lc.rule;
-    S.linkAuto = !!lc.auto; if (lc.clicks) S.linkClicks = lc.clicks;
-    save();
-  }
+  // (4.47) LINK_CFG_LAST is no longer re-applied here: the link window starts from the
+  // main window's settings, never the other way round.
 
   if (on) {
     S.mode = 'pve';
@@ -11699,8 +11711,8 @@ function setLinkMode(on) {
   if (els.num_turn) els.num_turn.value = ((+S.turnMs || 2000) / 1000).toFixed(3);
   if (els.sel_rule) els.sel_rule.value = String(S.rule);
   applyLayout();
-  // Link session opened: collect all cards into the left dock and persist it.
-  if (on) { cardsToLeftDock(); persistLayout(); }
+  // (4.47) the main window stays EXACTLY as it is when a link session opens -
+  // no card gathering, no layout persistence anymore.
 
   applyLang();
   buildSelects(); refreshUI(); paint();
@@ -12083,15 +12095,12 @@ function lkPaintCurve() {
 
 function bootLink() {
   try {
-
-    var st1 = JSON.parse(localStorage.getItem('gbcalc.settings.link.v1') || '{}');
+    // legacy key of the old link persistence line - gone (single authority: settings.v1)
+    try { localStorage.removeItem('gbcalc.settings.link.v1'); } catch (eLK) {}
+    // the link window STARTS from the main window's current settings: look fields AND
+    // every AI parameter (cores / hash / weights / turnMs / aiB / aiW / rule ...)
     var st = JSON.parse(localStorage.getItem('gbcalc.settings.v1') || '{}');
-    if (st && st.theme) S.theme = (st.theme === 'light') ? 'light' : 'dark';
-    else if (st1 && st1.theme) S.theme = (st1.theme === 'light') ? 'light' : 'dark';
-    if (st && st.lang) S.lang = (st.lang === 'en') ? 'en' : 'zh';
-    else if (st1 && st1.lang) S.lang = (st1.lang === 'en') ? 'en' : 'zh';
-    if (st && st.cssVars) { S.cssVars = st.cssVars; applyColorVars(st.cssVars); }
-    else if (st1 && st1.cssVars) { S.cssVars = st1.cssVars; applyColorVars(st1.cssVars); }
+    for (var k in st) if (S.hasOwnProperty(k)) S[k] = st[k];
     var rgLk = loadRuleGlobal();
     if (rgLk != null) S.rule = rgLk;
   } catch (e) {}
@@ -12209,6 +12218,9 @@ function bootLink() {
   if (lkBrandEl) lkBrandEl.innerHTML = lkBrandHTML();
 
   var c = lkCfg();
+  // (4.47) AI parameters start from the main window's current settings:
+  // think time (and below: AI sides). Recognition thresholds keep their own archive.
+  if (S.turnMs >= 200 && S.turnMs <= 300000) c.turnMs = S.turnMs;
   c.auto = false;
   lkSaveCfg(c);
   LK.canvas = document.getElementById('lkBoard');
@@ -12226,7 +12238,7 @@ function bootLink() {
   ruleSync();
   q('lk_auto').classList.toggle('on', !!c.auto);
 
-  if (c.aiB !== true && c.aiB !== false) { c.aiB = true; c.aiW = false; }
+  c.aiB = !!S.aiB; c.aiW = !!S.aiW;   // (4.47) follow the main window
   if (c.aiB === true && c.aiW === true) c.aiW = false;
   q('lk_auto').onclick = function () {
     c.auto = !(c.auto === true); lkSaveCfg(c);

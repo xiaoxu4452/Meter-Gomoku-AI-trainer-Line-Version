@@ -7297,7 +7297,22 @@ class LinkMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
     if (FAILED(e->get_WebMessageAsJson(&raw)) || !raw) return S_OK;
     std::string s = WideToUtf8(raw);
     CoTaskMemFree(raw);
-    
+
+    // (4.47) the link page posts settingsPatch as well: relay it to EVERY window like the
+    // settings window's own patches (main / link echo / review / vision / settings)
+    if (s.find("\"settingsPatch\"") != std::string::npos) {
+      std::string patch = JsonStrAfterDecoded(s, "\"patch\":");
+      if (!patch.empty()) {
+        std::string msg = "{\"type\":\"setSync\",\"patch\":" + patch + "}";
+        PostToPageSoon(msg);
+        PostToLinkPageSoon(msg);
+        PostToRvPageSoon(msg);
+        PostToVisPageSoon(msg);
+        if (g_setWebview) g_setWebview->PostWebMessageAsJson(Utf8ToWide(msg).c_str());
+      }
+      return S_OK;
+    }
+
     {
       LPWSTR raw2 = nullptr;
       if (SUCCEEDED(e->TryGetWebMessageAsString(&raw2)) && raw2) {
@@ -7880,7 +7895,8 @@ class SetMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
     }
     if (s.find("\"settingsPatch\"") != std::string::npos) {
       // the settings page pushes its patch; relay it to EVERY window (settings are master:
-      // main, link, review and vision all follow immediately)
+      // main, link, review and vision all follow immediately - and the settings window
+      // itself follows link-side changes back)
       std::string patch = JsonStrAfterDecoded(s, "\"patch\":");
       if (!patch.empty()) {
         std::string msg = "{\"type\":\"setSync\",\"patch\":" + patch + "}";
@@ -7888,6 +7904,7 @@ class SetMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
         PostToLinkPageSoon(msg);
         PostToRvPageSoon(msg);
         PostToVisPageSoon(msg);
+        if (g_setWebview) g_setWebview->PostWebMessageAsJson(Utf8ToWide(msg).c_str());
       }
       return S_OK;
     }
