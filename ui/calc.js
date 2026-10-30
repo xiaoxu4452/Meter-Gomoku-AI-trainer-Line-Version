@@ -6771,6 +6771,7 @@ function applyLang() {
   els.btn_mv_left.title = d.mvLeftT; els.btn_mv_right.title = d.mvRightT;
   els.btn_save.textContent = d.savePos;
   els.btn_review.textContent = d.review;
+  if (els.btn_link) els.btn_link.textContent = (S.lang === 'en') ? 'Link' : '连线';
   els.btn_copy.title = d.copy; els.btn_copy.setAttribute('aria-label', d.copy);
   els.btn_paste.title = d.pasteLoad || d.paste;
   els.btn_paste.setAttribute('aria-label', els.btn_paste.title);
