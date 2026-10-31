@@ -5,7 +5,7 @@
 
   var S = window.GB_S || (window.GB_S = {});
 
-  var GB_VER = 'v4.47';
+  var GB_VER = 'v4.48';
   try { window.__gbTacTest = engineTacTest; } catch (e) {}
   var UI = window.GBUI || {};
   var N = 15;
@@ -526,6 +526,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
                   side: (b.side === 1 || b.side === 2) ? b.side : 0,
                   rule: b.rule | 0,
                   budgetMs: Math.max(200, b.turnMs | 0),
+                  dyn: b.dyn ? 1 : 0,
                   key: b.key || 0 };
         if (op === 'balance') {
           q.topN = 1; q.pondering = false;

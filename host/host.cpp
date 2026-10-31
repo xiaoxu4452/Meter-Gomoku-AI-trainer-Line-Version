@@ -1,5 +1,4 @@
-﻿/* Meter Gomoku Trainer - desktop host (Win32 / WebView2). Owns board scanning, recognition, click injection, the native engine process and overlay windows. */
-
+/* Meter Gomoku Trainer - desktop host (Win32 / WebView2). Owns board scanning, recognition, click injection, the native engine process and overlay windows. */
 
 #ifndef UNICODE
 #define UNICODE
@@ -115,12 +114,18 @@ static void FireTestHooks();
 
 static void OpenUpdateWindow();
 static void OpenSetWindow();
+static void CreateSetWindow();
 
 // settings window globals (defined once here; used by MsgHandler mainSync relay too)
 static HWND      g_setHwnd = nullptr;
 static ICoreWebView2* g_setWebview = nullptr;
 static ICoreWebView2Controller* g_setController = nullptr;
 static bool g_setCreating = false, g_setPageReady = false;
+// Last play-state patch pushed by the main window. The settings window prewarms at boot and
+// can miss mainSync posts that happen before its page is ready; replaying this when it
+// announces "ready" keeps its snapshot in step (otherwise a stale settings edit could drag
+// the main window back to pve / re-show cards).
+static std::string g_mainPatch;
 
 static const UINT_PTR kRvTimerTestOpen = 3;  
 
@@ -271,9 +276,6 @@ static COLORREF MixColor(COLORREF a, COLORREF b, float t) {
   return RGB(cl((int)(ar + (br - ar) * t)), cl((int)(ag + (bg - ag) * t)), cl((int)(ab + (bb - ab) * t)));
 }
 
-// LogMsg() MUST build the whole line first and write it under ONE lock (open -> single fwrite -> close).
-// Pages and engine threads log concurrently; three partial fwrites used to interleave and split lines,
-// which broke the '[eng] ack id=' E2E greps (the link was up but the probe saw nothing).
 static std::mutex g_logMu;
 
 static void LogMsg(const std::string& s) {
@@ -332,15 +334,14 @@ static void ParseBalPairs(const std::string& s, const char* key, std::vector<std
 static void PostToLinkPageSoon(const std::string& json);
 static void PostToLinkPage(const std::string& json);
 
-
 static std::atomic<bool> g_linkSession(false);
 
-static std::atomic<int> g_syncInterval(200);   // sync interval (ms): non-locked scan period
-static std::atomic<int> g_syncGray(50);   // gray deviation (0-255)
-static std::atomic<int> g_syncBlackOff(96);   // black deviation (0-255)
-static std::atomic<int> g_syncWhiteOff(96);   // white deviation (0-255)
-static std::atomic<int> g_syncBlackPct(33);   // black ratio (0-100)
-static std::atomic<int> g_syncWhitePct(33);   // white ratio (0-100)
+static std::atomic<int> g_syncInterval(200);   
+static std::atomic<int> g_syncGray(50);        
+static std::atomic<int> g_syncBlackOff(96);    
+static std::atomic<int> g_syncWhiteOff(96);    
+static std::atomic<int> g_syncBlackPct(33);    
+static std::atomic<int> g_syncWhitePct(33);    
 
 static std::vector<std::string> g_outboxPage;
 static std::vector<std::string> g_outboxRv;
@@ -491,18 +492,35 @@ static bool g_uiDark = true;
 static COLORREF g_uiBg = RGB(0x26, 0x27, 0x2a);   
 static COLORREF g_uiFg = RGB(0x9a, 0xa0, 0xa6);   
 static std::wstring g_uiText = L"加载中…";
-static bool g_mainPageShown = false;              
+static bool g_mainPageShown = false;
+
+static HWND g_splashLayer = nullptr;
+
+static const UINT_PTR kMainTimerSplashTop = 18;
+static const UINT_PTR kMainSplashTopIntervalMs = 20;
+
+static const UINT_PTR kMainTimerSplashFade = 21;
+static const UINT kMainSplashFadeStepMs = 16;
+static const int  kMainSplashFadeStep = 18;
+static int g_splashAlpha = 255;
+static const UINT_PTR kMainTimerRevealSettle = 20;   
+static const UINT kMainRevealSettleMs = 300;
+
+static const UINT_PTR kMainTimerPrewarmAll = 22;
+static const UINT kMainPrewarmDelayMs = 120;   
+static const UINT kBootRvPrewarmDelayMs = 400;  
+static bool g_bootPrewarmStarted = false;
 static const UINT_PTR kMainTimerReload = 5;
 static const UINT_PTR kMainTimerEval = 8;
 static const UINT_PTR kMainTimerTestLink = 10;
 static const UINT_PTR kMainTimerTestLinkScan = 11;
 static const UINT_PTR kMainTimerTestLinkCheck = 12;         
-// GB_TEST_LINK_PROBE=1 regression probe: an empty-board frame must reset the TT, and a rule change
-// while the board is non-empty must re-run the evaluation.
+
 static const UINT_PTR kMainTimerTestLinkProbe = 13;
 static const UINT_PTR kMainTimerTestLinkProbe2 = 14;
 
 static const UINT_PTR kMainTimerSysMem = 9;
+static const UINT_PTR kMainTimerRevealFallback = 17;   
 static const UINT kSysMemIntervalMs = 3000;
 static int g_mainReloads = 0;                    
 static int g_mainCtrlRebuilds = 0;               
@@ -519,9 +537,14 @@ static void ClampLinkRecog(int& interval, int& gray, int& blackOff, int& whiteOf
                            int& blackPct, int& whitePct);
 static void ApplyDarkTitleBar(HWND h, bool dark);
 static void SetWebviewBg(ICoreWebView2Controller* ctl, COLORREF c);
+static void SetWebviewBgTransparent(ICoreWebView2Controller* ctl);
+static bool GbPageSplashMode();
 static void RevealMainPage();
+static void ShowSplashLayer();
+static void HideSplashLayer();
 static void RevealRvPage();
 static void PaintSplash(HWND h, bool pageShown, const wchar_t* brand);
+static void StartBootPrewarm();
 
 static std::string JsonSubObject(const std::string& s, const char* key) {
   size_t p = s.find(key);
@@ -1225,6 +1248,7 @@ static void VselShot(HWND h) {
 static std::wstring FindVisionExe();                       
 
 static bool VisionScanImage(const unsigned char* img, int len, std::string& out);
+
 static bool VisionRecognize(const unsigned char* img, int len, int size, bool nosnap,
                             const std::string& recogJson, std::string& out);
 
@@ -1274,11 +1298,11 @@ static bool VselScanRect(const std::string& s, RECT& out, double& stepOut) {
   return true;
 }
 
-static std::atomic<int> g_visRcGray(50);   // gray deviation (0-255)
-static std::atomic<int> g_visRcBlackOff(96);   // black deviation (0-255)
-static std::atomic<int> g_visRcWhiteOff(96);   // white deviation (0-255)
-static std::atomic<int> g_visRcBlackPct(33);   // black ratio (0-100)
-static std::atomic<int> g_visRcWhitePct(33);   // white ratio (0-100)
+static std::atomic<int> g_visRcGray(50);        
+static std::atomic<int> g_visRcBlackOff(96);    
+static std::atomic<int> g_visRcWhiteOff(96);    
+static std::atomic<int> g_visRcBlackPct(33);    
+static std::atomic<int> g_visRcWhitePct(33);    
 
 static std::wstring VisRecogPrefFile() {
   wchar_t tmp[MAX_PATH] = { 0 };
@@ -1334,7 +1358,7 @@ static void SaveVisRecogPrefs() {
   fclose(f);
 }
 
-static bool VisionScanScreen(const std::string& body, std::string& out);   // server-side screen capture + recognition (fast lane)
+static bool VisionScanScreen(const std::string& body, std::string& out);   
 
 static bool VselAutoFindRect(HWND h, RECT& br, double& step) {
   int vx = GetSystemMetrics(SM_XVIRTUALSCREEN), vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
@@ -1692,7 +1716,7 @@ static void EnsureVisionServer() {
       envPinned = true;
       SetEnvironmentVariableA("GB_RECOG_PORT", std::to_string(VisionRecogPort()).c_str());
       SetEnvironmentVariableA("GB_SCAN_PORT", std::to_string(VisionScanPort()).c_str());
-// The vision process is HTTP-free on purpose: pin the spawn count to 0 so nobody re-enables it.
+
       SetEnvironmentVariableA("GB_VISION_HTTP", "0");
       SetEnvironmentVariableA("GB_PARENT_PID", std::to_string(GetCurrentProcessId()).c_str());
     }
@@ -1912,7 +1936,8 @@ static bool VisionRecognize(const unsigned char* img, int len, int size, bool no
                             const std::string& recogJson, std::string& out) {
   if (len <= 0) return false;
   EnsureVisionServer();
-// algo=sync => the service uses self-made locating (findBoardRects + refineGrid) plus the sync reader.
+
+  
   std::string recog = recogJson.empty() ? VisRecogJson() : recogJson;
   std::string extra = std::string("{\"size\":") + std::to_string(size) +
                       (nosnap ? ",\"nosnap\":true" : "") +
@@ -1963,7 +1988,8 @@ static bool VisScanCall(const std::string& body, std::string& out) {
 }
 
 static bool VisionScanScreen(const std::string& body, std::string& out) {
-// VisScanCall/VisPipeConnect never spawn the service process themselves - start it here as a fallback.
+
+  
   EnsureVisionServer();
   return VisScanCall(body, out);
 }
@@ -2066,6 +2092,8 @@ static void RunVisionForVis(std::string req) {
   }
   if (mode != "scan") mode = "image";
 
+  
+
   int rcGray     = JsonIntAfter(req, "\"gray_offset\":");
   int rcBlackOff = JsonIntAfter(req, "\"black_offset\":");
   int rcWhiteOff = JsonIntAfter(req, "\"white_offset\":");
@@ -2108,7 +2136,7 @@ static void RunVisionForVis(std::string req) {
     std::string js;
     bool ok = false;
     if (!visUseTest) {
-// The vision process is HTTP-free: this path is pure named pipe + shared memory.
+
       if (mode == "scan")
         ok = VisionScanImage(bytes.data(), (int)bytes.size(), js);
       else
@@ -2139,8 +2167,8 @@ static void RunVisionForVis(std::string req) {
     fwrite(bytes.data(), 1, bytes.size(), f);
     fclose(f);
   }
+
   
-// The fallback standalone spawn must carry algo=sync + the 5 thresholds too.
   std::wstring syncArgs;
   if (mode != "scan") {
     syncArgs = L" --algo sync --recog " +
@@ -2229,7 +2257,6 @@ static int        g_hashMB = 0;
 
 static int        g_linkCfgSeen = 0;
 
-// Cache at startup; later affinity/Job limits must never change this value.
 static int CpuCount() {
   static const int cached = [] {
     SYSTEM_INFO si; GetNativeSystemInfo(&si);
@@ -2237,11 +2264,15 @@ static int CpuCount() {
   }();
   return cached > 0 ? cached : 4;
 }
-// Dropdown cap = logical cores - reserved cores (reserved for WebView2 rendering, vision and the
-// sub/forward lanes); the reserve scales with the core count and SMT pairs stay together.
-static int PhysCoreCount();   // implemented further down in this file
+
+static int PhysCoreCount();   
 
 static int ThreadsMax() {
+
+  
+
+  
+
   int phys = PhysCoreCount();
   int n    = CpuCount();
   if (n < 1) n = 1;
@@ -2250,6 +2281,7 @@ static int ThreadsMax() {
   if (t > n) t = n;
   return t;
 }
+
 static int ThreadsDefault() {
   int t = ThreadsMax();
   if (t < 1) t = 1;
@@ -2358,9 +2390,7 @@ struct CpuSplitInfo {
   std::string why;                                  
 };
 
-// Forward declaration: CpuSplit needs the mask for the CURRENT user thread count.
-static std::atomic<int> g_usrThreads{0};   // user thread pref (0 = auto = all cores)
-
+static std::atomic<int> g_usrThreads{0};             
 
 static int PopCountPtr(DWORD_PTR v) {
   int n = 0;
@@ -2369,7 +2399,10 @@ static int PopCountPtr(DWORD_PTR v) {
 }
 
 static const CpuSplitInfo& CpuSplit() {
-// The mask is RECOMPUTED from the current user thread count (not once per process).
+
+  
+
+  
   int needWanted = ThreadsMax();
   static std::mutex csMu;
   static CpuSplitInfo cache;
@@ -2379,7 +2412,9 @@ static const CpuSplitInfo& CpuSplit() {
   cachedNeed = needWanted;
   cache = [needWanted] {
     CpuSplitInfo inf;
+
     
+
     char on[4] = {0};
     bool want = true;
     if (GetEnvironmentVariableA("GB_CPU_SPLIT", on, sizeof(on)) > 0 && on[0] == '0') want = false;
@@ -2394,8 +2429,10 @@ static const CpuSplitInfo& CpuSplit() {
       inf.why = "GB_NO_CPU_SPLIT=1（排障杀开关）";
       return inf;
     }
+
     
-// Collect each physical core together with its EfficiencyClass.
+
+    
     struct CoreGrp { DWORD_PTR mask; int eff; };
     std::vector<CoreGrp> groups;
     DWORD len = 0;
@@ -2432,28 +2469,32 @@ static const CpuSplitInfo& CpuSplit() {
     if (n < 3) { inf.why = "物理核不足 3 个"; return inf; }
     std::stable_sort(groups.begin(), groups.end(),
                      [](const CoreGrp& a, const CoreGrp& b) { return a.eff < b.eff; });
-    int need = needWanted;   // decided by the outer call from the current user thread count
+
+    
+
+    
+    int need = needWanted;                    
     if (need < 1) need = 1;
-    if (need > (int)CpuCount() - 1) {   // always leave at least 1 logical core for recognition
+    if (need > (int)CpuCount() - 1) {         
       inf.why = "逻辑核不足（引擎上限 " + std::to_string(need) + " / 共 " +
                 std::to_string(CpuCount()) + "）";
       return inf;
     }
     DWORD_PTR all = 0, em = 0;
     for (int i = 0; i < n; ++i) all |= groups[i].mask;
-    for (int i = 0; i < n; ++i) {   // 1) one primary per physical core (sorted by eff => P-cores first)
+    for (int i = 0; i < n; ++i) {              
       DWORD_PTR g = groups[i].mask;
       if (g) em |= (g & (~g + 1));
     }
     int have = PopCountPtr(em);
-    for (int i = 0; i < n && have < need; ++i) {   // 2) top up with SMT siblings
+    for (int i = 0; i < n && have < need; ++i) {   
       DWORD_PTR rest = groups[i].mask & ~em;
       while (rest && have < need) {
         DWORD_PTR low = rest & (~rest + 1);
         em |= low; rest &= ~low; ++have;
       }
     }
-    DWORD_PTR vm = all & ~em;   // 3) the rest goes to recognition
+    DWORD_PTR vm = all & ~em;                  
     inf.engMask = em; inf.visMask = vm;
     inf.engCPUs = PopCountPtr(em); inf.visCPUs = PopCountPtr(vm);
     inf.engCores = inf.engCPUs; inf.visCores = inf.visCPUs;
@@ -2483,7 +2524,6 @@ static void LogCpuSplitOnce() {
   LogMsg(b);
 }
 
-// The engine is never pinned => budget over ALL logical cores (0 = unlimited); ThreadsMax() still caps.
 static int EngThreadCPUs() { return 0; }
 
 static std::string CpuSplitStatusJson() {
@@ -2497,11 +2537,17 @@ static std::string CpuSplitStatusJson() {
 
 static bool ApplyEngineAffinity(HANDLE h) {
   if (!h) return false;
-// Final verdict after two rounds of real-machine tests (do NOT flip again): the engine and the host
-// both run unpinned; no affinity/Job may touch them after startup.
+
+  
+
   const CpuSplitInfo& c = CpuSplit();
   if (!c.active) return false;
   LogCpuSplitOnce();
+
+  
+
+  
+
   SYSTEM_INFO si; GetNativeSystemInfo(&si);
   DWORD_PTR all = (DWORD_PTR)si.dwActiveProcessorMask;
   if (!SetProcessAffinityMask(h, all)) {
@@ -2527,8 +2573,9 @@ static bool ApplyVisionAffinity(HANDLE h) {
 
 static std::atomic<bool> g_hostPinned{ false };
 static void CpuSplitPinHost() {
-// The host must NEVER pin itself to cores (root cause of the "select 1 thread" bug chain); pinning the
-// engine measurably made it SLOWER (real-machine test) - leave both unpinned.
+
+  
+
   const CpuSplitInfo& c = CpuSplit();
   if (!c.active) return;
   LogCpuSplitOnce();
@@ -2560,7 +2607,6 @@ static LONG RegDword(HKEY root, const wchar_t* sub, const wchar_t* val, DWORD& o
   return r;
 }
 
-// Keep the WebView2 renderer processes at HIGH_PRIORITY_CLASS.
 static void BoostWebViewPriority() {
   HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
   if (snap == INVALID_HANDLE_VALUE) return;
@@ -2661,7 +2707,6 @@ static void SendAll(SOCKET cs, const char* p, int n) {
   }
 }
 
-// ---- Job object (KILL_ON_JOB_CLOSE) ----
 static void EnsureJob() {
   if (g_job) return;
   g_job = CreateJobObjectW(nullptr, nullptr);
@@ -2833,7 +2878,7 @@ static void HttpUiServer() {
                         name.find('/') == std::string::npos && name.find('\\') == std::string::npos &&
                         name.find('.') != std::string::npos;
           if (nameOk) {
-// Prefer the single ui.pak binary container, then the legacy <name>.enc packs, then plaintext.
+            
             std::wstring dir = Join(ExeDir(), L"calc");
             std::wstring enc = Join(dir, Utf8ToWide(name) + L".enc");
             std::vector<uint8_t> dec;
@@ -3048,7 +3093,7 @@ class ResHandler : public Cb<ICoreWebView2WebResourceRequestedEventHandler> {
     std::vector<uint8_t> content;
     bool ok = false;
     const char* how = "none";
-// ui.pak first (see ui_crypto.h); legacy .enc packs still work as a fallback.
+
     std::wstring enc = Join(UiDir(), path + L".enc");
     if (gbCalcReadUiPak(Join(UiDir(), L"ui.pak"), WideToUtf8(path), content)) { ok = true; how = "pak"; }
     else if (FileExists(enc) && gbCalcReadEncFile(enc, content)) { ok = true; how = "enc"; }
@@ -3061,8 +3106,7 @@ class ResHandler : public Cb<ICoreWebView2WebResourceRequestedEventHandler> {
       }
     }
     if (!ok || content.empty()) {
-      
-// If calc.html cannot be served, show the built-in diagnostic page (a blank window is undebuggable).
+
       if (path == L"calc.html") {
         std::string page(kUiMissingHtml);
         LogMsg("[res] calc.html MISSING -> built-in notice page (ui.pak 被隔离/删除？)");
@@ -3092,7 +3136,6 @@ static void LayoutWebView() {
   g_controller->put_Bounds(r);
 }
 
-// Forensics probe for a "silent" main page: the host served everything but no console messages came back.
 static const char* kSilentProbeJs =
     "(function(){try{return JSON.stringify({rs:document.readyState,"
     "cv:(window.chrome&&window.chrome.webview)?1:0,title:document.title,"
@@ -3119,7 +3162,6 @@ class EvalHandler : public Cb<ICoreWebView2ExecuteScriptCompletedHandler> {
   }
 };
 
-// The update link intentionally does NOT follow GB_SUITE_ENGINE.
 static const char* kUpdateShareUrl = "https://wwbbj.lanzout.com/b016l49aqj";
 static const char* kUpdateSharePwd = "15";
 
@@ -3760,8 +3802,7 @@ static void OpenUpdateWindow(bool asSearch) {
   SetForegroundWindow(g_updHwnd);
 }
 
-// ============================ engine call layer ============================
-static std::string SysInfoJson();   // forward use: OnVariantChanged is used before its definition
+static std::string SysInfoJson();   
 namespace eng {
 namespace host {
 
@@ -3774,6 +3815,7 @@ void ChildTracked(HANDLE h) { ChildTrack(h); }
 bool ApplyAffinity(HANDLE h) { return ApplyEngineAffinity(h); }
 void PinHostAway() { CpuSplitPinHost(); }
 void UnpinHost() { CpuSplitUnpinHost(); }
+
 void OnVariantChanged() { PostToPage(SysInfoJson()); }
 
 int PhysCores() { return PhysCoreCount(); }
@@ -3792,13 +3834,13 @@ class MsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
      std::string s = WideToUtf8(raw);
      CoTaskMemFree(raw);
      LogMsg("[msg] " + s.substr(0, 200));
+
     
-// Engine call layer rebuilt: the page sends one op (ask/stop/caps/config); the host engine layer
-// pushes ack/tick back to the link page.
     if (s.find("\"engine\"") != std::string::npos && s.find("\"op\":") != std::string::npos) {
       std::string op = JsonStrAfter(s, "\"op\":");
       int id = JsonIntAfter(s, "\"id\":");
       eng::HandleOp(op, id, s, false);
+
       if (op == "config") PostToPage(SysInfoJson());
       return S_OK;
     }
@@ -3808,12 +3850,27 @@ class MsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       bool cfgChanged = (t != g_threads || h != g_hashMB);
       g_threads = t; g_hashMB = h;
       LogMsg("[ai] engineConfig threads=" + std::to_string(t) + " hashMB=" + std::to_string(h) + " (in-page)");
-// User prefs live in the host engine layer (THREAD_NUM / HASH_SIZE are clamped there).
+      
       eng::SetUserPrefs(t, h);
       if (cfgChanged || g_linkCfgSeen == 0) {
         g_linkCfgSeen = 1;
         PostToLinkPageSoon(std::string("{\"type\":\"engineCfg\",\"threads\":") +
                            std::to_string(t) + ",\"hashMB\":" + std::to_string(h) + "}");
+      }
+      return S_OK;
+    }
+
+    
+    
+    if (s.find("\"painted\"") != std::string::npos) {
+      if (!g_mainPageShown) {
+        
+        if (g_hwnd && IsWindow(g_hwnd)) SetTimer(g_hwnd, kMainTimerRevealFallback, 1200, nullptr);
+        LogBoot("UI FIRST FRAME");
+        if (g_hwnd && IsWindow(g_hwnd))
+          SetTimer(g_hwnd, kMainTimerRevealSettle, kMainRevealSettleMs, nullptr);
+        else
+          RevealMainPage();
       }
       return S_OK;
     }
@@ -3827,14 +3884,14 @@ class MsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       SaveUiPrefs(s);
       g_uiDark = (JsonStrAfterDecoded(s, JKey("theme").c_str()) != "light");
       ApplyDarkTitleBar(g_hwnd, g_uiDark);
-      RevealMainPage();
       KillTimer(g_hwnd, kMainTimerReload);
       LogBoot("PAGE READY");
-      LogMsg("[ui] main page ready - splash removed");
+      LogMsg("[ui] main page ready - splash stays until the first UI frame is painted");
+      
+      SetTimer(g_hwnd, kMainTimerRevealFallback, 600, nullptr);
       
       SetTimer(g_hwnd, kMainTimerHook, 50, nullptr);
-      
-      PrewarmReviewWindow();
+
       return S_OK;
     }
     
@@ -3928,9 +3985,12 @@ class MsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       // the main window changed settings (AI sides, think time, ...): the settings window
       // is the master panel and follows immediately
       std::string patch = JsonStrAfterDecoded(s, "\"patch\":");
-      if (!patch.empty() && g_setWebview) {
-        g_setWebview->PostWebMessageAsJson(
-            Utf8ToWide("{\"type\":\"setSync\",\"patch\":" + patch + "}").c_str());
+      if (!patch.empty()) {
+        g_mainPatch = patch;
+        if (g_setWebview) {
+          g_setWebview->PostWebMessageAsJson(
+              Utf8ToWide("{\"type\":\"setSync\",\"patch\":" + patch + "}").c_str());
+        }
       }
       return S_OK;
     }
@@ -3940,6 +4000,9 @@ class MsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       OpenLinkWindow();
       return S_OK;
     }
+
+    
+
     
     if (s.find("\"linkCfgSync\"") != std::string::npos) {
       std::string payload = s;
@@ -4093,7 +4156,6 @@ static std::string SysInfoJson() {
        ",\"avx512vnni\":" + (ec.hasAVX512VNNI ? "true" : "false") +
        ",\"avxvnni\":" + (ec.hasAVXVNNI ? "true" : "false") + "}";
 
-
   int l1 = 0, l2 = 0, l3 = 0;
   {
     DWORD len = 0;
@@ -4154,7 +4216,7 @@ static std::string SysInfoJson() {
   }
 
   o += ",\"variant\":" + JsonQuote(ec.variant);
-// Fastest measured variant (auto-bench cache, empty = untested) - shown on the instruction-set card.
+  
   o += ",\"variantBench\":" + JsonQuote(ec.benchVariant);
   o += ",\"native\":" + std::string(ec.available ? "true" : "false");
 
@@ -4183,11 +4245,11 @@ static std::string HostHandshakeJson() {
   snprintf(b, sizeof(b),
            "{\"type\":\"host\",\"cpu\":%d,\"threadsDefault\":%d,\"threadsMax\":%d,"
            "\"physCores\":%d,\"memMB\":%d,\"memAvailMB\":%d,\"native\":%s,"
-// User threads/hash prefs ride the handshake; the host is the single source of truth (0 = unset).
+           
            "\"userThreads\":%d,\"userHashMB\":%d,"
            "\"variant\":%s,\"cpuName\":%s,"
-// CPU instruction-set capabilities ride the host handshake too: the page used to wait for the 3-8s
-// engine probe and often showed nothing but "auto". The host message arrives right after page-ready.
+
+           
            "\"sse\":%s,\"avx2\":%s,\"avx512\":%s,\"avx512vnni\":%s,\"avxvnni\":%s,"
            "\"variantBench\":%s}",
            CpuCount(), ThreadsDefault(), ThreadsMax(), PhysCoreCount(),
@@ -4220,8 +4282,8 @@ class DomHandler : public Cb<ICoreWebView2DOMContentLoadedEventHandler> {
     PostToPage(SysInfoJson());   
     
     if (g_hwnd && IsWindow(g_hwnd)) SetTimer(g_hwnd, kMainTimerSysMem, kSysMemIntervalMs, nullptr);
-    // pre-create the settings window shortly after boot so the first open is instant
-    if (g_hwnd && IsWindow(g_hwnd)) SetTimer(g_hwnd, kMainTimerPrewarmSet, 1500, nullptr);
+
+    
     LogBoot("dom content loaded");
     FireTestHooks();
     return S_OK;
@@ -4281,7 +4343,8 @@ static void FireTestHooks() {
     LogMsg("[ai] test hook: asked the page to run the AI-vs-AI self-play walkthrough");
   }
 
-// Link E2E test hooks (no real game window needed).
+  
+  
   memset(tv, 0, sizeof(tv));
   if (GetEnvironmentVariableA("GB_TEST_OPEN_LINK", tv, sizeof(tv)) && tv[0] == '1') {
     UINT delayMs = 2500;
@@ -4294,7 +4357,7 @@ static void FireTestHooks() {
     }
   }
 
-// Persistence regression hook: injects JS into the main page (change a select -> restart -> value survives).
+  
   {
     char ev[2048] = {0};
     if (GetEnvironmentVariableA("GB_TEST_EVAL", ev, sizeof(ev)) && ev[0] && g_webview) {
@@ -4387,7 +4450,6 @@ static void SetupUiServing(ICoreWebView2* wv, const char* tag) {
   wv->add_ProcessFailed(new ProcFailHandler(base), &ptok);
 }
 
-// Forward declaration: defined before EnvHandler but already needed by CtlHandler.
 static void HardenWebviewSettings(ICoreWebView2* wv, const char* tag);
 
 class CtlHandler : public Cb<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler> {
@@ -4421,8 +4483,21 @@ class CtlHandler : public Cb<ICoreWebView2CreateCoreWebView2ControllerCompletedH
     }
     
     SetWebviewBg(ctl, g_uiBg);
-    ctl->put_IsVisible(TRUE);
+
+    
+    
+    if (GbPageSplashMode()) {
+      
+      SetWebviewBgTransparent(ctl);
+      LayoutWebView();
+      ctl->put_IsVisible(TRUE);
+      LogMsg("[ui] page-splash mode (transparent webview, no popup cover)");
+      return S_OK;
+    }
+    ctl->put_IsVisible(FALSE);      
     LayoutWebView();
+    ShowSplashLayer();
+    ctl->put_IsVisible(TRUE);
     return S_OK;
   }
 };
@@ -4434,26 +4509,24 @@ static std::wstring GbWv2BrowserArgs() {
     return (n2 > 0 && n2 < sizeof(b)) ? Utf8ToWide(std::string(b, n2)) : std::wstring();
   };
   std::wstring over = getenvW("GB_WV2_ARGS");
-// GB_WV2_ARGS=none => explicitly attach NO extra args (debugging; an empty value counts as unset on Windows).
+  
   if (_wcsicmp(over.c_str(), L"none") == 0) return L"";
   if (!over.empty()) return over;
-// Chromium honours only the LAST --enable-features / --disable-features flag, so all feature lists
-// are merged into a single flag before adding.
+
   std::wstring a =
-      L"--disable-background-timer-throttling"   // timers are not throttled
-      L" --disable-backgrounding-occluded-windows"   // normal priority even when occluded
-      L" --disable-renderer-backgrounding"   // no reduced rendering priority in background/occluded state
-      L" --disable-features=CalculateNativeWinOcclusion"   // do not pause frame submission when occluded
-      L" --enable-gpu-rasterization"   // GPU rasterization (smoother board/curves)
-      L" --enable-zero-copy"   // zero-copy compositing
-      L" --enable-features=CanvasOopRasterization"   // canvas goes through OOP rasterization
-      L" --ignore-gpu-blocklist";   // no software-rendering fallback due to driver version numbers
+      L"--disable-background-timer-throttling"          
+      L" --disable-backgrounding-occluded-windows"      
+      L" --disable-renderer-backgrounding"              
+      L" --disable-features=CalculateNativeWinOcclusion" 
+      L" --enable-gpu-rasterization"                    
+      L" --enable-zero-copy"                            
+      L" --enable-features=CanvasOopRasterization"      
+      L" --ignore-gpu-blocklist";                       
   std::wstring extra = getenvW("GB_WV2_ARGS_EXTRA");
   if (!extra.empty()) { a += L" "; a += extra; }
   return a;
 }
 
-// Minimal ICoreWebView2EnvironmentOptions implementation (only to carry AdditionalBrowserArguments).
 class EnvOptions : public ICoreWebView2EnvironmentOptions {
  public:
   explicit EnvOptions(std::wstring args) : m_args(std::move(args)) {}
@@ -4506,7 +4579,6 @@ class EnvOptions : public ICoreWebView2EnvironmentOptions {
   std::wstring m_args;
 };
 
-// Applied to every WebView2: unified hardening - strip built-in UI/interactions, keep a deterministic scale.
 static void HardenWebviewSettings(ICoreWebView2* wv, const char* tag) {
   if (!wv) return;
   ICoreWebView2Settings* st = nullptr;
@@ -4545,8 +4617,9 @@ class EnvHandler : public Cb<ICoreWebView2CreateCoreWebView2EnvironmentCompleted
       char hrbuf[24] = {0};
       sprintf_s(hrbuf, "0x%08X", (unsigned)hr);
       LogMsg(std::string("[wv2] environment creation failed - is WebView2 Runtime installed? hr=") + hrbuf);
-// No WebView2 runtime installed (trimmed Win10 / LTSC): show a clear bilingual message with a one-click
-// official download link instead of a dead blank window (same URL as the installer script).
+
+      
+
       static const wchar_t* kUrl = L"https://go.microsoft.com/fwlink/p/?LinkId=2124703";
       std::wstring msg =
           L"本软件需要「Microsoft Edge WebView2 运行时」。\n"
@@ -4566,7 +4639,7 @@ class EnvHandler : public Cb<ICoreWebView2CreateCoreWebView2EnvironmentCompleted
     g_env = env;
     env->AddRef();
     LogBoot("wv2 env ready");
-// Log the actually running WebView2 runtime version - the renderer must be verifiable, not guessed.
+
     {
       LPWSTR bv = nullptr;
       if (SUCCEEDED(env->get_BrowserVersionString(&bv)) && bv) {
@@ -4639,7 +4712,7 @@ static void SaveUiPrefs(const std::string& s) {
 // which Chromium commits lazily (~5s) while the app terminates the WebView2 child on exit,
 // so the write was lost (observed: set 5 -> restart read back 3). engineConfig reaches the
 // host synchronously, so writing here bypasses that async commit entirely.
-// Persist point for the link recognition-params overlay (single source of truth). Same rationale as
+
 // EnginePrefFile: the host gets the message synchronously, so writing here beats the page's
 // lazily-committed localStorage. Format: `interval|gray|blackOff|whiteOff|blackPct|whitePct`.
 static std::wstring LinkRecogPrefFile() {
@@ -4651,7 +4724,7 @@ static std::wstring LinkRecogPrefFile() {
 static void ClampLinkRecog(int& interval, int& gray, int& blackOff, int& whiteOff,
                            int& blackPct, int& whitePct) {
   auto clamp = [](int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); };
-  interval = clamp(interval, 40, 2000);   // sync interval (ms): floor 40 to avoid busy-looping
+  interval = clamp(interval, 40, 2000);   
   gray     = clamp(gray, 0, 255);
   blackOff = clamp(blackOff, 0, 255);
   whiteOff = clamp(whiteOff, 0, 255);
@@ -4701,11 +4774,6 @@ static void SaveLinkRecogPrefs() {
   fclose(f);
 }
 
-//   [{"name":"…","recog":{"interval":..,…},"ts":1690000000000}, …]）。
-// Page localStorage commits late (WebView2 children are killed at exit, writes get lost), so the host
-// keeps the single authoritative copy: the page sends the whole slots JSON (linkRecogSlots) on
-// save/delete/undo, the host writes it verbatim and feeds it back when the link page reports ready.
-// The host does NOT parse the payload (array + size sanity only); JSON escaping guarantees the round trip.
 static std::wstring LinkRecogSlotsFile() {
   wchar_t tmp[MAX_PATH] = {0};
   GetTempPathW(MAX_PATH, tmp);
@@ -4721,7 +4789,7 @@ static std::string ReadLinkRecogSlots() {
   while ((n = fread(buf, 1, sizeof(buf), f)) > 0) out.append(buf, n);
   fclose(f);
   size_t p = out.find_first_not_of(" \r\n\t");
-  if (p == std::string::npos || out[p] != '[') return std::string("[]");   // corrupted or hand-edited to something else
+  if (p == std::string::npos || out[p] != '[') return std::string("[]");   
   return out;
 }
 
@@ -4741,6 +4809,12 @@ static void ApplyDarkTitleBar(HWND h, bool dark) {
   }
 }
 
+static void DisableDwmTransitions(HWND h) {
+  if (!h || !IsWindow(h)) return;
+  BOOL on = TRUE;
+  DwmSetWindowAttribute(h, DWMWA_TRANSITIONS_FORCEDISABLED, &on, sizeof(on));
+}
+
 static void SetWebviewBg(ICoreWebView2Controller* ctl, COLORREF c) {
   if (!ctl) return;
   ICoreWebView2Controller2* c2 = nullptr;
@@ -4750,10 +4824,34 @@ static void SetWebviewBg(ICoreWebView2Controller* ctl, COLORREF c) {
   c2->Release();
 }
 
+static void SetWebviewBgTransparent(ICoreWebView2Controller* ctl) {
+  if (!ctl) return;
+  ICoreWebView2Controller2* c2 = nullptr;
+  if (FAILED(ctl->QueryInterface(__uuidof(ICoreWebView2Controller2), (void**)&c2)) || !c2) return;
+  COREWEBVIEW2_COLOR col = { 0, 0, 0, 0 };
+  c2->put_DefaultBackgroundColor(col);
+  c2->Release();
+}
+
+static bool GbPageSplashMode() {
+  char b[8] = {0};
+  return GetEnvironmentVariableA("GB_SPLASH_PAGE", b, sizeof(b)) && b[0] == '1';
+}
+
 static void RevealMainPage() {
+  if (g_mainPageShown) return;                    
   g_mainPageShown = true;
+  if (g_hwnd && IsWindow(g_hwnd)) {
+    KillTimer(g_hwnd, kMainTimerRevealSettle);
+    KillTimer(g_hwnd, kMainTimerRevealFallback);
+  }
+
+  HideSplashLayer();
   if (g_controller) g_controller->put_IsVisible(TRUE);
   if (g_hwnd && IsWindow(g_hwnd)) InvalidateRect(g_hwnd, nullptr, TRUE);
+
+  if (!g_splashLayer && g_hwnd && IsWindow(g_hwnd))
+    SetTimer(g_hwnd, kMainTimerPrewarmAll, kMainPrewarmDelayMs, nullptr);
 }
 
 static const wchar_t* kBrandName = L"Meter Gomoku";   
@@ -4831,6 +4929,101 @@ static void PaintSplash(HWND h, bool pageShown, const wchar_t* brand) {
     DeleteObject(f);
   }
   EndPaint(h, &ps);
+}
+
+static LRESULT CALLBACK SplashLayerProc(HWND h, UINT m, WPARAM w, LPARAM l) {
+  switch (m) {
+    case WM_CREATE:
+      DisableDwmTransitions(h);                   
+      return 0;
+    case WM_ERASEBKGND:
+      return 1;                                  
+    case WM_PAINT:
+      PaintSplash(h, false, kBrandName);          
+      return 0;
+    case WM_NCHITTEST:
+      return HTTRANSPARENT;                       
+    case WM_MOUSEACTIVATE:
+      return MA_NOACTIVATE;
+    case WM_GETDLGCODE:
+      return DLGC_STATIC;
+    default:
+      break;
+  }
+  return DefWindowProcW(h, m, w, l);
+}
+
+static void SplashLayerPlace() {
+  if (!g_splashLayer || !IsWindow(g_splashLayer) || !g_hwnd || !IsWindow(g_hwnd)) return;
+  RECT cr;
+  GetClientRect(g_hwnd, &cr);
+  if (cr.right <= 0 || cr.bottom <= 0) return;
+  POINT pt = { cr.left, cr.top };
+  ClientToScreen(g_hwnd, &pt);
+  
+  SetWindowPos(g_splashLayer, g_hwnd, pt.x, pt.y, cr.right - cr.left, cr.bottom - cr.top,
+               SWP_NOACTIVATE | SWP_SHOWWINDOW);
+}
+
+static void ShowSplashLayer() {
+  if (!g_hwnd || !IsWindow(g_hwnd)) return;
+  RECT rc;
+  GetClientRect(g_hwnd, &rc);
+  if (rc.right <= 0 || rc.bottom <= 0) return;
+  if (g_splashLayer && IsWindow(g_splashLayer)) {
+    SplashLayerPlace();
+    InvalidateRect(g_splashLayer, nullptr, FALSE);
+    return;
+  }
+  static bool s_reg = false;
+  if (!s_reg) {
+    WNDCLASSEXW sc = {};
+    sc.cbSize = sizeof(sc);
+    sc.lpfnWndProc = SplashLayerProc;
+    sc.hInstance = g_hInst;
+    sc.lpszClassName = L"GbSplashLayer";
+    sc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    sc.hbrBackground = nullptr;
+    if (RegisterClassExW(&sc)) s_reg = true;
+  }
+  POINT pt = { 0, 0 };
+  ClientToScreen(g_hwnd, &pt);
+
+  
+  g_splashLayer = CreateWindowExW(WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
+                                  L"GbSplashLayer", L"",
+                                  WS_POPUP | WS_VISIBLE,
+                                  pt.x, pt.y, rc.right, rc.bottom,
+                                  g_hwnd, nullptr, g_hInst, nullptr);
+  if (!g_splashLayer) { LogMsg("[ui] splash layer create failed"); return; }
+  g_splashAlpha = 255;
+  SetLayeredWindowAttributes(g_splashLayer, 0, (BYTE)g_splashAlpha, LWA_ALPHA);
+  SplashLayerPlace();
+  UpdateWindow(g_splashLayer);                     
+  
+  if (g_hwnd && IsWindow(g_hwnd))
+    SetTimer(g_hwnd, kMainTimerSplashTop, kMainSplashTopIntervalMs, nullptr);
+  LogMsg("[ui] splash layer on (top-level popup above the webview)");
+}
+
+static void HideSplashLayer() {
+  if (g_hwnd && IsWindow(g_hwnd)) KillTimer(g_hwnd, kMainTimerSplashTop);
+  if (!g_splashLayer || !IsWindow(g_splashLayer)) { g_splashLayer = nullptr; return; }
+  if (g_splashAlpha >= 255) g_splashAlpha = 255;
+  if (g_hwnd && IsWindow(g_hwnd))
+    SetTimer(g_hwnd, kMainTimerSplashFade, kMainSplashFadeStepMs, nullptr);
+  LogMsg("[ui] splash layer fading out");
+}
+
+static void FinishSplashLayer() {
+  if (g_hwnd && IsWindow(g_hwnd)) KillTimer(g_hwnd, kMainTimerSplashFade);
+  if (g_splashLayer && IsWindow(g_splashLayer)) DestroyWindow(g_splashLayer);
+  g_splashLayer = nullptr;
+  g_splashAlpha = 255;
+  LogMsg("[ui] splash layer off");
+
+  if (g_hwnd && IsWindow(g_hwnd))
+    SetTimer(g_hwnd, kMainTimerPrewarmAll, kMainPrewarmDelayMs, nullptr);
 }
 
 static const wchar_t* kRvCls = L"GbCalcReview";
@@ -5095,6 +5288,8 @@ static void CreateReviewWindow() {
   g_rvCreating = true;
   g_rvShown = false;
   g_rvPageReady = false;
+  
+  DisableDwmTransitions(g_rvHwnd);
   LogMsg("[rv] review window created (independent top-level window)");
   LogMsg("[rv] window kept hidden until the page reports ready (no black flash)");
   g_env->CreateCoreWebView2Controller(g_rvHwnd, new RvCtlHandler());
@@ -5268,8 +5463,7 @@ class VisMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
         PostToVisPage(p);
       }
       ShowVisWindow();
-// Feed host-persisted vision recognition params back to the vision page (page localStorage is
-// unreliable; the host is the single authority - same policy as the link window).
+
       PostToVisPage("{\"type\":\"visRecog\",\"recog\":" + VisRecogJson() + "}");
       return S_OK;
     }
@@ -5278,10 +5472,9 @@ class VisMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       PostMessageW(g_hwnd, kMsgVisShot, 0, 0);
       return S_OK;
     }
+
     
-// Every vision-param change posts one message: the host stores + persists it (single authority) and
-// the next auto-lock tick sends the new thresholds to the vision service. Keep this branch BEFORE
-// "visRecognize" - the two streams never contain each other, the order is just belt-and-braces.
+
     if (s.find("\"visRecogPreview\"") != std::string::npos) {
       int gr = JsonIntAfter(s, "\"gray_offset\":");    if (gr < 0) gr = g_visRcGray.load();
       int bo = JsonIntAfter(s, "\"black_offset\":");   if (bo < 0) bo = g_visRcBlackOff.load();
@@ -5418,6 +5611,7 @@ static void CreateVisWindow() {
   g_visCreating = true;
   g_visShown = false;
   g_visPageReady = false;
+  DisableDwmTransitions(g_visHwnd);
   LogMsg("[vis] vision window created (independent top-level window)");
   LogMsg("[vis] window kept hidden until the page reports ready (no black flash)");
   g_env->CreateCoreWebView2Controller(g_visHwnd, new VisCtlHandler());
@@ -5452,7 +5646,6 @@ static bool g_linkCreating = false, g_linkShown = false, g_linkPageReady = false
 
 static std::atomic<bool> g_linkAuto(false);         
 static std::atomic<int>  g_linkClicks(1);           
-static RECT g_mainRectBeforeLink = {0, 0, 0, 0};    
 
 static std::wstring LinkWinPosFile() {
   wchar_t tmp[MAX_PATH] = { 0 };
@@ -5506,29 +5699,6 @@ static void SetLinkBackground(const std::string& hex) {
     c2->put_DefaultBackgroundColor(col);
   }
   c2->Release();
-}
-
-static void ApplyMainLinkAspect(bool on) {
-  if (!g_hwnd || !IsWindow(g_hwnd)) return;
-  if (on) {
-    if (g_mainRectBeforeLink.right > g_mainRectBeforeLink.left) return;   
-    GetWindowRect(g_hwnd, &g_mainRectBeforeLink);
-    LONG hgt = g_mainRectBeforeLink.bottom - g_mainRectBeforeLink.top;
-    LONG wid = (LONG)((double)hgt * 1.16 + 0.5);
-    RECT work = { 0, 0, 0, 0 };
-    SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
-    if (wid > work.right - work.left) wid = work.right - work.left;
-    SetWindowPos(g_hwnd, nullptr, g_mainRectBeforeLink.left, g_mainRectBeforeLink.top,
-                 wid, hgt, SWP_NOZORDER);
-    LogMsg("[link] main window -> 1.16:1 (w=" + std::to_string(wid) + " h=" + std::to_string(hgt) + ")");
-  } else if (g_mainRectBeforeLink.right > g_mainRectBeforeLink.left) {
-    SetWindowPos(g_hwnd, nullptr,
-                 g_mainRectBeforeLink.left, g_mainRectBeforeLink.top,
-                 g_mainRectBeforeLink.right - g_mainRectBeforeLink.left,
-                 g_mainRectBeforeLink.bottom - g_mainRectBeforeLink.top, SWP_NOZORDER);
-    LogMsg("[link] main window restored");
-    g_mainRectBeforeLink = { 0, 0, 0, 0 };
-  }
 }
 
 static HWND g_fsWnd = nullptr;                 
@@ -6237,6 +6407,9 @@ static void LselApplyRegion(HWND h) {
   GetWindowRect(h, &wr);
   int top = wr.top + LSEL_TITLE_H;
   if (wr.right - wr.left < 120 || wr.bottom - top < 120) return;
+
+  
+  
   {
     int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
     if ((wr.right - wr.left) < sw / 3 || (wr.bottom - top) < sh / 3) {
@@ -6504,8 +6677,7 @@ static void StartLinkFrame() {
     y = wa.top + (wa.bottom - wa.top - h) / 2;
   }
   LselOpenAt(x, y, w, h);
-// Re-framing with auto mode on: run a full-screen board search first so the frame tightens onto the
-// board instead of scanning the previous stale region.
+
   if (g_lselAuto) {
     LselSetAutoScanRegion();
     StartLinkScanLoop();
@@ -6632,9 +6804,10 @@ static void LinkScanTick() {
     }
   }
   if (!excl.empty()) body += ",\"exclude\":[" + excl + "]";
-// Final policy: locating = self-made (findBoardRects + refineGrid); stone reading = the sync algorithm
-// (readStonesSync/syncCellInfo). So algo=sync + the 6 params go down, and vision ScanDirect() uses
-// sync only for the black/white cell decision (useSync != nullptr).
+
+  
+
+  
   {
     char sb[256];
     snprintf(sb, sizeof(sb),
@@ -6674,9 +6847,9 @@ static void LinkScanTick() {
     if (pB != std::string::npos) blkS = resp.substr(pB, 80);
     size_t pW = resp.find("\"white\"");
     if (pW != std::string::npos) whtS = resp.substr(pW, 80);
-// reader= tells which stone-reading algorithm ran: the vision sync branch writes diag.sync=true, the
-// self-made reader does not. read/cells/hit are the change-recognition metrics (frame fingerprint +
-// per-cell signature cache): hit=1 -> nothing recalculated; cells = read/reused; read = ms.
+
+    
+    
     const char* reader = (resp.find("\"sync\": true") != std::string::npos ||
                           resp.find("\"sync\":true") != std::string::npos) ? "sync" : "adaptive";
     int rMs = JsonIntAfter(resp, "sync_read_ms");
@@ -6992,7 +7165,7 @@ static void StartLinkScanLoop() {
         else if (!g_lselAuto &&
                  (g_scanRegion.right > g_scanRegion.left &&
                   g_scanRegion.bottom > g_scanRegion.top))
-          period = g_syncInterval.load();   // the non-locked scan period is owned by the recognition-params "sync interval" (locked branch still 50ms)
+          period = g_syncInterval.load();   
         
         else if (g_linkMissStreak.load() >= 3) period = 1000;
         
@@ -7268,7 +7441,6 @@ static LRESULT CALLBACK LinkWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       SaveLinkWinPos();
       LselClose();                              
       if (g_linkSession.exchange(false)) {
-        ApplyMainLinkAspect(false);             
         PostToPageSoon("{\"type\":\"linkOn\",\"on\":false}");
         
         PostToPageSoon("{\"type\":\"linkClosed\"}");
@@ -7318,11 +7490,11 @@ class LinkMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       if (SUCCEEDED(e->TryGetWebMessageAsString(&raw2)) && raw2) {
         std::string t = WideToUtf8(raw2);
         CoTaskMemFree(raw2);
-// WebView2 TryGetWebMessageAsString only succeeds for messages sent AS A STRING (the page must
-// postMessage(JSON.stringify(o))). A direct postMessage({...}) yields an empty string here => the
-// whole branch is skipped and the message is silently dropped (bridgeDiag died exactly this way).
+
+        
+        
         //   LINK_ACK_TIMEOUT / LINK_ENG_STATUS / LINK_BOOT_GUARD / LINK_TT_RESET /
-// Fallback: when t is empty, read the message as JSON (s) instead.
+
         if (t.empty() && !s.empty() && s[0] == '{') t = s;
         if (!t.empty() && t[0] == '{') {
           
@@ -7341,8 +7513,7 @@ class LinkMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
             }
             return S_OK;
           }
-          
-// Engine channel: ask/stop/caps/config go to the host engine layer as-is (it pushes ack/tick back).
+
           if (t.find("\"engine\"") != std::string::npos && t.find("\"op\":") != std::string::npos) {
             std::string op = JsonStrAfter(t, "\"op\":");
             int id = JsonIntAfter(t, "\"id\":");
@@ -7454,8 +7625,9 @@ class LinkMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
         g_linkPending.clear();
         PostToLinkPage(p);
       }
-// Feed host-persisted recognition params back to the link overlay (page localStorage unreliable).
+      
       PostToLinkPage("{\"type\":\"linkRecog\",\"recog\":" + LinkRecogJson() + "}");
+
       PostToLinkPage("{\"type\":\"linkRecogSlots\",\"json\":" + JsonQuote(ReadLinkRecogSlots()) + "}");
       LogMsg("[link] recog slots backfilled: " + std::to_string(ReadLinkRecogSlots().size()) + " bytes");
       ShowLinkWindow();
@@ -7466,12 +7638,14 @@ class LinkMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       PostMessageW(g_hwnd, kMsgLinkSelect, 0, 0);
       return S_OK;
     }
+
     
-// Recognition params: in-place editing with live effect. linkRecogPreview: every slider/number change
-// posts one message - the host stores AND persists it (disk == what is on screen; survives exit), then
-// wakes the scan loop so the next tick reads stones with the new thresholds. linkRecogCancel: the page
-// re-sends the snapshot taken at open time (cancel = last applied). linkRecogCfg (apply): write to
-// disk (single authority) + feed back to the page.
+
+    
+
+    
+
+    
     auto lkApplyRecog = [](const std::string& js, bool persist) {
       int iv = JsonIntAfter(js, "\"interval\":");        if (iv < 0) iv = g_syncInterval.load();
       int gr = JsonIntAfter(js, "\"gray_offset\":");     if (gr < 0) gr = g_syncGray.load();
@@ -7487,14 +7661,14 @@ class LinkMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       g_syncBlackPct.store(bp);
       g_syncWhitePct.store(wp);
       if (persist) SaveLinkRecogPrefs();
-      g_linkRescanSoon.store(true);   // rescan immediately with the new thresholds (locked state ticks at 50ms)
-      g_linkFastLeft.store(3);   // the next few ticks also run at the fast cadence for a visible live effect
+      g_linkRescanSoon.store(true);      
+      g_linkFastLeft.store(3);           
     };
 
-// Save/load slots: the page sends the WHOLE slots JSON -> written verbatim ({"type":"linkRecogSlots",
-// "json":"[...]"}); JsonStrAfter un-escaping is the exact inverse of JSON.stringify escaping, so names
-// with quotes/backslashes survive the round trip. The host only checks array + size. This branch MUST
-// come before the other linkRecog* ones: a slot named "linkRecogCfg" would otherwise hit the apply branch.
+    
+
+    
+
     if (s.find("\"linkRecogSlots\"") != std::string::npos) {
       std::string blob = JsonStrAfter(s, "\"json\":");
       size_t bp = blob.find_first_not_of(" \r\n\t");
@@ -7508,18 +7682,17 @@ class LinkMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
     }
 
     if (s.find("\"linkRecogPreview\"") != std::string::npos) {
-      lkApplyRecog(s, true);   // the preview is persisted too (see the comment above)
+      lkApplyRecog(s, true);            
       LogMsg("[link] recog live: " + LinkRecogJson());
       return S_OK;
     }
 
     if (s.find("\"linkRecogCancel\"") != std::string::npos) {
-      lkApplyRecog(s, true);   // the restored snapshot is persisted as well
+      lkApplyRecog(s, true);            
       LogMsg("[link] recog reverted to: " + LinkRecogJson());
       return S_OK;
     }
 
-// Link recognition-params "apply" -> host persists (single authority) + feeds back to the page.
     if (s.find("\"linkRecogCfg\"") != std::string::npos) {
       lkApplyRecog(s, true);
       PostToLinkPage("{\"type\":\"linkRecog\",\"recog\":" + LinkRecogJson() + "}");
@@ -7653,9 +7826,9 @@ static void CreateLinkWindow() {
   int cw = 0, ch = 0;
   RECT work = { 0, 0, 0, 0 };
   SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+
   
-// Restored to the original 304x712; the params view shows only the param area + board below
-// (buttons/stats/status collapsed), so the original height is enough.
+  
   const int kLinkCssW = 304, kLinkCssH = 712;
   if (g_hwnd) {
     
@@ -7699,6 +7872,7 @@ static void CreateLinkWindow() {
   }
   g_linkCreating = true;
   g_linkShown = false;
+  DisableDwmTransitions(g_linkHwnd);
   g_linkPageReady = false;
   LogMsg("[link] link window created (no maximize, bounded resize)");
 #ifndef WDA_EXCLUDEFROMCAPTURE
@@ -7714,11 +7888,9 @@ static void OpenLinkWindow() {
   eng::Init();
   bool firstOpen = !g_linkSession.exchange(true);
   if (firstOpen) {
-    ApplyMainLinkAspect(true);                 
     PostToPageSoon("{\"type\":\"linkOn\",\"on\":true}");
   }
-  
-  
+
   g_scanRegion.left = g_scanRegion.top = g_scanRegion.right = g_scanRegion.bottom = 0;
   g_lselGrown = false;
   g_lastBoardKey = GB_LINK_NO_BOARD_KEY;
@@ -7854,7 +8026,10 @@ static LRESULT CALLBACK SetWndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       }
       break;                     // DefWindowProc performs the actual minimize
     case WM_CLOSE:
-      DestroyWindow(h);
+
+      
+      ShowWindow(h, SW_HIDE);
+      LogMsg("[set] hidden (prewarmed resources kept for instant reopen)");
       return 0;
     case WM_DESTROY:
       if (g_setController) { g_setController->Release(); g_setController = nullptr; }
@@ -7881,11 +8056,18 @@ class SetMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
     if (s.find("\"ready\"") != std::string::npos) {
       g_setPageReady = true;
       RevealSetPage();
+
+      ScheduleRvPrewarm(kBootRvPrewarmDelayMs);
+      LogMsg("[set] page ready - review prewarm queued");
       // engine handshake for the settings page too: the threads/hash selects need the
       // real option lists (threadsMax / RAM-aware hash cap)
       if (g_setWebview) {
         g_setWebview->PostWebMessageAsJson(Utf8ToWide(HostHandshakeJson()).c_str());
         g_setWebview->PostWebMessageAsJson(Utf8ToWide(SysInfoJson()).c_str());
+        if (!g_mainPatch.empty()) {
+          g_setWebview->PostWebMessageAsJson(
+              Utf8ToWide("{\"type\":\"mainSync\",\"patch\":" + g_mainPatch + "}").c_str());
+        }
       }
       return S_OK;
     }
@@ -7941,7 +8123,8 @@ class SetCtlHandler : public Cb<ICoreWebView2CreateCoreWebView2ControllerComplet
     g_setWebview->add_WebMessageReceived(new SetMsgHandler(), &tok);
     g_setWebview->Navigate(UiBaseUrl("set").c_str());
     SetWebviewBg(ctl, g_uiBg);
-    ctl->put_IsVisible(TRUE);
+
+    ctl->put_IsVisible(FALSE);
     LayoutSetWebView();
     // the client rect can still be empty this early: force one deferred layout pass
     PostMessageW(g_setHwnd, WM_SIZE, 0, 0);
@@ -7979,6 +8162,10 @@ static void CreateSetWindow() {
   g_setCreating = true;
   g_setPageReady = false;
   ApplyDarkTitleBar(g_setHwnd, g_uiDark);
+
+  
+  
+  DisableDwmTransitions(g_setHwnd);
   LogMsg("[set] window created " + std::to_string(d.right - d.left) + "x" +
          std::to_string(d.bottom - d.top));
   g_env->CreateCoreWebView2Controller(g_setHwnd, new SetCtlHandler());
@@ -7990,9 +8177,12 @@ static void OpenSetWindow() {
   }
   if (g_setHwnd) {
     if (IsIconic(g_setHwnd)) ShowWindow(g_setHwnd, SW_RESTORE);
+    
+    if (g_setPageReady) RevealSetPage();
     ShowWindow(g_setHwnd, SW_SHOWNORMAL);
     SetForegroundWindow(g_setHwnd);
     LayoutSetWebView();
+    InvalidateRect(g_setHwnd, nullptr, FALSE);
     return;
   }
   if (g_setCreating || !g_env) {
@@ -8005,6 +8195,18 @@ static void OpenSetWindow() {
     SetForegroundWindow(g_setHwnd);
   }
 }
+
+static void StartBootPrewarm() {
+  if (g_bootPrewarmStarted) return;
+  g_bootPrewarmStarted = true;
+  CreateSetWindow();
+  if (!g_setHwnd && g_hwnd && IsWindow(g_hwnd))
+    SetTimer(g_hwnd, kMainTimerPrewarmSet, 1500, nullptr);    
+
+  ScheduleRvPrewarm(6000);
+  LogMsg("[ui] boot prewarm started (settings page first, review after it)");
+}
+
 static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
   switch (m) {
     case kMsgPrewarmRv:                        
@@ -8029,9 +8231,16 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       return 0;
     case WM_SIZE:
       LayoutWebView();
+      
+      SplashLayerPlace();
       return 0;
+    case WM_ACTIVATE:
+      
+      if (LOWORD(w) != WA_INACTIVE) SplashLayerPlace();
+      break;
     case WM_MOVE:
-      // the settings window is independent: it never follows the main window
+      
+      SplashLayerPlace();
       return 0;
     case kMsgFlushOutbox:
       
@@ -8049,10 +8258,50 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       return 0;
     case WM_TIMER:
       
+      if (w == kMainTimerSplashTop) {
+        
+        if (!g_mainPageShown && g_splashLayer && IsWindow(g_splashLayer))
+          SplashLayerPlace();
+        else
+          KillTimer(h, kMainTimerSplashTop);
+        return 0;
+      }
+      if (w == kMainTimerRevealFallback) {
+        KillTimer(h, kMainTimerRevealFallback);
+        if (!g_mainPageShown) {
+          LogMsg("[ui] painted signal missing -> reveal on fallback");
+          RevealMainPage();
+        }
+        return 0;
+      }
+      if (w == kMainTimerSplashFade) {
+        
+        if (!g_splashLayer || !IsWindow(g_splashLayer)) {
+          KillTimer(h, kMainTimerSplashFade);
+          g_splashLayer = nullptr;
+          return 0;
+        }
+        g_splashAlpha -= kMainSplashFadeStep;
+        if (g_splashAlpha <= 0) { FinishSplashLayer(); return 0; }
+        SetLayeredWindowAttributes(g_splashLayer, 0, (BYTE)g_splashAlpha, LWA_ALPHA);
+        return 0;
+      }
+      if (w == kMainTimerRevealSettle) {
+        
+        KillTimer(h, kMainTimerRevealSettle);
+        if (!g_mainPageShown) RevealMainPage();
+        return 0;
+      }
+      if (w == kMainTimerPrewarmAll) {
+
+        KillTimer(h, kMainTimerPrewarmAll);
+        StartBootPrewarm();
+        return 0;
+      }
       if (w == kMainTimerReload) {
         KillTimer(h, kMainTimerReload);
         if (g_mainPageShown) return 0;
-// Forensics before self-healing: log whether the renderer process is actually alive on every silence.
+
         if (g_webview) g_webview->ExecuteScript(Utf8ToWide(kSilentProbeJs).c_str(), new MainProbeHandler());
         if (g_mainReloads < 2 && g_webview) {
           g_mainReloads++;
@@ -8062,8 +8311,9 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
           SetTimer(h, kMainTimerReload, 8000, nullptr);
           return 0;
         }
-// Two re-navigations still silent => rebuild the WebView2 controller (a fresh renderer process): a
-// silent page can be completely dead (probe gets no reply) and re-navigation cannot fix that.
+
+        
+        
         if (g_mainCtrlRebuilds < 2 && g_env && g_hwnd) {
           g_mainCtrlRebuilds++;
           LogMsg("[ui] 页面始终无 ready ⇒ 重建 WebView2 控制器（换渲染进程）#" +
@@ -8156,7 +8406,6 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         return 0;
       }
 
-// Timers for the link E2E test hooks.
       if (w == kMainTimerTestLink) {
         KillTimer(h, kMainTimerTestLink);
         LogMsg("[test] GB_TEST_OPEN_LINK: opening link window");
@@ -8170,8 +8419,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
           SetTimer(h, kMainTimerTestLinkScan, 2000, nullptr);
           return 0;
         }
-// We play black + a synthetic 4B4W scan frame -> triggers the real analyze chain. setSide toggles:
-// a persisted side=0 would cancel on the first send - send twice so the final state is black.
+
         PostToLinkPageSoon("{\"type\":\"setSide\",\"v\":0}");
         PostToLinkPageSoon("{\"type\":\"setSide\",\"v\":0}");
         std::string fake =
@@ -8182,7 +8430,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
           "\"white\":[{\"x\":7,\"y\":8},{\"x\":8,\"y\":9},{\"x\":9,\"y\":7},{\"x\":10,\"y\":10}]}}";
         PostToLinkPageSoon(fake);
         LogMsg("[test] link fake scan posted (4B4W, side=black)");
-// Link-window persistence regression hook - card pinning/layout can only be verified here.
+        
         {
           char lev[2048] = {0};
           if (GetEnvironmentVariableA("GB_TEST_EVAL_LINK", lev, sizeof(lev)) && lev[0] && g_linkWebview) {
@@ -8190,13 +8438,15 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
             LogMsg("[test] GB_TEST_EVAL_LINK injected (" + std::to_string(strlen(lev)) + " chars)");
           }
         }
-// Regression probe (GB_TEST_LINK_PROBE=1): 1) after 6s post an empty-board frame (several frames to
-// pass STABLE_FRAMES/emptyStreak) -> expect LINK_TT_RESET reason=empty-board; 2) after 16s inject a
-// rule change into the MAIN page -> expect host relay + LINK_TT_RESET reason=rule-change.
+
+        
+
+        
         char pv2[8] = {0};
         if (GetEnvironmentVariableA("GB_TEST_LINK_PROBE", pv2, sizeof(pv2)) && pv2[0] == '1') {
-// Order fix: switch the rule while the board is still 4B4W (must re-evaluate under the new rule
-// immediately), THEN post the empty frame (TT reset) - empty-first made the switch a no-op.
+
+          
+          
           SetTimer(h, kMainTimerTestLinkProbe2, 6000, nullptr);
           SetTimer(h, kMainTimerTestLinkProbe, 16000, nullptr);
           LogMsg("[test] link probe armed (rule-sync @6s on non-empty board, empty-board @16s)");
@@ -8205,7 +8455,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         return 0;
       }
       if (w == kMainTimerTestLinkProbe) {
-// Empty frame posted 5x (400ms apart): the handleScan busy guard drops frames and emptyStreak needs >=2.
+
         static int s_emptyPost = 0;
         std::string empt =
           "{\"type\":\"scan\",\"data\":{\"ok\":true,\"found\":true,\"size\":15,"
@@ -8224,12 +8474,13 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       }
       if (w == kMainTimerTestLinkProbe2) {
         KillTimer(h, kMainTimerTestLinkProbe2);
-// The REAL path of a rule change is page -> host -> link page relay:
-        //   {type:'linkCfgSync',rule:N}（calc.js sel_rule.onchange → tellHost），
-// inject the change as a script so the page performs its real action (a real dropdown + postMessage).
+
+        
+
+        
         if (g_webview) {
-// Toggle to the OPPOSITE of the current rule - the probe persists the rule into gbcalc.rule.v1, so a
-// hard-coded rule=1 would be a no-op on the next run (bitten once).
+
+          
           const char* inj =
             "(function(){try{"
             "var e=document.getElementById('sel_rule');"
@@ -8249,7 +8500,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         return 0;
       }
       if (w == kMainTimerTestLinkCheck) {
-// Periodic probing (4s x 6) - covers fast candidate delivery (~1-2s) and the fallback paths.
+        
         static int s_linkCheckCount = 0;
         if (g_linkWebview) {
           g_linkWebview->ExecuteScript(Utf8ToWide(
@@ -8335,8 +8586,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   
   LogCpuSplitOnce();
-  EnsureJob();   // Job (KILL_ON_JOB_CLOSE): engine children are reaped when the host exits
-  eng::Init();   // probe variants + read back user thread/hash prefs (no spawn; the first ask starts lazily)
+  EnsureJob();   
+  eng::Init();   
                             
   std::string argPayload;
   {
@@ -8368,13 +8619,17 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     return 0;
   }
 
+  
+  
+  LoadUiPrefs();
+  static HBRUSH mainBgBrush = CreateSolidBrush(g_uiBg);
   WNDCLASSEXW wc = {};
   wc.cbSize = sizeof(wc);
   wc.lpfnWndProc = WndProc;
   wc.hInstance = hInst;
   wc.lpszClassName = kCls;
   wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-  wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+  wc.hbrBackground = mainBgBrush;
   wc.hIcon = LoadIconW(hInst, MAKEINTRESOURCEW(1));         
   wc.hIconSm = LoadIconW(hInst, MAKEINTRESOURCEW(1));
   RegisterClassExW(&wc);
@@ -8403,21 +8658,23 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
     if (w < mw) w = mw;
     if (h < mh) h = mh;
   }
-  
-  LoadUiPrefs();
-// Load persisted link recognition-params before the link page can be opened, so the overlay and the
+
   // scan loop start from the user's real choice.
   LoadLinkRecogPrefs();
-  LoadVisRecogPrefs();   // vision recognition-params: the host-persisted copy is read back at startup (single authority)
+  LoadVisRecogPrefs();      
   g_hwnd = CreateWindowExW(0, kCls, kTitle,
                            WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                            x, y, w, h, nullptr, nullptr, hInst, nullptr);
   if (!g_hwnd) { LogMsg("[boot] CreateWindowEx failed"); return 1; }
   ApplyDarkTitleBar(g_hwnd, g_uiDark);
+
+  DisableDwmTransitions(g_hwnd);
   ShowWindow(g_hwnd, maximized ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL);
   
   PrewarmVisionServiceAsync();
-  UpdateWindow(g_hwnd);          
+  UpdateWindow(g_hwnd);
+
+  if (!GbPageSplashMode()) ShowSplashLayer();
 #ifndef WDA_EXCLUDEFROMCAPTURE
 #define WDA_EXCLUDEFROMCAPTURE 0x11
 #endif
@@ -8436,9 +8693,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int) {
   std::wstring wv2udf = WebView2UserDataDir();
   
   ClearWebViewCache(wv2udf, "启动");
-// Do NOT pass nullptr (= Chromium desktop defaults, the most throttled set). Attach the no-throttle +
-// GPU-raster args; if the environment rejects them (driver/enterprise policy), fall back to the
-// default set automatically so the UI always comes up.
+
+  
   HRESULT hr = E_FAIL;
   {
     EnvOptions* opt = new EnvOptions(GbWv2BrowserArgs());

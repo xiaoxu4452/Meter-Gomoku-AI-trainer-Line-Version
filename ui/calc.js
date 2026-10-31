@@ -62,7 +62,7 @@ var I18N = {
     mdNone: '不限', mnNone: '不限',
     phNone: '不限',
     phDepth: '4 ~ 128 的整数，留空 = 不限',
-    phNodes: '0.1 ~ 256（单位 M），留空 = 不限',
+    phNodes: '0.1 ~ 4096（单位 M），留空 = 不限',
     coresHint: '本机 {n} 线程 · 上限 {m}',
     coach: '指导视图', coachHint: '方形四色热力：AI 帮你算最佳落点，落子即消失',
     heatBest: '最佳', heatGood: '良好', heatFair: '一般', heatPoor: '劣势',
@@ -80,6 +80,8 @@ var I18N = {
     turnAiBoth: 'AI 自打 · 轮到{c}',
     turnYouBoth: '轮到你 · {c}（双方都你下）',
     showNum: '显示序号', showNumHint: '棋子上标出第几手',
+    spCards: '窗口功能卡片展示',
+    dynTime: '动态时间', dynTimeHint: '难局最多 +15%，见杀局面只用 40%',
     bgThink: '后台思考', bgThinkHint: 'AI 落子后你在思考时，引擎在后台继续深算这一局面（算你的优势点 + 它的应对），你一落子它从热置换表接着算',
     bgThinkOffAi: 'AI 对打期间已自动关闭', bgThinkOffBusy: '有计算在跑，已自动暂停',
 
@@ -168,7 +170,7 @@ var I18N = {
       ]},
       { t: '七、规则与外观', ps: [
         '规则：无禁手 / 无禁手 · 长连不赢 / 连珠（有禁手，黑方三三、四四、长连禁手）；前瞻与算杀都跟随所选规则。',
-        '「EN / 中」一键切换全界面语言（含识图截图框的按键与历史日期格式）；「颜色」打开调色窗（棋盘 / 页面底色 + 深浅主题 + 预制色）；右栏卡片可拖动换位、点小横杠折叠，布局自动记忆。',
+        '「EN / 中」一键切换全界面语言（含识图截图框的按键与历史日期格式）；「主题」打开主题窗（20 套主题 + 自定义调色板）；右栏卡片可拖动换位、点小横杠折叠，布局自动记忆。',
       ]},
       { t: '八、连线功能（对战平台 / 外部棋局）', ps: [
         '打开与框选：顶部「连线」键打开连线窗 → 点「框选棋盘」在屏幕上拖出目标棋盘的范围 → 点窗栏的「识别」键。框由紫色变蓝绿色、四角出现 L 形角框与定位点 = 识别成功。识别全程静默在后台做（帧间像素差分：画面静止时零消耗，棋子一变才重新识别），框色不会来回闪。',
@@ -188,6 +190,13 @@ var I18N = {
     aboutVer: '版本', aboutFeat: '功能', aboutOss: '开源组件', aboutLic: '许可',
     aboutUpdates: '最近更新',
     aboutUpdateList: [
+      { v: '4.48', items: [
+        '棋子新增「玉石」材质（层状浅杂色 + 玻璃光泽），仿真棋子也有落盘微阴影；棋盘改为 2 倍超采样，棋子、序号、网格线全部变清',
+        '「对局」新增「动态时间」开关：简单局面少算、难局多算（最多 +15%），见杀局面只用 40%，省下的时间存进时间池供后续调用；关闭后严格按设定秒数思考',
+        '修复必胜 / 必败局面偶尔长时间无响应、进度一直停在深度 0 的问题（mate 后空迭代 24 次、START_DEPTH 跳层两条原因）',
+        '设置窗选项标题改为天蓝色（背景为天蓝时自动转为黑 / 白）；顶部三个卡片开关新增「窗口功能卡片展示」框',
+        '「字体 → 棋子」一行在「适中 / 较大」字号下不再挤出，按钮组刚好填满整行；棋子序号三档字号整体收小',
+      ]},
       { v: '4.47', items: [
         '设置窗成为独立主控窗：常驻置顶、固定比例（宽:高 = 1:1.618）随屏幕自适应、启动预热点开即现、最小化直接进任务栏并拥有独立任务栏入口；加载画面只显示 Gomoku Settings',
         '主窗与设置窗双向实时联动：在设置窗里改 AI 执子会立即让引擎行棋，线程 / 哈希 / 选点范围 / 分析点数 / 主题 / 语言全部即时同步到所有窗口；打开连线窗不再收纳主窗卡片、也不再写独立的连线存档 —— 连线里的 AI 参数初始一律听从主窗当前设置',
@@ -251,6 +260,22 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     setGrpUi: '界面', setGrpShow: '显示在主界面',
     setDescLang: '界面文字：中文 / English',
     setDescColor: '主题、棋子与背景配色',
+    setDescFont: '字体大小、界面 / 日志 / 棋子数字字体',
+    font: '字体', fontTtl: '字体设置', fontSize: '字体大小',
+    fontSmall: '较小', fontNormal: '合适', fontLarge: '较大', fontCur: '当前',
+    fontTabUi: '系统', fontTabLog: '提示', fontTabNum: '棋子',
+    fontOk: '确定', fontApplied: '已应用',
+    fontPickHint: '点击上方字体预览，选定后按「确定」应用',
+    fontNumS: '小', fontNumM: '中', fontNumL: '大',
+    fontWeight: '粗细', fontWLight: '细', fontWNormal: '常规', fontWMedium: '中等',
+    fontWBold: '加粗', fontWBlack: '特粗', fontItalic: '斜体',
+    fontStoneReal: '仿真', fontStoneJade: '玉石', fontStoneFlat: '扁平',
+    fontSampleUi: '对局设置 · 分析计算 · 评估 Meter Gomoku 0123456789',
+    fontSampleLog: '引擎：Rapfi · 深度 24 · 节点 4.5M · 用时 1.92s',
+    fontSampleNum: '1 2 3 4 5 6 7 8 9 10',
+    fontDefault: '系统默认',
+    placeEval: '评估', placeEvalStop: '停止评估',
+    placeEvalTip: '点击后持续评估当前局面，胜率与曲线实时更新到引擎仪表盘',
     setDescEngine: '深度、速度、节点、局面代码',
     setDescAnalysis: '分析计算、平衡点、扫描防守',
     setDescSetup: '模式、思考时间、规则、引擎参数',
@@ -326,9 +351,20 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     srcLocal: '本机', srcDesktop: '桌面', srcBookmark: '书签',
     theme: '深色', theme2: '浅色', themeCustom: '自定义',
 
-    color: '颜色', cpClose: '关闭', cpReset: '恢复默认',
+    color: '主题', cpClose: '关闭', cpReset: '恢复默认',
     cpTheme: '主题', cpTarget: '调色对象', cpBoard: '棋盘', cpPage: '背景',
     cpHex: 'RGB 代码', cpPreset: '预制色',
+    cpCustom: '自定义', cpBackThemes: '返回主题',
+    cpThLight: '浅色', cpThDark: '深色',
+    cpThPaper: '宣纸', cpThCeladon: '青瓷', cpThMist: '雾蓝', cpThBluegray: '蓝灰',
+    cpThDune: '沙丘', cpThTundra: '苔原', cpThDusk: '暮蓝', cpThWalnut: '炭棕',
+    cpThPine: '深青', cpThWine: '酒褐', cpThInk: '夜墨', cpThMauve: '夜紫',
+    cpThSlate: '石青', cpThNavy: '夜蓝', cpThSilver: '银灰', cpThGraphite: '石墨',
+    cpThDawn: '晨霞', cpThAurora: '极光',
+    cpThLatte: '奶咖', cpThBamboo: '竹青', cpThLotus: '藕荷', cpThLavender: '薰衣',
+    cpThApricot: '杏色', cpThJade: '青玉', cpThClay: '陶土', cpThFog: '雾灰',
+    cpThGlacier: '冰川', cpThWheat: '麦黄', cpThPlum: '梅子', cpThForest: '松林',
+    cpThIndigo: '靛蓝', cpThCocoa: '可可', cpThRosewood: '花梨', cpThOcean: '深海',
     cpHintB: '调的是棋盘底色；网格线、星位、坐标轴会自动跟着深浅变化',
     cpHintP: '调的是页面底色；卡片与文字会自动按明暗跟随',
     cpBad: '色值读不出来：要 #rrggbb，或 rgb(r,g,b)',
@@ -545,7 +581,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     mdNone: 'No limit', mnNone: 'No limit',
     phNone: 'No limit',
     phDepth: 'Integer 4 ~ 128, empty = no limit',
-    phNodes: '0.1 ~ 256 (in M), empty = no limit',
+    phNodes: '0.1 ~ 4096 (in M), empty = no limit',
     coresHint: '{n} threads on this PC · max {m}',
     coach: 'Coach view', coachHint: 'Square 4-colour heat: AI computes your best spots; clears on move',
     heatBest: 'Best', heatGood: 'Good', heatFair: 'Fair', heatPoor: 'Poor',
@@ -562,6 +598,8 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     turnAiBoth: 'AI vs AI · {c} to move',
     turnYouBoth: 'Your turn · {c} (both sides)',
     showNum: 'Move numbers', showNumHint: 'Mark each stone with its move number',
+    spCards: 'Window cards',
+    dynTime: 'Dynamic time', dynTimeHint: '+15% on hard moves, 40% on forced wins',
     bgThink: 'Background thinking', bgThinkHint: 'After the AI moves, the engine keeps deepening this position while you think (your threats + its replies), so your move hits a hot transposition table',
     bgThinkOffAi: 'auto-off while AI plays both sides', bgThinkOffBusy: 'paused while a calculation runs',
 
@@ -647,7 +685,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
       ]},
       { t: '7. Rules & appearance', ps: [
         'Rules: free-style (no forbidden), overline does not win, Renju (double-three / double-four / overline forbidden), Swap-1, Yamaguchi and Taraguchi-10; look-ahead and mates follow the chosen rule. Swap-style rules open a small popup to pick first or second.',
-        '"EN / 中" switches the whole UI (including the screenshot-box buttons and the date format in History); "Colour" opens the palette (board / page plus themes and presets); right-side cards can be dragged to reorder and folded with the dash, and the layout is remembered.',
+        '"EN / 中" switches the whole UI (including the screenshot-box buttons and the date format in History); "Themes" opens the theme page (20 themes plus a custom palette); right-side cards can be dragged to reorder and folded with the dash, and the layout is remembered.',
       ]},
       { t: '8. Link mode (play in another app)', ps: [
         'Open and select: press "Link" on the top bar to open the Link window, click "Select board" and drag a rectangle over the target board, then press "Recognize" on its title bar. The box turning teal with L-shaped corner brackets and anchors means success. Recognition runs silently in the background (inter-frame pixel diff: no work at all while the board is still, re-read only when something changes), so the frame colour never flickers.',
@@ -667,6 +705,13 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     aboutVer: 'Version', aboutFeat: 'Features', aboutOss: 'Open-source components', aboutLic: 'Licence',
     aboutUpdates: 'Recent updates',
     aboutUpdateList: [
+      { v: '4.48', items: [
+        'New "Jade" stone material (layered pale tints with a glass-like sheen); realistic stones also cast a soft contact shadow. The board renders at 2x supersampling, so stones, move counters and grid lines are visibly sharper',
+        'New "Dynamic time" switch under Game: trivial positions get less time, hard ones up to +15%, forced wins only 40% - the saved seconds go into a time bank for later moves. Turn it off to think exactly the configured number of seconds',
+        'Fixed forced-win / forced-loss positions that sometimes took very long while the depth display stayed at 0 (24 empty iterations after a mate, and START_DEPTH resuming above what the hash could support)',
+        'Option labels in the settings window are sky blue now (they fall back to black or white when the page colour is close to it); the three window-card switches gained a titled "Window cards" frame',
+        'The Font -> stones row no longer overflows at the Medium / Large font sizes - the button groups now fill the row exactly; move-counter sizes were reduced by one step',
+      ]},
       { v: '4.47', items: [
         'The settings window is now a standalone master panel: always on top, fixed 1:1.618 ratio that scales with the screen, pre-created at boot (opens instantly), minimizes straight into its own taskbar entry; the splash shows only Gomoku Settings',
         'Two-way live sync between the main and settings windows: switching AI sides there makes the engine move immediately; threads / hash / candidate range / analysis points / theme / language apply to every window at once. Opening a link session no longer reshapes the main window and no longer keeps its own settings archive - link AI parameters start from the main window\'s current settings',
@@ -729,6 +774,22 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     setGrpUi: 'Interface', setGrpShow: 'Shown on the main screen',
     setDescLang: 'Interface language: 中文 / English',
     setDescColor: 'Theme, stones and background',
+    setDescFont: 'Font size; UI, log and stone-number typefaces',
+    font: 'Font', fontTtl: 'Font settings', fontSize: 'Font size',
+    fontSmall: 'Small', fontNormal: 'Normal', fontLarge: 'Large', fontCur: 'current',
+    fontTabUi: 'System', fontTabLog: 'Hints', fontTabNum: 'Stones',
+    fontOk: 'OK', fontApplied: 'Applied',
+    fontPickHint: 'Pick a face above, then press OK',
+    fontNumS: 'S', fontNumM: 'M', fontNumL: 'L',
+    fontWeight: 'Weight', fontWLight: 'Light', fontWNormal: 'Regular', fontWMedium: 'Medium',
+    fontWBold: 'Bold', fontWBlack: 'Black', fontItalic: 'Italic',
+    fontStoneReal: 'Real', fontStoneJade: 'Jade', fontStoneFlat: 'Flat',
+    fontSampleUi: 'Setup · Live analysis · Eval  Meter Gomoku 0123456789',
+    fontSampleLog: 'Engine: Rapfi · depth 24 · nodes 4.5M · 1.92s',
+    fontSampleNum: '1 2 3 4 5 6 7 8 9 10',
+    fontDefault: 'System default',
+    placeEval: 'Evaluate', placeEvalStop: 'Stop evaluation',
+    placeEvalTip: 'Continuously evaluate this position; win rate and curve update in the engine dashboard',
     setDescEngine: 'Depth, speed, nodes, position code',
     setDescAnalysis: 'Live analysis, balance, scan defence',
     setDescSetup: 'Mode, think time, rules, engine knobs',
@@ -798,9 +859,20 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     rvNothing: 'Board is empty: place a few stones first, or pick a game in History',
     srcLocal: 'Local', srcDesktop: 'Desktop', srcBookmark: 'Bookmark',
     theme: 'Dark', theme2: 'Light', themeCustom: 'Custom',
-    color: 'Colours', cpClose: 'Close', cpReset: 'Reset',
+    color: 'Themes', cpClose: 'Close', cpReset: 'Reset',
     cpTheme: 'Theme', cpTarget: 'Apply to', cpBoard: 'Board', cpPage: 'Background',
     cpHex: 'RGB code', cpPreset: 'Presets',
+    cpCustom: 'Custom', cpBackThemes: 'Back to themes',
+    cpThLight: 'Light', cpThDark: 'Dark',
+    cpThPaper: 'Paper', cpThCeladon: 'Celadon', cpThMist: 'Mist', cpThBluegray: 'Blue Gray',
+    cpThDune: 'Dune', cpThTundra: 'Tundra', cpThDusk: 'Dusk', cpThWalnut: 'Walnut',
+    cpThPine: 'Pine', cpThWine: 'Wine', cpThInk: 'Ink', cpThMauve: 'Mauve',
+    cpThSlate: 'Slate', cpThNavy: 'Navy', cpThSilver: 'Silver', cpThGraphite: 'Graphite',
+    cpThDawn: 'Dawn', cpThAurora: 'Aurora',
+    cpThLatte: 'Latte', cpThBamboo: 'Bamboo', cpThLotus: 'Lotus', cpThLavender: 'Lavender',
+    cpThApricot: 'Apricot', cpThJade: 'Jade', cpThClay: 'Clay', cpThFog: 'Fog',
+    cpThGlacier: 'Glacier', cpThWheat: 'Wheat', cpThPlum: 'Plum', cpThForest: 'Forest',
+    cpThIndigo: 'Indigo', cpThCocoa: 'Cocoa', cpThRosewood: 'Rosewood', cpThOcean: 'Ocean',
     cpHintB: 'Tuning the board colour; grid, star points and axes follow automatically',
     cpHintP: 'Tuning the page background; cards and text follow the brightness',
     cpBad: 'Cannot read that colour: use #rrggbb or rgb(r,g,b)',
@@ -1014,6 +1086,7 @@ var S = {
   coach: false,
 
   bgThink: false,
+  dynTime: true,
 
   showNum: true,
 
@@ -1030,6 +1103,8 @@ var S = {
   nbest: 3,
 
   cards: null,
+
+  uiFont: null,
 };
 
 var G = {
@@ -1098,6 +1173,8 @@ function setMissBox() {
 }
 function resetGame(keepLoaded) {
   engMsgClear();
+  
+  try { LocalAI.markDirty(); } catch (eRG0) {}
   G.moves = []; G.board = newBoard(); G.curve = [];
   clearHeat();
   clearCoach();
@@ -1183,6 +1260,7 @@ function grab() {
    'heatLegend','t_heatBest','t_heatGood','t_heatFair','t_heatPoor',
    't_showNum','chk_num','t_showNumHint',
    't_bgThink','btn_bgThink','t_bgThinkHint',
+   't_dynTime','btn_dynTime','t_dynTimeHint',
    'btn_rv_num',
    't_preview','chk_preview','t_previewHint',
    'fwdBox','btn_fwd','btn_fwd_vcf','btn_fwd_vct','btn_fwd_ok','btn_fwd_prev','btn_fwd_next','fwdBody','fwdMsg','fwdSeq','fwdLg','fwdLgB','fwdLgW','btn_fwd_clear',
@@ -1196,12 +1274,13 @@ function grab() {
    'drawer','drList','drCount','dr_save','dr_open','dr_del','dr_close','dr_all',
    'dr_exp','dr_imp','ctxMenu','file_imp',
 
-   'btn_color','colorPop','t_color','cp_close','cp_theme','cp_target','cp_sv','cp_hue',
+   'btn_color','colorPop','t_color','cp_close','cp_target','cp_sv','cp_hue',
    'cp_r','cp_g','cp_b','cp_rn','cp_gn','cp_bn','cp_hex','cp_presets','cp_prev','cp_hint','cp_reset',
-   'cpPresetRow',
-   't_cpTheme','t_cpTarget','t_cpHex','t_cpPreset',
+   'cpPresetRow','cp_theme_presets',
+   'cpThemesView','cpCustomView','cp_custom','cp_custom_back','t_cpCustom',
+   't_cpTarget','t_cpHex','t_cpPreset',
    'btn_set','btn_settings','setPop','btn_aiside','aiSidePop','btn_ai_close',
-   'ai_side_b','ai_side_w','t_aiTurn','num_turn2','btn_live',
+   'ai_side_b','ai_side_w','t_aiTurn','num_turn2','btn_live','btn_place_eval',
    't_analysis','btn_an_calc','btn_an_bal','btn_an_baln','btn_an_defend',
    'num_nbest','t_nbest','t_nbestHint',
    't_history','t_saved','t_drTip'].forEach(function (id) {
@@ -1209,12 +1288,15 @@ function grab() {
   });
 }
 
+var BOARD_MIN_DPR = 2;
+function boardDpr() { return Math.max(BOARD_MIN_DPR, window.devicePixelRatio || 1); }
+
 function layoutBoard() {
   var box = els.boardWrap.getBoundingClientRect();
 
   var pad = 4;
   var side = Math.max(160, Math.min(box.width, box.height) - pad * 2);
-  var dpr = window.devicePixelRatio || 1;
+  var dpr = boardDpr();
   els.board.style.width = side + 'px';
   els.board.style.height = side + 'px';
   els.board.width = Math.round(side * dpr);
@@ -1228,7 +1310,7 @@ function css(name) {
 }
 
 function geom() {
-  var cv = els.board, dpr = window.devicePixelRatio || 1;
+  var cv = els.board, dpr = boardDpr();
   var size = cv.width / dpr;
   var axis = Math.max(14, size * 0.055);
   var pad = axis + Math.max(4, size * 0.012);
@@ -1240,7 +1322,16 @@ function numShown() { return RV_MODE ? !!S.rvNum : !!S.showNum; }
 
 // Move numbers: serif face (Source Han Serif / Noto Serif SC), centred by glyph box instead of
 // the em box - with a serif face the em middle sits visibly high inside the stone.
+
 var NUM_FONT = '"Source Han Serif SC","Noto Serif SC","Noto Serif CJK SC","思源宋体","SimSun",serif';
+var NUM_SCALE = 0.5;              // small .44 / normal .50 / large .58
+var NUM_WEIGHT = 700;             
+var NUM_ITALIC = false;
+var STONE_STYLE = 'flat';         
+function numFontStr(px, weight) {
+  var w = (weight === undefined || weight === null) ? NUM_WEIGHT : weight;
+  return (NUM_ITALIC ? 'italic ' : '') + w + ' ' + px + 'px ' + NUM_FONT;
+}
 function numGlyphDy(ctx, txt) {
   var m = ctx.measureText(txt);
   var a = m.actualBoundingBoxAscent, d = m.actualBoundingBoxDescent;
@@ -1313,6 +1404,253 @@ function cellAt(px, py) {
 }
 
 // ---- board rendering: grid, stones, marks, guidance ----
+
+var JADE_TEX = { r: -1, dpr: -1, blk: [], wht: [] };
+var JADE_SLOTS = 6;
+function jadeRand(seed) {
+  var t = seed >>> 0;
+  return function () {
+    t = (t + 0x6D2B79F5) >>> 0;
+    var x = t;
+    x = Math.imul(x ^ (x >>> 15), x | 1);
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function jadeTexBuild(r, dpr, c, seed) {
+  var rr = Math.max(4, r * dpr);
+  var side = Math.ceil(rr * 2) + 2;
+  var cv = document.createElement('canvas');
+  cv.width = side; cv.height = side;
+  var z = cv.getContext('2d');
+  var cx = side / 2, cy = side / 2;
+  z.save();
+  z.beginPath(); z.arc(cx, cy, rr, 0, Math.PI * 2); z.clip();
+  
+  var g = z.createRadialGradient(cx - rr * 0.32, cy - rr * 0.38, rr * 0.04, cx, cy, rr * 1.04);
+  if (c === 1) {            
+    g.addColorStop(0.00, '#3d4643');
+    g.addColorStop(0.14, '#2a312e');
+    g.addColorStop(0.48, '#171c1a');
+    g.addColorStop(0.84, '#0c100f');
+    g.addColorStop(1.00, '#050706');
+  } else {                  
+    g.addColorStop(0.00, '#fefcf6');
+    g.addColorStop(0.26, '#f8f4e7');
+    g.addColorStop(0.58, '#ece5d3');
+    g.addColorStop(0.84, '#d8d0b8');
+    g.addColorStop(1.00, '#c0b79c');
+  }
+  z.fillStyle = g; z.fillRect(0, 0, side, side);
+
+  var rnd = jadeRand(seed);
+  
+  var clouds = 2 + Math.floor(rnd() * 3);
+  for (var w = 0; w < clouds; w++) {
+    var wx = cx + (rnd() - 0.5) * rr * 1.3, wy = cy + (rnd() - 0.5) * rr * 1.3;
+    var wr = rr * (0.22 + rnd() * 0.45);
+    var cg = z.createRadialGradient(wx, wy, 0, wx, wy, wr);
+    var ca = c === 1 ? (0.055 + rnd() * 0.055) : (0.100 + rnd() * 0.075);
+    cg.addColorStop(0, (c === 1 ? 'rgba(206,222,212,' : 'rgba(232,224,200,') + ca.toFixed(3) + ')');
+    cg.addColorStop(1, 'rgba(255,255,255,0)');
+    z.fillStyle = cg; z.fillRect(0, 0, side, side);
+  }
+
+  
+  var layers = 4 + Math.floor(rnd() * 3);
+  for (var li = 0; li < layers; li++) {
+    var ly = cy + (rnd() - 0.5) * rr * 1.15;
+    var amp = rr * (0.02 + rnd() * 0.07) * (rnd() < 0.5 ? 1 : -1);
+    var thick = rr * (0.09 + rnd() * 0.15);
+    var tilt = (rnd() - 0.5) * 0.5;
+    var light = rnd() < 0.55;
+    
+    var la = (c === 1)
+      ? (light ? (0.020 + rnd() * 0.020) : (0.028 + rnd() * 0.024))
+      : (light ? (0.070 + rnd() * 0.055) : (0.300 + rnd() * 0.100));
+    z.save();
+    z.filter = 'blur(' + Math.max(0.8, rr * 0.075).toFixed(2) + 'px)';
+    z.beginPath();
+    z.moveTo(cx - rr * 1.35, ly);
+    z.bezierCurveTo(cx - rr * 0.45, ly - amp, cx + rr * 0.45, ly + amp, cx + rr * 1.35, ly + tilt * rr);
+    z.lineTo(cx + rr * 1.35, ly + tilt * rr + thick);
+    z.bezierCurveTo(cx + rr * 0.45, ly + amp + thick, cx - rr * 0.45, ly - amp + thick, cx - rr * 1.35, ly + thick);
+    z.closePath();
+    z.fillStyle = (c === 1)
+      ? (light ? 'rgba(126,144,134,' + la.toFixed(3) + ')' : 'rgba(0,0,0,' + (la * 1.2).toFixed(3) + ')')
+      : (light ? 'rgba(255,255,252,' + la.toFixed(3) + ')' : 'rgba(188,180,156,' + la.toFixed(3) + ')');
+    z.fill();
+    z.restore();
+  }
+
+  var dots = Math.round(rr * rr * 0.12);
+  for (var i = 0; i < dots; i++) {
+    var ang = rnd() * Math.PI * 2, rad = Math.sqrt(rnd()) * rr;
+    z.fillStyle = (rnd() < 0.5)
+      ? 'rgba(255,255,255,' + (0.010 + rnd() * 0.028).toFixed(3) + ')'
+      : 'rgba(0,0,0,' + (0.008 + rnd() * 0.020).toFixed(3) + ')';
+    z.fillRect(cx + Math.cos(ang) * rad, cy + Math.sin(ang) * rad, 1, 1);
+  }
+
+  
+  
+  z.save();
+  z.translate(cx - rr * 0.26, cy - rr * 0.40);
+  z.scale(1, 0.82);
+  var bigHl = z.createRadialGradient(0, 0, 0, 0, 0, rr * 0.74);
+  bigHl.addColorStop(0.00, (c === 1) ? 'rgba(255,255,255,.30)' : 'rgba(255,255,255,.92)');
+  bigHl.addColorStop(0.24, (c === 1) ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.55)');
+  bigHl.addColorStop(0.55, (c === 1) ? 'rgba(255,255,255,.05)' : 'rgba(255,255,255,.16)');
+  bigHl.addColorStop(1.00, 'rgba(255,255,255,0)');
+  z.fillStyle = bigHl;
+  z.beginPath(); z.arc(0, 0, rr * 0.74, 0, Math.PI * 2); z.fill();
+  z.restore();
+  
+  var spx = cx - rr * 0.33, spy = cy - rr * 0.39;
+  var sp = z.createRadialGradient(spx, spy, 0, spx, spy, rr * 0.145);
+  sp.addColorStop(0.00, (c === 1) ? 'rgba(255,255,255,.26)' : 'rgba(255,255,255,.95)');
+  sp.addColorStop(0.55, (c === 1) ? 'rgba(255,255,255,.06)' : 'rgba(255,255,255,.22)');
+  sp.addColorStop(1.00, 'rgba(255,255,255,0)');
+  z.fillStyle = sp;
+  z.beginPath(); z.arc(spx, spy, rr * 0.145, 0, Math.PI * 2); z.fill();
+  
+  var fr = z.createRadialGradient(cx, cy, rr * 0.80, cx, cy, rr * 1.0);
+  fr.addColorStop(0.00, 'rgba(255,255,255,0)');
+  fr.addColorStop(0.55, (c === 1) ? 'rgba(190,214,206,.06)' : 'rgba(255,255,255,.22)');
+  fr.addColorStop(0.92, (c === 1) ? 'rgba(206,230,222,.22)' : 'rgba(255,255,255,.60)');
+  fr.addColorStop(1.00, (c === 1) ? 'rgba(206,230,222,.30)' : 'rgba(255,255,255,.72)');
+  z.fillStyle = fr; z.fillRect(0, 0, side, side);
+  
+  if (c !== 1) {
+    var dk = z.createRadialGradient(cx + rr * 0.20, cy + rr * 0.26, rr * 0.30, cx + rr * 0.20, cy + rr * 0.26, rr * 1.02);
+    dk.addColorStop(0.00, 'rgba(150,140,116,0)');
+    dk.addColorStop(0.72, 'rgba(150,140,116,.06)');
+    dk.addColorStop(1.00, 'rgba(132,122,98,.16)');
+    z.fillStyle = dk; z.fillRect(0, 0, side, side);
+  }
+  
+  var rl = z.createRadialGradient(cx + rr * 0.06, cy + rr * 0.60, 0, cx + rr * 0.06, cy + rr * 0.60, rr * 0.62);
+  rl.addColorStop(0.00, (c === 1) ? 'rgba(120,150,140,.10)' : 'rgba(255,255,255,.34)');
+  rl.addColorStop(1.00, 'rgba(255,255,255,0)');
+  z.fillStyle = rl; z.fillRect(0, 0, side, side);
+  z.restore();
+  return cv;
+}
+function jadeTexPair(r, dpr) {
+  if (JADE_TEX.r === r && JADE_TEX.dpr === dpr && JADE_TEX.blk.length) return JADE_TEX;
+  JADE_TEX = { r: r, dpr: dpr, blk: [], wht: [] };
+  for (var i = 0; i < JADE_SLOTS; i++) {
+    JADE_TEX.blk.push(jadeTexBuild(r, dpr, 1, (0x9E3779B9 ^ Math.imul(i + 1, 2654435761)) >>> 0));
+    JADE_TEX.wht.push(jadeTexBuild(r, dpr, 2, (0x85EBCA6B ^ Math.imul(i + 1, 2246822519)) >>> 0));
+  }
+  return JADE_TEX;
+}
+
+var STONE_SHADOW = { r: -1, dpr: -1, cv: null };
+function stoneShadowTex(r, dpr) {
+  if (STONE_SHADOW.r === r && STONE_SHADOW.dpr === dpr) return STONE_SHADOW.cv;
+  var rr = Math.max(4, r * dpr);
+  var side = Math.ceil(rr * 2.5);
+  var cv = document.createElement('canvas');
+  cv.width = side; cv.height = side;
+  var z = cv.getContext('2d');
+  var mid = side / 2;
+  var g = z.createRadialGradient(mid, mid, rr * 0.80, mid, mid, rr * 1.16);
+  g.addColorStop(0, 'rgba(0,0,0,.20)');
+  g.addColorStop(0.55, 'rgba(0,0,0,.085)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  z.fillStyle = g;
+  z.beginPath(); z.arc(mid, mid, rr * 1.16, 0, Math.PI * 2); z.fill();
+  STONE_SHADOW = { r: r, dpr: dpr, cv: cv };
+  return cv;
+}
+
+function stoneDraw(ctx, px, py, r, c, lw, blkFill, blkEdge, whtFill, whtEdge) {
+  if (STONE_STYLE !== 'flat') {
+    var dprS = 1;
+    try { dprS = ctx.getTransform().a || 1; } catch (eSS) {}
+    var sh = stoneShadowTex(r, dprS);
+    var shSide = sh.width / dprS;
+    // 2026-10-31 (user): nudge the contact shadow to the lower-right, matching the upper-left key light
+    ctx.drawImage(sh, px - shSide / 2 + r * 0.11, py - shSide / 2 + r * 0.19, shSide, shSide);
+  }
+  ctx.beginPath();
+  ctx.arc(px, py, r, 0, Math.PI * 2);
+  if (STONE_STYLE === 'jade') {
+    var dpr = 1;
+    try { dpr = ctx.getTransform().a || 1; } catch (eJD) {}
+    var pair = jadeTexPair(r, dpr);
+    var tex = (c === 1 ? pair.blk : pair.wht)[(((px | 0) * 7 + (py | 0) * 13) % JADE_SLOTS + JADE_SLOTS) % JADE_SLOTS];
+    var rr = Math.max(4, r * dpr);
+    var sSide = (Math.ceil(rr * 2) + 2) / dpr;   
+    ctx.save();
+    ctx.globalAlpha = 0.95;                      
+    ctx.drawImage(tex, px - sSide / 2, py - sSide / 2, sSide, sSide);
+    ctx.restore();
+    
+    ctx.beginPath();
+    ctx.arc(px, py, r - lw * 0.5, 0, Math.PI * 2);
+    ctx.strokeStyle = (c === 1) ? 'rgba(210,226,214,.10)' : 'rgba(96,88,68,.34)';
+    ctx.lineWidth = lw;
+    ctx.stroke();
+    return;
+  }
+  if (STONE_STYLE === 'real') {
+
+    
+    
+    var gx = px - r * 0.36, gy = py - r * 0.44;
+    var g = ctx.createRadialGradient(gx, gy, 0, gx, gy, r * 1.9807);
+    if (c === 1) {
+      g.addColorStop(0, '#726d67');
+      g.addColorStop(0.28, '#4a4540');
+      g.addColorStop(0.68, '#241f1b');
+      g.addColorStop(1, '#080706');
+    } else {
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(0.42, '#f8f3e7');
+      g.addColorStop(0.80, '#e0d9c7');
+      g.addColorStop(1, '#b8b1a0');
+    }
+    ctx.fillStyle = g;
+    ctx.fill();
+    
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(px, py, Math.max(1, r - lw * 0.5), Math.PI, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    var hg = ctx.createLinearGradient(px, py - r, px, py - r * 0.72);
+    hg.addColorStop(0, (c === 1) ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.55)');
+    hg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = hg;
+    ctx.fillRect(px - r, py - r, r * 2, r * 0.3);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.strokeStyle = (c === 1) ? 'rgba(255,255,255,.16)' : 'rgba(120,112,98,.55)';
+    ctx.lineWidth = lw;
+    ctx.stroke();
+    return;
+  }
+  ctx.fillStyle = (c === 1) ? blkFill : whtFill;
+  ctx.fill();
+  ctx.strokeStyle = (c === 1) ? blkEdge : whtEdge;
+  ctx.lineWidth = lw;
+  ctx.stroke();
+}
+
+function fitStoneNum(ctx, txt, px, r, weight) {
+  var fpx = Math.max(1, +px || 1);
+  ctx.font = numFontStr(fpx, weight);
+  var maxW = Math.max(6, r * 1.62);
+  var tw = ctx.measureText(txt).width;
+  if (tw > maxW && tw > 0) {
+    fpx = Math.max(6, fpx * (maxW / tw));
+    ctx.font = numFontStr(fpx, weight);
+  }
+  return fpx;
+}
 function paint() {
   var cv = els.board, ctx = cv.getContext('2d');
   var g = geom(), dpr = g.dpr, size = g.size, pad = g.pad, gap = g.gap;
@@ -1416,12 +1754,8 @@ function paint() {
     var c = G.board[y][x];
     if (!c) continue;
     var px = pad + x * gap, py = pad + y * gap;
-    ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
-    if (c === 1) { ctx.fillStyle = css('--blk'); ctx.fill(); ctx.strokeStyle = css('--blk-edge'); }
-    else { ctx.fillStyle = css('--wht'); ctx.fill(); ctx.strokeStyle = css('--blk'); }
-
-    ctx.lineWidth = Math.max(0.68, gap * 0.0195);
-    ctx.stroke();
+    stoneDraw(ctx, px, py, r, c, Math.max(0.68, gap * 0.0195),
+              css('--blk'), css('--blk-edge'), css('--wht'), css('--blk'));
   }
 
   if (typeof VIS !== 'undefined' && VIS.edit) {
@@ -1429,11 +1763,8 @@ function paint() {
       var px = pad + gp.x * gap, py = pad + gp.y * gap;
       ctx.save();
       ctx.globalAlpha = 0.45;
-      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
-      if (gp.c === 1) { ctx.fillStyle = css('--blk'); ctx.fill(); ctx.strokeStyle = css('--blk-edge'); }
-      else { ctx.fillStyle = css('--wht'); ctx.fill(); ctx.strokeStyle = css('--blk'); }
-      ctx.lineWidth = Math.max(0.68, gap * 0.0195);
-      ctx.stroke();
+      stoneDraw(ctx, px, py, r, gp.c, Math.max(0.68, gap * 0.0195),
+                css('--blk'), css('--blk-edge'), css('--wht'), css('--blk'));
       ctx.restore();
     });
     if (VIS.ghosts && VIS.ghosts.length === 2) {
@@ -1480,15 +1811,17 @@ function paint() {
   if (numShown() && G.moves.length) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
 
-    ctx.font = '600 ' + Math.max(8, gap * 0.5) + 'px ' + NUM_FONT;
-    var numDy = numGlyphDy(ctx, '0');
+    var numPx = Math.max(8, gap * NUM_SCALE);
     G.moves.forEach(function (m, i) {
 
       if (i === G.moves.length - 1) return;
       var sx = pad + m.x * gap, sy = pad + m.y * gap;
+      var txt = String(i + 1);
+      fitStoneNum(ctx, txt, numPx, r, NUM_WEIGHT);
+      var numDy = numGlyphDy(ctx, txt);
 
       ctx.fillStyle = (m.c === 1) ? '#ffffff' : '#1a1a1a';
-      ctx.fillText(String(i + 1), sx, sy + numDy);
+      ctx.fillText(txt, sx, sy + numDy);
     });
   }
 
@@ -1530,8 +1863,9 @@ function paint() {
     if (numShown()) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
 
-      ctx.font = '700 ' + Math.max(10, gap * 0.5) + 'px ' + NUM_FONT;
-      var lmTxt = String(G.moves.length), lmDy = numGlyphDy(ctx, lmTxt);
+      var lmTxt = String(G.moves.length);
+      fitStoneNum(ctx, lmTxt, Math.max(10, gap * NUM_SCALE), r, Math.max(700, NUM_WEIGHT));
+      var lmDy = numGlyphDy(ctx, lmTxt);
       ctx.fillStyle = css('--winline');
       ctx.fillText(lmTxt, lx, ly + lmDy);
     } else {
@@ -2151,8 +2485,13 @@ var LocalAI = (function () {
   var pend = {};
   var capWait = {};
   var cur = null, wait = null;
+
+  
+  
+  var ttDirty = false;
   var cfgT = 0, cfgKB = 0;
   var capsCache = null;
+  function markTtDirty() { ttDirty = true; }
 
   function post(o) {
     if (!HOST) return false;
@@ -2196,19 +2535,22 @@ var LocalAI = (function () {
   function startJob(job) {
     cur = job;
     job.t0 = Date.now();
+    job.started = true;   
+
+    if (job.op === 'ask' && ttDirty) { job.q.clearHash = true; ttDirty = false; }
     pend[job.id] = job;
     if (job.op !== 'live') {
       job.timer = setTimeout(function () {
         if (cur === job) cur = null;
         delete pend[job.id];
-        if (job.op === 'balance') job.res({ moves: [], eval: null, swap: false, error: 'timeout' });
+        if (job.op === 'balance') { markTtDirty(); job.res({ moves: [], eval: null, swap: false, error: 'timeout' }); }
         else job.rej(new Error('timeout'));
         pump();
       }, job.timeoutMs);
     }
     if (!post({ engine: 1, op: job.op || 'ask', id: job.id, q: job.q })) {
       clearTimeout(job.timer); delete pend[job.id]; cur = null;
-      if (job.op === 'balance') job.res({ moves: [], eval: null, swap: false, error: 'engine unavailable' });
+      if (job.op === 'balance') { markTtDirty(); job.res({ moves: [], eval: null, swap: false, error: 'engine unavailable' }); }
       else if (job.onEnd) { try { job.onEnd({ error: 'engine unavailable', stopped: true }); } catch (e) {} }
       else job.rej(new Error('engine unavailable'));
       pump();
@@ -2216,6 +2558,9 @@ var LocalAI = (function () {
   }
   function endJob(job, res) {
     if (!job) return;
+
+    
+    if (job.started && job.op === 'balance') markTtDirty();
     if (job.onEnd) { try { job.onEnd(res || {}); } catch (e) {} return; }
     try { job.res(res); } catch (e) {}
   }
@@ -2231,6 +2576,8 @@ var LocalAI = (function () {
   }
   function pump() {
     if (cur || !wait) return;
+    // the AI move has the engine while it thinks - a queued live job must not jump ahead
+    if (G.busy && wait.op === 'live') return;
     var j = wait; wait = null; startJob(j);
   }
   function makeJob(body, timeoutMs, res, rej, op) {
@@ -2239,6 +2586,8 @@ var LocalAI = (function () {
               side: (b.side === 1 || b.side === 2) ? b.side : 0,
               rule: b.rule | 0,
               budgetMs: Math.max(200, b.turnMs | 0),
+              
+              dyn: (b.dyn === 0) ? 0 : 1,
               key: b.key || 0 };
     if (op === 'balance') {
       q.topN = 1; q.pondering = false;
@@ -2250,12 +2599,17 @@ var LocalAI = (function () {
       if (b.scan) q.mode = 3;
     }
     if (op === 'live' || b.live) { q.live = true; q.pondering = false; }
+    
+    if (b.clearHash) q.clearHash = true;
     return { id: ++seq, timer: null, res: res, rej: rej, op: op || 'ask',
              liveId: (b.liveId == null ? null : b.liveId), tag: b.tag || '', cid: b.cid || '',
              exclusive: !!b.exclusive, timeoutMs: timeoutMs || 20000, t0: Date.now(), q: q };
   }
   function submit(job) {
     if (job.op === 'live') {
+
+      
+      if (G.busy) { if (wait && wait.op === 'live') endJob(wait, { busy: true, stopped: true }); wait = job; return; }
       if (cur) { endJob(job, { busy: true, stopped: true }); return; }
       startJob(job);
       return;
@@ -2320,6 +2674,9 @@ var LocalAI = (function () {
     if (job.op === 'balance') {
       var br = balanceResOf(m.res);
       if (m.ok === false && m.err) br.error = String(m.err);
+
+      
+      markTtDirty();
       job.res(br);
       pump();
       return;
@@ -2421,8 +2778,12 @@ var LocalAI = (function () {
     },
     restart: function () {
       post({ engine: 1, op: 'stop', id: ++seq, q: {} });
+      markTtDirty();
       failAll(new Error('engine reconnecting'));
     },
+    
+    markDirty: function () { markTtDirty(); },
+    kick: function () { try { pump(); } catch (e) {} },
     stopLane: function (lane) {
       post({ engine: 1, op: 'stop', id: ++seq, q: {} });
     },
@@ -2441,6 +2802,14 @@ function apiBalance(body, ms) {
 var RAPFI_MATE = 30000;
 var RAPFI_MATE_MAX_PLY = 500;
 var RAPFI_EVAL_MAX = 6000;
+
+var RAPFI_MATE_FMT_MAX = 225;
+function fmtMatePly(sign, ply) {
+  var p = Math.round(+ply);
+  if (!isFinite(p) || p < 0) p = 0;
+  if (p > RAPFI_MATE_FMT_MAX) return sign + 'M';
+  return sign + 'M' + p;
+}
 
 var RIF_OPENINGS = [
 
@@ -2480,10 +2849,15 @@ function boardFp() {
 function fmtEval(ev) {
   var s = String(ev == null ? '' : ev).trim();
   if (!s) return '';
-  var m = /^([+-]?)M(\d+)$/i.exec(s);
-  if (m) return (m[1] === '-' ? '-' : '+') + 'M' + m[2];
+  var m = /^([+-]?)M(\d+|\*)$/i.exec(s);
+  if (m) {
+    var sg = (m[1] === '-') ? '-' : '+';
+    return (m[2] === '*') ? (sg + 'M') : fmtMatePly(sg, parseInt(m[2], 10));
+  }
   var n = parseFloat(s.replace('+', ''));
   if (isNaN(n)) return s.slice(0, 5);
+  if (n > RAPFI_EVAL_MAX) n = RAPFI_EVAL_MAX;
+  else if (n < -RAPFI_EVAL_MAX) n = -RAPFI_EVAL_MAX;
   return (n > 0 ? '+' : '') + Math.round(n);
 }
 // ---- evaluation curve: black / white lines, self-rescaling axis ----
@@ -2509,6 +2883,10 @@ async function analyze(turnMs, topN, lane, side, tag, opt) {
 
   if (linkSessionOn()) return Promise.reject(new Error('link session: main analyze paused'));
   try { bgThinkStop(); } catch (eBG) {}
+
+  
+  var liveWasOn = !!(typeof LIVE_AN !== 'undefined' && LIVE_AN && LIVE_AN.on);
+  if (liveWasOn && !(opt && opt.keepLive)) { try { liveAnaStopJob(); } catch (eLS) {} }
   var ply = G.moves.length;
   var effSide = (side === 1 || side === 2) ? side : curColor();
   try {
@@ -2516,6 +2894,7 @@ async function analyze(turnMs, topN, lane, side, tag, opt) {
 
       board: (opt && opt.board) || G.board, moveList: [],
       matchMs: 600000, turnMs: turnMs, timeUsedMs: 0,
+      dyn: S.dynTime !== false ? 1 : 0,
       topN: topN, rule: engineRule(), cid: 'calc-' + ply + (lane ? '-' + lane : ''),
       lane: lane || 'main', side: (side === 1 || side === 2) ? side : 0,
       liveId: LocalAI.nextLiveId(), tag: tag || '',
@@ -2532,6 +2911,9 @@ async function analyze(turnMs, topN, lane, side, tag, opt) {
 
     if (!RV_MODE && !G.review) noteEngineDown();
     throw e;
+  } finally {
+    // engine is free again -> put the residency analysis back on duty
+    try { if (liveWasOn && LIVE_AN.on) liveAnaScheduleRetry(200); } catch (eLR) {}
   }
 }
 
@@ -2640,7 +3022,9 @@ var gAiGen = 0;
 async function aiMove() {
   if (G.busy) return;
   if (G.moves.length === 0 && curColor() === 1) {
-    var cx = Math.floor(G.size / 2), cy = Math.floor(G.size / 2);
+    // (4.47 fix) the tengen open: G.size never existed, so an empty-board AI-black used to
+    // throw "reading 'NaN'" inside place() and the engine never moved at all
+    var cx = Math.floor(N / 2), cy = Math.floor(N / 2);
     place(cx, cy, false, true);
     return;
   }
@@ -2656,13 +3040,19 @@ async function aiMove() {
     var budget = aiTurnBudget();
     var wasRecon = !!G.reconBoost;
     if (wasRecon) { G.reconBoost = false; }
-    var r = await analyze(budget, 1, null, curColor(), T('tagAiMove'),
-                          { exclusive: true, urgent: true, noPonder: !S.bgThink || aiVsAi() });
+
+    var r = null, cs = [];
+    for (var att = 0; att < 3; att++) {
+      r = await analyze(budget, 1, null, curColor(), T('tagAiMove'),
+                        { exclusive: true, urgent: true, noPonder: !S.bgThink || aiVsAi() });
+      cs = (r && r.candidates) || [];
+      if (cs.length) break;
+      if (!(r && r.superseded)) break;
+    }
 
     if (myGen !== gAiGen) { G.think = []; G.busy = false; refreshUI(); return; }
 
     if (S.paused) { G.think = []; G.busy = false; setTurnPill(T('paused')); refreshUI(); return; }
-    var cs = (r && r.candidates) || [];
     if (!cs.length) { setStat(null, T('offline')); G.busy = false; refreshUI(); return; }
     var c0 = cs[0];
     c0.timeMs = Date.now() - t0;
@@ -2686,6 +3076,7 @@ async function aiMove() {
     setStat(null, T('offline'));
   }
   G.busy = false;
+  try { LocalAI.kick(); } catch (eK) {}
   refreshUI();
 
   if (S.coach && !G.over) refreshCoach().then(paint);
@@ -2786,6 +3177,8 @@ function place(x, y, fromRedo, byAI) {
   bgThinkKick(140);
   paint();
 
+  if (PLACE_EVAL && PLACE_EVAL.on) placeEvalKick();
+
   if (G.fwd && G.fwd.on && !G.fwd.hold) fwdQueue();
   return true;
 }
@@ -2846,6 +3239,7 @@ function settleMove() {
   var last = G.moves[G.moves.length - 1];
   if (last && winCheck(G.board, last.x, last.y, last.c)) {
     G.over = true;
+    if (PLACE_EVAL && PLACE_EVAL.on) { PLACE_EVAL.on = false; placeEvalHaltJob(); }
     G.think = [];
     clearHeat();
     setStat(G.lastStat, T('over') + ' · ' + winTextFor(last.c));
@@ -3494,10 +3888,8 @@ function evalBlack(c0) {
 }
 function scoreTxt(v) {
   if (v == null || !isFinite(v)) return '-';
-  if (Math.abs(v) > RAPFI_EVAL_MAX) {
-    var mv = Math.round(RAPFI_MATE - Math.abs(v));
-    return (v > 0 ? '+M' : '-M') + mv;
-  }
+  if (Math.abs(v) > RAPFI_EVAL_MAX)
+    return fmtMatePly(v > 0 ? '+' : '-', RAPFI_MATE - Math.abs(v));
   return (v > 0 ? '+' : '') + Math.round(v);
 }
 function scoreWin(v) {
@@ -3569,6 +3961,9 @@ function refreshUI() {
   try { bgThinkHintSync(); } catch (eBH) {}
 
   if (RV_MODE) { refreshRvUI(); return; }
+  // keep the setup card in step with S even when the mode was changed from another window
+  
+  try { syncSetSetup(); } catch (eSU) {}
   var c = curColor();
   if (G.review) {
     setTurnPill(G.review.kind === 'recite' ? T('recite') : T('replay'));
@@ -3603,6 +3998,7 @@ function refreshUI() {
   els.btn_pause.disabled = (S.mode === 'place' || S.mode === 'endgame');
 
   if (els.btn_live) liveAnaUI();
+  placeEvalUI();
 
   if (els.sideHint) {
     els.sideHint.textContent = aiVsAi()
@@ -3644,17 +4040,26 @@ function refreshUI() {
   bgThinkKick(200);
 }
 
-var CURVE_TIERS = [
-  [10, 2], [20, 5], [50, 10], [100, 25], [200, 50], [500, 100],
-  [1000, 250], [2000, 500], [4000, 1000], [6000, 1500],
-];
-var curveTier = 0;
+var CURVE_RANGE_LAST = null;
+function niceCurveScale(peak) {
+  if (!isFinite(peak) || peak <= 0) return { range: 10, step: 2 };
+  var target = peak / 6;
+  var p10 = Math.pow(10, Math.floor(Math.log(target) / Math.LN10));
+  var m = target / p10;
+  var base = m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10;
+  var step = base * p10;
+  if (step < 1) step = 1;
+  step = Math.round(step * 100) / 100;
+  var range = Math.ceil(peak / step) * step;
+  if (range < 10) { range = 10; step = 2; }
+  return { range: range, step: step };
+}
 
 function cvLabel(v) {
   var s = (Math.abs(v) >= 10000) ? (v / 1000).toFixed(0) + 'k' : String(v);
   return (v > 0 ? '+' : '') + s;
 }
-function drawCurve() {
+function drawCurveNow() {
   var cv = els.curve, scroll = els.curveScroll, ax = els.curveAxis;
   if (!cv || !scroll || !ax) return;
   var dpr = window.devicePixelRatio || 1;
@@ -3670,12 +4075,12 @@ function drawCurve() {
     if (vb > RAPFI_EVAL_MAX || vw > RAPFI_EVAL_MAX) return;
     peak = Math.max(peak, vb, vw);
   });
-  if (!G.curve.length) curveTier = 0;
-  var ti = 0;
-  while (ti < CURVE_TIERS.length - 1 && peak > CURVE_TIERS[ti][0]) ti++;
-  if (ti > curveTier) curveTier = ti;
-  else if (ti < curveTier && peak <= CURVE_TIERS[ti][0] * 0.8) curveTier = ti;
-  var RANGE = CURVE_TIERS[curveTier][0], STEP = CURVE_TIERS[curveTier][1];
+  var nr = niceCurveScale(peak);
+  if (CURVE_RANGE_LAST && peak <= CURVE_RANGE_LAST.range && peak >= CURVE_RANGE_LAST.range * 0.5)
+    nr = CURVE_RANGE_LAST;
+  CURVE_RANGE_LAST = nr;
+  var RANGE = nr.range, STEP = nr.step;
+  var NTICKS = Math.max(1, Math.round(RANGE / STEP));
   function yOf(v) {
 
     if (Math.abs(v) > RAPFI_EVAL_MAX) {
@@ -3701,13 +4106,15 @@ function drawCurve() {
   ac.font = '9px sans-serif';
   ac.textBaseline = 'middle';
   ac.textAlign = 'right';
-  for (var g = -RANGE; g <= RANGE; g += STEP) {
+  for (var gi = -NTICKS; gi <= NTICKS; gi++) {
+    var g = gi * STEP;
+    if (Math.abs(g) < 1e-9) g = 0;
     var gy = yOf(g);
     ac.strokeStyle = (g === 0) ? css('--sub') : css('--border');
     ac.lineWidth = (g === 0) ? 1.4 : 1;
     ac.beginPath(); ac.moveTo(AXW - 6, gy); ac.lineTo(AXW, gy); ac.stroke();
     ac.fillStyle = css('--sub');
-    ac.fillText((g > 0 ? '+' : '') + g, AXW - 8, gy);
+    ac.fillText((g > 0 ? '+' : '') + Math.round(g * 100) / 100, AXW - 8, gy);
   }
 
   var availW = Math.max(160, scroll.clientWidth - 2);
@@ -3729,7 +4136,9 @@ function drawCurve() {
   ctx.scale(dpr, dpr);
 
   ctx.lineWidth = 1;
-  for (var g2 = -RANGE; g2 <= RANGE; g2 += STEP) {
+  for (var gi2 = -NTICKS; gi2 <= NTICKS; gi2++) {
+    var g2 = gi2 * STEP;
+    if (Math.abs(g2) < 1e-9) g2 = 0;
     var gy2 = yOf(g2);
     ctx.strokeStyle = (g2 === 0) ? css('--sub') : css('--border');
     ctx.lineWidth = (g2 === 0) ? 1.4 : 1;
@@ -3743,7 +4152,7 @@ function drawCurve() {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(T('curve'), x0 + 8, (y0 + y1) / 2);
-    drawCurveInfo();
+    drawCurveInfo(true);
     return;
   }
 
@@ -3856,6 +4265,57 @@ function drawCurve() {
   drawCurveInfo();
 }
 
+var CURVE_VIEW = null, CURVE_AN_RAF = 0;
+function curveViewCopy(src) {
+  return (src || []).filter(function (p) {
+    return p && typeof p.b === 'number' && isFinite(p.b);
+  }).map(function (p) {
+    return { i: p.i || 0, b: p.b, w: (typeof p.w === 'number' && isFinite(p.w)) ? p.w : -(p.b || 0) };
+  }).sort(function (a, b) { return a.i - b.i; });
+}
+function curveViewsEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i].i !== b[i].i || Math.abs(a[i].b - b[i].b) > 0.01 || Math.abs(a[i].w - b[i].w) > 0.01)
+      return false;
+  }
+  return true;
+}
+function curveInterpView(from, to, t) {
+  var out = [];
+  to.forEach(function (p) {
+    var src = null;
+    for (var i = 0; i < from.length; i++) if (from[i].i === p.i) { src = from[i]; break; }
+    if (!src && from.length) {
+      src = (p.i > from[from.length - 1].i) ? from[from.length - 1] : from[0];
+    }
+    if (!src) src = { b: 0, w: 0 };
+    out.push({ i: p.i, b: src.b + (p.b - src.b) * t, w: src.w + (p.w - src.w) * t });
+  });
+  return out;
+}
+function drawCurveView(view) {
+  var real = G.curve;
+  G.curve = view;
+  try { drawCurveNow(); } finally { G.curve = real; }
+}
+function drawCurve() {
+  var target = curveViewCopy(G.curve);
+  if (!CURVE_VIEW) { CURVE_VIEW = target; drawCurveView(target); return; }
+  if (curveViewsEqual(CURVE_VIEW, target)) { drawCurveView(CURVE_VIEW); return; }
+  if (CURVE_AN_RAF) { cancelAnimationFrame(CURVE_AN_RAF); CURVE_AN_RAF = 0; }
+  var from = CURVE_VIEW, t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+  function frame(now) {
+    var t = Math.min(1, (now - t0) / 340);
+    var e = 1 - Math.pow(1 - t, 3);
+    CURVE_VIEW = curveInterpView(from, target, e);
+    drawCurveView(CURVE_VIEW);
+    if (t < 1) CURVE_AN_RAF = requestAnimationFrame(frame);
+    else { CURVE_VIEW = target; CURVE_AN_RAF = 0; }
+  }
+  CURVE_AN_RAF = requestAnimationFrame(frame);
+}
+
 var CURVE_GEO = null, CURVE_HOVER = null;
 
 function curveLastPoint() {
@@ -3888,25 +4348,53 @@ function curveHoverLine(p) {
   ln.style.height = CURVE_GEO.H + 'px';
   ln.style.display = 'block';
 }
-function drawCurveInfo() {
+
+var CI_NUM_MS = 333, ciNumT = 0, ciNumTimer = 0;
+
+var ciLastTxt = { bs: null, bw: null, ws: null, ww: null };
+var ciLastBar = { b: null, w: null };
+function ciText(node, key, txt) {
+  if (!node || ciLastTxt[key] === txt) return;
+  ciLastTxt[key] = txt;
+  node.textContent = txt;
+}
+function ciBar(node, key, ratio) {
+  var r = (typeof ratio === 'number' && isFinite(ratio)) ? ratio : 0;
+  if (ciLastBar[key] === r) return;
+  ciLastBar[key] = r;
+  paintCiBar(node, r);
+}
+function drawCurveInfo(force) {
   var hover = (CURVE_HOVER != null);
   var p = hover ? curvePointAt(CURVE_HOVER) : curveLastPoint();
   var b = p ? p.b : null;
   curveHoverLine(hover ? p : null);
+  var now = Date.now();
+  if (!force && !hover && now - ciNumT < CI_NUM_MS) {
+    if (!ciNumTimer) {
+      ciNumTimer = setTimeout(function () {
+        ciNumTimer = 0;
+        drawCurveInfo(true);       
+      }, Math.max(0, CI_NUM_MS - (now - ciNumT)));
+    }
+    return;
+  }
+  if (ciNumTimer) { clearTimeout(ciNumTimer); ciNumTimer = 0; }
+  ciNumT = now;
   if (b == null) {
-    if (els.ci_b_score) els.ci_b_score.textContent = '-';
-    if (els.ci_b_win) els.ci_b_win.textContent = '-';
-    if (els.ci_w_score) els.ci_w_score.textContent = '-';
-    if (els.ci_w_win) els.ci_w_win.textContent = '-';
-    paintCiBar(els.ci_b_win, 0); paintCiBar(els.ci_w_win, 0);
+    ciText(els.ci_b_score, 'bs', '-');
+    ciText(els.ci_b_win, 'bw', '-');
+    ciText(els.ci_w_score, 'ws', '-');
+    ciText(els.ci_w_win, 'ww', '-');
+    ciBar(els.ci_b_win, 'b', 0); ciBar(els.ci_w_win, 'w', 0);
     return;
   }
   var wb = scoreWin(b);
-  if (els.ci_b_score) els.ci_b_score.textContent = scoreTxt(b);
-  if (els.ci_b_win) els.ci_b_win.textContent = Math.round(wb * 100) + '%';
-  if (els.ci_w_score) els.ci_w_score.textContent = scoreTxt(-b);
-  if (els.ci_w_win) els.ci_w_win.textContent = Math.round((1 - wb) * 100) + '%';
-  paintCiBar(els.ci_b_win, wb); paintCiBar(els.ci_w_win, 1 - wb);
+  ciText(els.ci_b_score, 'bs', scoreTxt(b));
+  ciText(els.ci_b_win, 'bw', Math.round(wb * 100) + '%');
+  ciText(els.ci_w_score, 'ws', scoreTxt(-b));
+  ciText(els.ci_w_win, 'ww', Math.round((1 - wb) * 100) + '%');
+  ciBar(els.ci_b_win, 'b', wb); ciBar(els.ci_w_win, 'w', 1 - wb);
 }
 function paintCiBar(node, ratio) {
   if (!node || !node.parentNode || !node.parentNode.parentNode) return;
@@ -3931,11 +4419,11 @@ function wireCurveHover() {
     var p = curvePointAt(ply);
     if (!p) return;
     CURVE_HOVER = p.i || 0;
-    drawCurveInfo();
+    drawCurveInfo(true);
   });
   cv.addEventListener('mouseleave', function () {
     CURVE_HOVER = null;
-    drawCurveInfo();
+    drawCurveInfo(true);
   });
 }
 
@@ -4341,7 +4829,7 @@ function toast(msg) {
   setStat(null, msg);
 }
 
-var APP_VERSION = '4.47';
+var APP_VERSION = '4.48';
 
 var UPDATE_URL = 'https://wwbbj.lanzout.com/b016l49aqj';
 var UPDATE_PWD = '15';
@@ -5736,13 +6224,18 @@ function visBoardCtx(ev) {
 function bootVis() {
   try {
     var st = JSON.parse(localStorage.getItem('gbcalc.settings.v1') || '{}');
-    if (st && st.theme) S.theme = (st.theme === 'light') ? 'light' : 'dark';
+    if (st && (st.theme === 'light' || st.theme === 'dark' || st.theme === 'custom')) S.theme = st.theme;
+    if (st && (st.customBase === 'light' || st.customBase === 'dark')) S.customBase = st.customBase;
     if (st && st.lang) S.lang = (st.lang === 'en') ? 'en' : 'zh';
     if (st && st.boardColor) S.boardColor = st.boardColor;
     if (st && st.pageBgColor) S.pageBgColor = st.pageBgColor;
+    if (st && st.customColors) S.customColors = st.customColors;
     if (st && st.cssVars) { S.cssVars = st.cssVars; applyColorVars(st.cssVars); }
+    if (st && st.uiFont) S.uiFont = st.uiFont;
   } catch (e) {}
-  document.body.setAttribute('data-theme', S.theme);
+  applyFontVars();
+  try { applyColors(); } catch (eVS) {}
+  document.body.setAttribute('data-theme', themeKey());
   document.body.classList.add('vis');
   document.title = T('visTitle');
   grab();
@@ -5994,18 +6487,22 @@ function bootReview() {
 
   try {
     var rvst = JSON.parse(localStorage.getItem('gbcalc.settings.v1') || '{}');
-    if (rvst && rvst.theme) S.theme = (rvst.theme === 'light') ? 'light' : 'dark';
+    if (rvst && (rvst.theme === 'light' || rvst.theme === 'dark' || rvst.theme === 'custom')) S.theme = rvst.theme;
+    if (rvst && (rvst.customBase === 'light' || rvst.customBase === 'dark')) S.customBase = rvst.customBase;
 
     if (rvst && rvst.boardColor) S.boardColor = rvst.boardColor;
     if (rvst && rvst.pageBgColor) S.pageBgColor = rvst.pageBgColor;
+    if (rvst && rvst.customColors) S.customColors = rvst.customColors;
     if (rvst && rvst.cssVars) { S.cssVars = rvst.cssVars; applyColorVars(rvst.cssVars); }
 
     if (rvst && typeof rvst.previewOn === 'boolean') S.previewOn = rvst.previewOn;
 
     if (rvst && typeof rvst.rvNum === 'boolean') S.rvNum = rvst.rvNum;
+    if (rvst && rvst.uiFont) S.uiFont = rvst.uiFont;
 
     if (rvst && (rvst.lang === 'zh' || rvst.lang === 'en')) S.lang = rvst.lang;
   } catch (e) {}
+  applyFontVars();
 
   window.addEventListener('storage', function (ev) {
     if (ev.key !== 'gbcalc.settings.v1' || !ev.newValue) return;
@@ -6017,7 +6514,8 @@ function bootReview() {
       }
     } catch (e) {}
   });
-  document.body.setAttribute('data-theme', S.theme);
+  try { applyColors(); } catch (eRC) {}
+  document.body.setAttribute('data-theme', themeKey());
   document.body.classList.add('rv');
   document.title = T('rvWindow');
   grab();
@@ -6448,6 +6946,7 @@ function undoOne() {
   anaReset();
   liveAnaBoardChanged();
   paint(); refreshUI();
+  if (PLACE_EVAL && PLACE_EVAL.on) placeEvalKick();
   refreshCoach();
 }
 function stepBack() {
@@ -6475,6 +6974,7 @@ function stepBack() {
   anaReset();
   liveAnaBoardChanged();
   paint(); refreshUI();
+  if (PLACE_EVAL && PLACE_EVAL.on) placeEvalKick();
   refreshCoach();
 }
 function stepForward() {
@@ -6543,6 +7043,40 @@ function ingestExternal(text) {
 
 var LAY_KEY = 'gbcalc.layout.v7';
 function layKey() { return 'gbcalc.layout.v8'; }
+
+var COMPACT_W = 1180;
+var LAY_SIDE = 'L';
+function isCompactLayout() {
+  if (SET_MODE || LINK_MODE || RV_MODE || VIS_MODE) return false;
+  return (window.innerWidth || document.documentElement.clientWidth || 0) < COMPACT_W;
+}
+function dockBySide(side) { return (side === 'R') ? els.dockR : els.dockL; }
+function otherSide(side) { return (side === 'R') ? 'L' : 'R'; }
+function mergeCardsToSide(side) {
+  var tgt = dockBySide(side), other = dockBySide(otherSide(side));
+  if (!tgt || !other) return;
+  var cards = [];
+  [els.dockL, els.dockR].forEach(function (d) {
+    if (!d) return;
+    [].forEach.call(d.children, function (c) {
+      if (c.classList && c.classList.contains('card')) cards.push(c);
+    });
+  });
+  cards.forEach(function (c) { tgt.appendChild(c); });
+  LAY_SIDE = (side === 'R') ? 'R' : 'L';
+}
+function restoreWideOrder(l) {
+  var order = (l && l.order) || {};
+  ['dockL', 'dockR'].forEach(function (dn) {
+    var list = order[dn === 'dockL' ? 'L' : 'R'];
+    if (!list || !els[dn]) return;
+    list.forEach(function (id) {
+      var card = document.querySelector('.card[data-id="' + id + '"]');
+      if (card) els[dn].appendChild(card);
+    });
+  });
+}
+
 function loadLayout() {
   try {
     var raw = localStorage.getItem(layKey());
@@ -6601,17 +7135,14 @@ function applyLayout() {
   var l = loadLayout();
   var order = l.order || {};
   var fresh = !order.L && !order.R;
+  LAY_SIDE = (l.side === 'R') ? 'R' : 'L';
 
-  ['dockL', 'dockR'].forEach(function (dn) {
-    var list = order[dn === 'dockL' ? 'L' : 'R'];
-    if (!list || !els[dn]) return;
-    list.forEach(function (id) {
-      var card = document.querySelector('.card[data-id="' + id + '"]');
-      if (card) els[dn].appendChild(card);
-    });
-  });
-
+  restoreWideOrder(l);
   if (fresh) { if (linkSessionOn()) defaultLayoutLink(); else defaultLayout(); }
+
+  var compact = isCompactLayout();
+  if (compact) mergeCardsToSide(LAY_SIDE);
+  document.body.classList.toggle('compactDock', compact);
 
   var col = l.collapsed || {};
   [].forEach.call(document.querySelectorAll('.card'), function (card) {
@@ -6621,11 +7152,22 @@ function applyLayout() {
   applyCardVis();
 }
 function persistLayout() {
-  var l = { order: {} };
-  ['dockL', 'dockR'].forEach(function (dn) {
-    l.order[dn === 'dockL' ? 'L' : 'R'] = [].map.call(els[dn].querySelectorAll('.card'),
-      function (c) { return c.getAttribute('data-id'); });
-  });
+  var l = loadLayout();
+  var compact = isCompactLayout();
+  if (compact) {
+    // keep the wide-window order intact; only the compact side is stored
+    l.side = LAY_SIDE;
+    if (!l.order || (!l.order.L && !l.order.R)) {
+      // no wide-window order yet: remember the factory split, not the merged single column
+      l.order = { L: ['engine'], R: CARD_IDS.filter(function (id) { return id !== 'engine'; }) };
+    }
+  } else {
+    l.order = {};
+    ['dockL', 'dockR'].forEach(function (dn) {
+      l.order[dn === 'dockL' ? 'L' : 'R'] = [].map.call(els[dn].querySelectorAll('.card'),
+        function (c) { return c.getAttribute('data-id'); });
+    });
+  }
 
   l.collapsed = {};
   [].forEach.call(document.querySelectorAll('.card'), function (c) {
@@ -6634,6 +7176,42 @@ function persistLayout() {
   saveLayout(l);
   syncDocks();
 
+  buildCardMenu();
+}
+// Window width crossing COMPACT_W: merge every card to the remembered side, or restore the
+// wide-window two-column order. Never calls persistLayout (that would overwrite the wide order).
+function syncResponsiveDock() {
+  if (SET_MODE || LINK_MODE || RV_MODE || VIS_MODE) return;
+  if (!els.dockL || !els.dockR) return;
+  var compact = isCompactLayout();
+  var was = document.body.classList.contains('compactDock');
+  if (compact) {
+    // merge whenever the columns are split (or the class was stale), not only when the right
+    // dock holds a card: a right-side merge must also catch cards left on the other side
+    var split = els.dockL.querySelector('.card') && els.dockR.querySelector('.card');
+    if (!was || split) mergeCardsToSide(LAY_SIDE);
+  } else if (was) {
+    var l = loadLayout(), order = l.order || {};
+    if (!order.L && !order.R) {
+      // first boot while narrow: rebuild the standard two-column layout from scratch
+      var eng = document.querySelector('.card[data-id="engine"]');
+      if (eng && els.dockL) els.dockL.appendChild(eng);
+      CARD_IDS.forEach(function (id) {
+        if (id === 'engine') return;
+        var c = document.querySelector('.card[data-id="' + id + '"]');
+        if (c && els.dockR) els.dockR.appendChild(c);
+      });
+    } else {
+      restoreWideOrder(l);
+      var known = {};
+      (order.L || []).concat(order.R || []).forEach(function (id) { known[id] = 1; });
+      [].forEach.call(document.querySelectorAll('.card'), function (c) {
+        if (!known[c.getAttribute('data-id')]) els.dockR.appendChild(c);
+      });
+    }
+  }
+  document.body.classList.toggle('compactDock', compact);
+  syncDocks();
   buildCardMenu();
 }
 
@@ -6695,21 +7273,30 @@ function onCardDown(e) {
   card.style.zIndex = 60;
   card.style.pointerEvents = 'none';
   document.body.classList.add('dragging');
-  drag = { card: card, ph: ph, dx: e.clientX - r.left, dy: e.clientY - r.top };
+  drag = { card: card, ph: ph, dx: e.clientX - r.left, dy: e.clientY - r.top,
+           lastY: e.clientY, lastX: e.clientX };
   document.addEventListener('mousemove', onCardMove);
   document.addEventListener('mouseup', onCardUp);
   e.preventDefault();
 }
 function onCardMove(e) {
   if (!drag) return;
+  drag.lastY = e.clientY; drag.lastX = e.clientX;
   drag.card.style.left = (e.clientX - drag.dx) + 'px';
   drag.card.style.top = (e.clientY - drag.dy) + 'px';
-  var docks = [els.dockL, els.dockR], tgt = els.dockR, best = 1e9;
-  docks.forEach(function (d) {
-    var r = d.getBoundingClientRect(), cx = (r.left + r.right) / 2;
-    var dist = Math.abs(e.clientX - cx);
-    if (dist < best) { best = dist; tgt = d; }
-  });
+  var tgt = els.dockR;
+  if (isCompactLayout() && els.boardWrap) {
+    // narrow window: dropping on either side of the BOARD picks that dock; all cards follow on drop
+    var br = els.boardWrap.getBoundingClientRect();
+    tgt = dockBySide(e.clientX < (br.left + br.right) / 2 ? 'L' : 'R');
+  } else {
+    var docks = [els.dockL, els.dockR], best = 1e9;
+    docks.forEach(function (d) {
+      var r = d.getBoundingClientRect(), cx = (r.left + r.right) / 2;
+      var dist = Math.abs(e.clientX - cx);
+      if (dist < best) { best = dist; tgt = d; }
+    });
+  }
   var kids = [].filter.call(tgt.children, function (c) {
     return c.classList.contains('card') || c.classList.contains('ph');
   });
@@ -6720,15 +7307,36 @@ function onCardMove(e) {
   }
   if (drag.ph.parentNode !== tgt || drag.ph.nextSibling !== ref) tgt.insertBefore(drag.ph, ref);
 }
+function insertCardAtY(tgt, card, y) {
+  var kids = [].filter.call(tgt.children, function (c) { return c.classList.contains('card'); });
+  var ref = null;
+  for (var i = 0; i < kids.length; i++) {
+    var r = kids[i].getBoundingClientRect();
+    if (y < (r.top + r.bottom) / 2) { ref = kids[i]; break; }
+  }
+  tgt.insertBefore(card, ref);
+}
 function onCardUp() {
   if (!drag) return;
-  var card = drag.card, ph = drag.ph;
+  var card = drag.card, ph = drag.ph, lastY = drag.lastY;
   card.classList.remove('floating');
   card.style.position = ''; card.style.left = ''; card.style.top = '';
   card.style.width = ''; card.style.zIndex = ''; card.style.pointerEvents = '';
   document.body.classList.remove('dragging');
-  ph.parentNode.insertBefore(card, ph);
-  if (ph.parentNode) ph.parentNode.removeChild(ph);
+
+  var droppedSide = (ph.parentNode === els.dockR) ? 'R' : (ph.parentNode === els.dockL ? 'L' : '');
+  var compactCross = isCompactLayout() && droppedSide && droppedSide !== LAY_SIDE;
+  if (compactCross) {
+    // "move to the other side" in a narrow window moves EVERY card there, and remembers the side
+    LAY_SIDE = droppedSide;
+    var tgt = dockBySide(droppedSide), other = dockBySide(otherSide(droppedSide));
+    [].forEach.call(other.querySelectorAll('.card'), function (c) { tgt.appendChild(c); });
+    if (ph.parentNode) ph.parentNode.removeChild(ph);
+    insertCardAtY(tgt, card, lastY);
+  } else {
+    ph.parentNode.insertBefore(card, ph);
+    if (ph.parentNode) ph.parentNode.removeChild(ph);
+  }
   document.removeEventListener('mousemove', onCardMove);
   document.removeEventListener('mouseup', onCardUp);
   drag = null;
@@ -6737,6 +7345,16 @@ function onCardUp() {
 
 function applyLang() {
   var d = I18N[S.lang];
+  // 2026-10-31: <... data-i18n="key"> is the declarative form used by the static markup. Nothing
+  // used to apply it, so a handful of labels (e.g. the balance-point caption) stayed Chinese in
+  // the English UI. Apply it generically: text from `key`, tooltip from `key` + "Ttl" when present.
+  try {
+    [].forEach.call(document.querySelectorAll('[data-i18n]'), function (el) {
+      var k = el.getAttribute('data-i18n');
+      if (d[k] !== undefined) el.textContent = d[k];
+      if (d[k + 'Ttl'] !== undefined) el.title = d[k + 'Ttl'];
+    });
+  } catch (eI18N) {}
   ['title','setup','mode','side','turn','rule','cores','hash','variant','weights','candRange','multiPv','maxDepth','maxNodes','heat','heatHint',
    'showNum','showNumHint','bgThink','preview','previewHint','engine','depth','speed','nodes','time','eval','best','curve',
    'blackCurve','whiteCurve','curveHint','reciteHint','code','drTip',
@@ -6790,14 +7408,16 @@ function applyLang() {
     if (els.t_color) els.t_color.textContent = d.color;
     els.cp_close.textContent = d.cpClose;
     els.cp_reset.textContent = d.cpReset;
-    els.t_cpTheme.textContent = d.cpTheme;
     els.t_cpTarget.textContent = d.cpTarget;
     els.t_cpHex.textContent = d.cpHex;
     els.t_cpPreset.textContent = d.cpPreset;
-    var ctp = els.cp_theme.querySelectorAll('button');
-    if (ctp[0]) ctp[0].textContent = d.theme2;
-    if (ctp[1]) ctp[1].textContent = d.theme;
-    if (ctp[2]) ctp[2].textContent = d.themeCustom;
+    if (els.t_cpCustom) els.t_cpCustom.textContent = d.cpCustom;
+    if (els.cp_custom) els.cp_custom.textContent = d.cpCustom;
+    if (els.cp_custom_back) {
+      els.cp_custom_back.title = d.cpBackThemes;
+      els.cp_custom_back.setAttribute('aria-label', d.cpBackThemes);
+    }
+    try { cpPaintThemes(); } catch (eCPT) {}
     var ctt = els.cp_target.querySelectorAll('button');
     if (ctt[0]) ctt[0].textContent = d.cpBoard;
     if (ctt[1]) ctt[1].textContent = d.cpPage;
@@ -6814,6 +7434,7 @@ function applyLang() {
       pinKeySync(pk, cd ? cd.getAttribute('data-id') : '');
     });
     if (els.btn_live) liveAnaUI();
+    placeEvalUI();
     els.t_analysis.textContent = d.analysis;
     if (els.t_curveTtl) els.t_curveTtl.textContent = d.curve;
     [].forEach.call(document.querySelectorAll('.ci-score'), function (el) { el.textContent = d.score; });
@@ -7207,12 +7828,18 @@ function pageVarsFrom(hex) {
 
 var COLOR_VARS = ['--board', '--line', '--star', '--axis',
                   '--bg', '--card', '--chip', '--border', '--ink', '--sub',
-                  '--chip-on', '--chip-on-ink'];
+                  '--chip-on', '--chip-on-ink', '--accent', '--accent-ink'];
 
 function computeColorVars() {
   var vars = {}, k;
   var b = boardVarsFrom(S.boardColor); if (b) for (k in b) vars[k] = b[k];
   var p = pageVarsFrom(S.pageBgColor); if (p) for (k in p) vars[k] = p[k];
+  // a preset interface theme also carries its own muted accent (buttons / selected tabs)
+  var a = (S.customColors && typeof S.customColors === 'object') ? hexToRgb255(S.customColors.accent) : null;
+  if (a) {
+    vars['--accent'] = rgbToHex(a[0], a[1], a[2]);
+    vars['--accent-ink'] = (lum255(a) > 0.62) ? '#1b1b1b' : '#ffffff';
+  }
   S.cssVars = Object.keys(vars).length ? vars : null;
   return S.cssVars;
 }
@@ -7221,11 +7848,210 @@ function applyColorVars(vars) {
   COLOR_VARS.forEach(function (n) { document.body.style.removeProperty(n); });
   if (vars) for (var k in vars) document.body.style.setProperty(k, vars[k]);
 }
-function applyColors() { applyColorVars(computeColorVars()); }
+// 2026-10-31 (user): sky-blue option labels, but never blue-on-blue.
+function _colRGB(str) {
+  if (!str) return null;
+  var t = String(str).trim();
+  var m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s\/]+([\d.]+))?\s*\)/i.exec(t);
+  if (m) return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]];
+  m = /^#([0-9a-f]{6})$/i.exec(t);
+  if (m) { var n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 1]; }
+  m = /^#([0-9a-f]{3})$/i.exec(t);
+  if (m) return [parseInt(m[1][0] + m[1][0], 16), parseInt(m[1][1] + m[1][1], 16), parseInt(m[1][2] + m[1][2], 16), 1];
+  return null;
+}
+function _relLum(c) {
+  function f(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+  return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+}
+function _contrastRatio(a, b) {
+  var la = _relLum(a), lb = _relLum(b), hi = Math.max(la, lb), lo = Math.min(la, lb);
+  return (hi + 0.05) / (lo + 0.05);
+}
+function _rgb2hsl(c) {
+  var r = c[0] / 255, g = c[1] / 255, b = c[2] / 255;
+  var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, h = 0, sat = 0, l = (mx + mn) / 2;
+  if (d > 0) {
+    sat = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (mx === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+  }
+  return { h: h, s: sat, l: l };
+}
+function syncLabelAccent() {
+  var dark = document.body.getAttribute('data-theme') === 'dark';
+  var sky = dark ? [0x5c, 0xb8, 0xf2] : [0x2f, 0x9a, 0xe0];
+  var bg = _colRGB(getComputedStyle(document.body).backgroundColor);
+  if (!bg || bg[3] < 0.5) bg = _colRGB(getComputedStyle(document.body).getPropertyValue('--bg'));
+  if (!bg || bg[3] < 0.5) bg = dark ? [38, 39, 42] : [246, 246, 244];
+  // Blue labels only fail on a background that is itself blue: judge by hue, not by the WCAG
+  // ratio - sky blue on a neutral light page is only ~2.8:1 yet still perfectly readable.
+  var hsl = _rgb2hsl(bg);
+  var blueish = hsl.h >= 170 && hsl.h <= 235 && hsl.s > 0.10;
+  var tooClose = _contrastRatio(sky, bg) < 1.9;
+  var ink = sky;
+  if (blueish || tooClose) ink = (hsl.l > 0.52) ? [22, 24, 28] : [255, 255, 255];
+  document.body.style.setProperty('--lbl-accent', 'rgb(' + ink[0] + ',' + ink[1] + ',' + ink[2] + ')');
+}
+function applyColors() { applyColorVars(computeColorVars()); try { syncLabelAccent(); } catch (eLA) {} }
 
 var CP = { h: 40, s: 0.45, v: 0.85, target: 'board', drag: 0 };
 
 var CP_PRESETS = ['#d9b878', '#e3be6f', '#ecdcbb', '#c3cbb4', '#a5804e'];
+
+// 36 themes = 2 regular (light / dark) + 34 colour families. Every theme is a calm,
+// low-saturation palette: a page tone (the theme is mostly the page), a board tone that
+// stones read on without glare, and one quiet accent. `prev` keeps the palette shipped
+// before the softening pass so an existing selection can migrate instead of dropping to
+// "custom". Light / dark keep the classic wood board.
+var CP_THEMES = [
+  { id: 'light', kind: 'light', page: '#f6f6f4', board: '#d9b878', accent: '#2f86d6', prev: { page: '#f6f6f4', board: '#d9b878', accent: '#2f86d6' } },
+  { id: 'dark', kind: 'dark', page: '#26272a', board: '#d9b878', accent: '#2e6da4', prev: { page: '#26272a', board: '#d9b878', accent: '#2e6da4' } },
+  { id: 'paper', base: 'light', page: '#f7f6f2', board: '#d2c5b3', accent: '#86694a', prev: { page: '#f5f2ec', board: '#d8c3a5', accent: '#86694a' } },
+  { id: 'celadon', base: 'light', page: '#f2f5f3', board: '#c4d0c7', accent: '#5a7c68', prev: { page: '#ecf2ee', board: '#bcd1c2', accent: '#5a7c68' } },
+  { id: 'mist', base: 'light', page: '#f3f6f9', board: '#c1ced8', accent: '#4f7592', prev: { page: '#ecf2f7', board: '#b6cbdd', accent: '#4f7592' } },
+  { id: 'bluegray', base: 'light', page: '#f0f2f4', board: '#b2bbc2', accent: '#465c6b', prev: { page: '#e9edf0', board: '#a8b7c3', accent: '#465c6b' } },
+  { id: 'dune', base: 'light', page: '#f6f0e7', board: '#beab91', accent: '#795a34', prev: { page: '#f5ead9', board: '#c8a87c', accent: '#795a34' } },
+  { id: 'tundra', base: 'light', page: '#f3f5ee', board: '#b6bead', accent: '#596b4c', prev: { page: '#eef2e6', board: '#b2bfa3', accent: '#596b4c' } },
+  { id: 'dusk', base: 'dark', page: '#2d343d', board: '#6c7782', accent: '#aec4d8', prev: { page: '#222932', board: '#5e6d7c', accent: '#aec4d8' } },
+  { id: 'walnut', base: 'dark', page: '#312c2b', board: '#807061', accent: '#c9ab87', prev: { page: '#262120', board: '#7a6551', accent: '#c9ab87' } },
+  { id: 'pine', base: 'dark', page: '#293432', board: '#617e77', accent: '#9cc3b5', prev: { page: '#1e2927', board: '#52786f', accent: '#9cc3b5' } },
+  { id: 'wine', base: 'dark', page: '#352c2f', board: '#7f6569', accent: '#cda3a8', prev: { page: '#2a2124', board: '#79565b', accent: '#cda3a8' } },
+  { id: 'ink', base: 'dark', page: '#24272d', board: '#545e6c', accent: '#9db1c8', prev: { page: '#191c21', board: '#445164', accent: '#9db1c8' } },
+  { id: 'mauve', base: 'dark', page: '#2f2a36', board: '#746980', accent: '#c1afd5', prev: { page: '#241f2b', board: '#6a5b79', accent: '#c1afd5' } },
+  { id: 'slate', base: 'light', page: '#eff3f4', board: '#9cb0b5', accent: '#336168', prev: { page: '#e7eff0', board: '#8fb0b7', accent: '#336168' } },
+  { id: 'navy', base: 'dark', page: '#252d3b', board: '#515d70', accent: '#94aed1', prev: { page: '#1a2230', board: '#415069', accent: '#94aed1' } },
+  { id: 'silver', base: 'light', page: '#f5f5f4', board: '#c7c8c7', accent: '#5c6265', prev: { page: '#f1f1ef', board: '#c3c5c3', accent: '#5c6265' } },
+  { id: 'graphite', base: 'dark', page: '#2b2c2e', board: '#66686b', accent: '#a8aeb3', prev: { page: '#202123', board: '#5a5d60', accent: '#a8aeb3' } },
+  { id: 'dawn', base: 'light', page: '#f9f4f3', board: '#cbbbbf', accent: '#a26770', prev: { page: '#f7efed', board: '#cdb2b9', accent: '#a26770' } },
+  { id: 'aurora', base: 'dark', page: '#263034', board: '#5d8083', accent: '#d6ab6c', prev: { page: '#1b2529', board: '#4c7a7e', accent: '#d6ab6c' } },
+  { id: 'latte', base: 'light', page: '#f6f3f0', board: '#c8bdb1', accent: '#7a5c3e' },
+  { id: 'bamboo', base: 'light', page: '#f1f5f2', board: '#b4c5b6', accent: '#4f6b4a' },
+  { id: 'lotus', base: 'light', page: '#f5f1f3', board: '#c4b5bc', accent: '#8c5f72' },
+  { id: 'lavender', base: 'light', page: '#f3f1f5', board: '#bbb4c5', accent: '#6b5f8a' },
+  { id: 'apricot', base: 'light', page: '#f7f3f0', board: '#cabbb0', accent: '#8a6136' },
+  { id: 'jade', base: 'light', page: '#f1f5f5', board: '#b4c5c2', accent: '#3f6f63' },
+  { id: 'clay', base: 'light', page: '#f6f2f1', board: '#c6b9b3', accent: '#7d5a44' },
+  { id: 'fog', base: 'light', page: '#f2f3f4', board: '#babdc0', accent: '#5a6268' },
+  { id: 'glacier', base: 'light', page: '#f1f4f6', board: '#b3c0c7', accent: '#3c627a' },
+  { id: 'wheat', base: 'light', page: '#f6f5f0', board: '#c8c2b1', accent: '#7a6329' },
+  { id: 'plum', base: 'dark', page: '#2a2126', board: '#6c5b66', accent: '#c6aab8' },
+  { id: 'forest', base: 'dark', page: '#202a24', board: '#5a6d60', accent: '#a6bfa9' },
+  { id: 'indigo', base: 'dark', page: '#1e202c', board: '#575a70', accent: '#9fadd2' },
+  { id: 'cocoa', base: 'dark', page: '#2b2420', board: '#6e6159', accent: '#c4a98c' },
+  { id: 'rosewood', base: 'dark', page: '#2c211e', board: '#705c57', accent: '#cda396' },
+  { id: 'ocean', base: 'dark', page: '#1c2a2f', board: '#526c75', accent: '#96bccd' },
+];
+
+function cpNormHex(h) {
+  var rgb = hexToRgb255(h);
+  return rgb ? rgbToHex(rgb[0], rgb[1], rgb[2]).toLowerCase() : '';
+}
+function cpThemeById(id) {
+  for (var i = 0; i < CP_THEMES.length; i++) if (CP_THEMES[i].id === id) return CP_THEMES[i];
+  return null;
+}
+// A preset stays highlighted even after its palette is softened: the chosen id lives in
+// S.themePreset, and hand edits clear it so a bespoke palette highlights "custom" instead.
+function cpActiveTheme() {
+  if (S.theme === 'light' || S.theme === 'dark') return S.theme;
+  if (S.theme !== 'custom') return '';
+  var b = cpNormHex(S.boardColor), p = cpNormHex(S.pageBgColor);
+  var acc = cpNormHex(S.customColors && S.customColors.accent);
+  if (!acc) return '';
+  var pin = S.themePreset && cpThemeById(S.themePreset);
+  if (pin && b === cpNormHex(pin.board) && p === cpNormHex(pin.page) && acc === cpNormHex(pin.accent)) return pin.id;
+  if (pin) return '';
+  for (var i = 0; i < CP_THEMES.length; i++) {
+    var t = CP_THEMES[i];
+    if (t.kind === 'light' || t.kind === 'dark') continue;
+    if (b === cpNormHex(t.board) && p === cpNormHex(t.page) && acc === cpNormHex(t.accent)) return t.id;
+  }
+  return '';
+}
+// One-shot migration: a palette saved under an older, harsher revision of the same theme
+// is moved to the softened values so the user keeps the theme they picked.
+function cpMigrateThemes() {
+  if (S.theme !== 'custom' || !S.customColors) return false;
+  var b = cpNormHex(S.boardColor), p = cpNormHex(S.pageBgColor), acc = cpNormHex(S.customColors.accent);
+  if (!b || !p || !acc) return false;
+  for (var i = 0; i < CP_THEMES.length; i++) {
+    var t = CP_THEMES[i], o = t.prev;
+    if (!o) continue;
+    if (b === cpNormHex(o.board) && p === cpNormHex(o.page) && acc === cpNormHex(o.accent)) {
+      cpApplyTheme(t);
+      return true;
+    }
+  }
+  return false;
+}
+function cpThemeName(t) {
+  return T('cpTh' + t.id.charAt(0).toUpperCase() + t.id.slice(1));
+}
+function cpPaintThemes() {
+  var box = els.cp_theme_presets;
+  if (!box) return;
+  box.innerHTML = CP_THEMES.map(function (t) {
+    var nm = cpThemeName(t);
+    return '<button type="button" data-thm="' + t.id + '" title="' + nm + '">' +
+      '<span class="cp-th-sw" style="background:' + t.page + '">' +
+        '<i style="background:' + t.board + '"></i>' +
+        '<b style="background:' + t.accent + '"></b>' +
+      '</span>' +
+      '<span class="cp-th-nm">' + nm + '</span>' +
+    '</button>';
+  }).join('');
+  [].forEach.call(box.querySelectorAll('button'), function (b) {
+    b.onclick = function () {
+      var t = cpThemeById(b.getAttribute('data-thm'));
+      if (t) cpApplyTheme(t);
+    };
+  });
+  cpSyncThemes();
+}
+function cpSyncThemes() {
+  var box = els.cp_theme_presets;
+  if (!box) return;
+  var active = cpActiveTheme();
+  [].forEach.call(box.querySelectorAll('button'), function (b) {
+    b.classList.toggle('on', b.getAttribute('data-thm') === active);
+  });
+  // a hand-made palette (or custom colours that match no preset) highlights the custom key
+  if (els.cp_custom) els.cp_custom.classList.toggle('on', S.theme === 'custom' && !active);
+}
+function cpApplyTheme(t) {
+  if (!t) return;
+  S.themePreset = t.id;
+  if (!S.customColors || typeof S.customColors !== 'object') S.customColors = {};
+  if (t.kind === 'light' || t.kind === 'dark') {
+    // the two regular themes use the built-in palette, so drop every custom colour
+    S.theme = t.kind;
+    S.customBase = t.kind;
+    S.boardColor = '';
+    S.pageBgColor = '';
+    S.customColors.board = '';
+    S.customColors.page = '';
+    S.customColors.accent = '';
+    applyColors();
+    save();
+    applyTheme();
+    cpFromColor(cpCurrentHex());
+    return;
+  }
+  S.theme = 'custom';
+  S.customBase = t.base;
+  S.boardColor = t.board;
+  S.pageBgColor = t.page;
+  S.customColors.board = t.board;
+  S.customColors.page = t.page;
+  S.customColors.accent = t.accent;
+  applyColors();
+  save();
+  applyTheme();
+  cpFromColor(cpCurrentHex());
+}
 
 function cpRGB() { var c = hsvToRgb(CP.h, CP.s, CP.v); return [Math.round(c[0]), Math.round(c[1]), Math.round(c[2])]; }
 function cpCurrentHex() {
@@ -7300,9 +8126,11 @@ function cpLive() {
   if (CP.target === 'page') { S.pageBgColor = hex; S.customColors.page = hex; }
   else { S.boardColor = hex; S.customColors.board = hex; }
   applyColors(); paint();
+  cpSyncThemes();
 }
 
 function cpCommit(keepTheme) {
+  S.themePreset = '';     // a hand edit is no longer a preset
   if (!keepTheme && S.theme !== 'custom') { S.customBase = (S.theme === 'dark') ? 'dark' : 'light'; S.theme = 'custom'; cpSyncSegs(); }
   var hex = rgbToHex.apply(null, cpRGB());
   if (!S.customColors || typeof S.customColors !== 'object') S.customColors = {};
@@ -7314,10 +8142,7 @@ function cpCommit(keepTheme) {
   applyTheme();
 }
 function cpSyncSegs() {
-  if (els.cp_theme) [].forEach.call(els.cp_theme.querySelectorAll('button'), function (b) {
-    b.classList.toggle('on', b.getAttribute('data-th') === (S.theme || 'light'));
-  });
-
+  cpSyncThemes();
   if (els.cpPresetRow) els.cpPresetRow.hidden = (CP.target === 'page');
   if (els.cp_target) [].forEach.call(els.cp_target.querySelectorAll('button'), function (b) {
     b.classList.toggle('on', b.getAttribute('data-tg') === CP.target);
@@ -7353,8 +8178,28 @@ function cpBindDrag(cv, name, onPos) {
   window.addEventListener('mousemove', function (e) { if (CP.drag === name) at(e); });
   window.addEventListener('mouseup', function () { if (CP.drag === name) { CP.drag = 0; cpCommit(); } });
 }
+// the theme page and the palette are two views of the same card: the palette only appears
+
+function cpShowCustom(on) {
+  on = !!on;
+  if (els.cpThemesView) els.cpThemesView.hidden = on;
+  if (els.cpCustomView) els.cpCustomView.hidden = !on;
+  // settings page: the custom key lives in the header, so it hides while the palette is open,
+  
+  if (els.cp_custom && els.cp_custom.classList.contains('sp-cust-key')) {
+    els.cp_custom.hidden = on;
+    document.body.classList.toggle('sp-custing', on);
+    var ttl = document.getElementById('t_spColorTtl');
+    if (ttl) ttl.textContent = on ? T('cpCustom') : T('color');
+  }
+  if (on) {
+    cpSyncSegs();
+    cpFromColor(cpCurrentHex());   // also repaints the picker now that it has a real size
+  }
+}
 function openColorPop() {
   if (els.colorPop) els.colorPop.hidden = false;
+  cpShowCustom(false);
   cpSyncSegs();
   cpFromColor(cpCurrentHex());
 }
@@ -7364,34 +8209,8 @@ function wireColors() {
   if (els.btn_color) els.btn_color.onclick = function () { openColorPop(); };
   els.cp_close.onclick = closeColorPop;
   els.colorPop.addEventListener('click', function (e) { if (e.target === els.colorPop) closeColorPop(); });
-  els.cp_theme.onclick = function (e) {
-    var b = e.target.closest('button'); if (!b) return;
-    var th = b.getAttribute('data-th');
-    S.theme = (th === 'dark' || th === 'custom') ? th : 'light';
-    if (th !== 'custom') S.customBase = th;
-
-    if (th !== 'custom') {
-      if (!S.customColors || typeof S.customColors !== 'object') S.customColors = {};
-      if (S.boardColor) S.customColors.board = S.boardColor;
-      if (S.pageBgColor) S.customColors.page = S.pageBgColor;
-      S.boardColor = ''; S.pageBgColor = '';
-    }
-
-    if (th === 'custom' && !S.boardColor && !S.pageBgColor) {
-      if (!S.customColors || typeof S.customColors !== 'object') S.customColors = {};
-      if (S.customColors.board || S.customColors.page) {
-        S.boardColor = S.customColors.board;
-        S.pageBgColor = S.customColors.page;
-      } else {
-        var hex0 = rgbToHex.apply(null, cpRGB());
-        if (CP.target === 'page') { S.pageBgColor = hex0; S.customColors.page = hex0; }
-        else { S.boardColor = hex0; S.customColors.board = hex0; }
-      }
-    }
-    applyTheme(); cpSyncSegs();
-    if (th !== 'custom') cpFromColor(cpCurrentHex());
-    save();
-  };
+  if (els.cp_custom) els.cp_custom.onclick = function () { cpShowCustom(true); };
+  if (els.cp_custom_back) els.cp_custom_back.onclick = function () { cpShowCustom(false); };
   els.cp_target.onclick = function (e) {
     var b = e.target.closest('button'); if (!b) return;
     CP.target = (b.getAttribute('data-tg') === 'page') ? 'page' : 'board';
@@ -7406,6 +8225,8 @@ function wireColors() {
 
     b.onclick = function () { cpFromColor(b.getAttribute('data-c')); cpCommit(true); };
   });
+  try { cpMigrateThemes(); } catch (eMig) {}
+  cpPaintThemes();
   cpBindDrag(els.cp_sv, 'sv', function (x, y) {
     CP.s = x; CP.v = 1 - y; cpLive();
   });
@@ -7436,7 +8257,7 @@ function wireColors() {
     if (!S.customColors || typeof S.customColors !== 'object') S.customColors = {};
     S.boardColor = ''; S.pageBgColor = '';
 
-    S.customColors.board = ''; S.customColors.page = '';
+    S.customColors.board = ''; S.customColors.page = ''; S.customColors.accent = '';
 
     if (S.theme === 'custom') { S.theme = 'light'; S.customBase = 'light'; }
 
@@ -7458,7 +8279,7 @@ var PREFS_KEY = 'gbcalc.prefs.v1';
 // ENGINE_PREF_KEY and are written only on an explicit change.
 var PREF_FIELDS = ['cores', 'hashMB', 'turnMs', 'rule', 'lang', 'theme',
                    'cards', 'customBase', 'aiB', 'aiW', 'linkAuto', 'linkClicks',
-                   'candRange', 'maxDepth', 'maxNodes'];
+                   'candRange', 'maxDepth', 'maxNodes', 'uiFont'];
 function prefsAll() {
   var o = null;
   try { o = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'); } catch (e) { o = null; }
@@ -7603,7 +8424,7 @@ function applyCardVis() {
 // ---- settings window (its own WebView, ?set=1) ------------------------------------------------
 // Preferences live in a second WebView window that the host creates (width = 0.4 of the main
 // window, same height, fixed ratio). The page runs this same file in SET_MODE: it shows the key
-// list and, behind the colour key, the palette. Cards keep living in the main window - the keys
+
 // here only decide whether a card is visible there.
 //
 // State sharing: the settings page must never write the big gbcalc.settings.v1 snapshot (it would
@@ -7626,19 +8447,21 @@ function setPatchNow() {
     customColors: S.customColors || null,
     cards: { engine: cv.engine ? 1 : 0, analysis: cv.analysis ? 1 : 0, setup: cv.setup ? 1 : 0 },
     mode: S.mode, rule: +S.rule, turnMs: +S.turnMs,
-    aiB: !!S.aiB, aiW: !!S.aiW, bgThink: !!S.bgThink,
+    aiB: !!S.aiB, aiW: !!S.aiW, bgThink: !!S.bgThink, dynTime: S.dynTime !== false,
     cores: +S.cores || 0, hashMB: +S.hashMB || 0,
     variant: S.variant || '', weights: S.weights || '',
     candRange: (S.candRange === undefined || S.candRange === null) ? null : +S.candRange,
     nbest: +S.nbest || 3, maxDepth: +S.maxDepth || 0, maxNodes: +S.maxNodes || 0,
-    showNum: !!S.showNum, previewOn: S.previewOn !== false
+    showNum: !!S.showNum, previewOn: S.previewOn !== false,
+    uiFont: fontCfg()
   };
 }
 // fields the settings window is allowed to write back into the stored snapshot
 function setSyncFields() {
   return ['lang', 'theme', 'customBase', 'cssVars', 'boardColor', 'pageBgColor', 'customColors',
-          'mode', 'rule', 'turnMs', 'aiB', 'aiW', 'bgThink', 'cores', 'hashMB',
-          'variant', 'weights', 'candRange', 'nbest', 'maxDepth', 'maxNodes', 'showNum', 'previewOn'];
+          'mode', 'rule', 'turnMs', 'aiB', 'aiW', 'bgThink', 'dynTime', 'cores', 'hashMB',
+          'variant', 'weights', 'candRange', 'nbest', 'maxDepth', 'maxNodes', 'showNum', 'previewOn',
+          'uiFont'];
 }
 function setPatchWrite() {
   if (!SET_MODE) return;   // patch key: settings window writes, main pages only read
@@ -7667,19 +8490,28 @@ function setPatchWrite() {
     if (ch) localStorage.setItem(settingsKey(), JSON.stringify(st));
   } catch (e) {}
 }
-function setPatchApply(p) {
+// fromMain: this page is FOLLOWING the main window (mainSync / boot snapshot). Never let a
+// followed patch force a mode switch: doing so made the prewarmed settings page rewrite the
+// main window's "place" mode back to "pve" whenever it booted a moment late.
+function setPatchApply(p, fromMain, skipLook) {
   if (!p) return;
   var langCh = false, lookCh = false, cardCh = false, setupCh = false, engCh = false;
+  var fontCh = false;
   var lg = (p.lang === 'en') ? 'en' : (p.lang === 'zh' ? 'zh' : '');
   if (lg && lg !== S.lang) { S.lang = lg; langCh = true; }
-  if (p.theme && p.theme !== S.theme) { S.theme = p.theme; lookCh = true; }
-  if (p.customBase && p.customBase !== S.customBase) { S.customBase = p.customBase; lookCh = true; }
-  if (p.cssVars !== undefined &&
-      JSON.stringify(p.cssVars || null) !== JSON.stringify(S.cssVars || null)) { S.cssVars = p.cssVars; lookCh = true; }
-  if (typeof p.boardColor === 'string' && p.boardColor !== S.boardColor) { S.boardColor = p.boardColor; lookCh = true; }
-  if (typeof p.pageBgColor === 'string' && p.pageBgColor !== S.pageBgColor) { S.pageBgColor = p.pageBgColor; lookCh = true; }
-  if (p.customColors && JSON.stringify(p.customColors) !== JSON.stringify(S.customColors || null)) {
-    S.customColors = p.customColors; lookCh = true;
+  // A SETKEY patch left over from an older session must not repaint the freshly loaded
+  // snapshot: the settings window also merges these fields into gbcalc.settings.v1, so at
+  // boot the stored snapshot is the newer authority for everything look-related.
+  if (!skipLook) {
+    if (p.theme && p.theme !== S.theme) { S.theme = p.theme; lookCh = true; }
+    if (p.customBase && p.customBase !== S.customBase) { S.customBase = p.customBase; lookCh = true; }
+    if (p.cssVars !== undefined &&
+        JSON.stringify(p.cssVars || null) !== JSON.stringify(S.cssVars || null)) { S.cssVars = p.cssVars; lookCh = true; }
+    if (typeof p.boardColor === 'string' && p.boardColor !== S.boardColor) { S.boardColor = p.boardColor; lookCh = true; }
+    if (typeof p.pageBgColor === 'string' && p.pageBgColor !== S.pageBgColor) { S.pageBgColor = p.pageBgColor; lookCh = true; }
+    if (p.customColors && JSON.stringify(p.customColors) !== JSON.stringify(S.customColors || null)) {
+      S.customColors = p.customColors; lookCh = true;
+    }
   }
   if (p.cards) {
     var cv = cardVis();
@@ -7708,14 +8540,19 @@ function setPatchApply(p) {
       setAiSides(nb, nw); setupCh = true;
       // same semantics as the main window's own aiSideToggle: back to pve, unpause a
       // both-AI game, so the change actually DRIVES the engine, not just the labels
-      try { if (S.mode !== 'pve') S.mode = 'pve'; } catch (eA1) {}
-      try { if (aiVsAi()) S.paused = false; } catch (eA2) {}
-      try { coachPauseByAiVsAi(); } catch (eA3) {}
+      if (!fromMain) {
+        try { if (S.mode !== 'pve') S.mode = 'pve'; } catch (eA1) {}
+        try { if (aiVsAi()) S.paused = false; } catch (eA2) {}
+        try { coachPauseByAiVsAi(); } catch (eA3) {}
+      }
     }
   }
   if (p.bgThink !== undefined && p.bgThink !== null && !!p.bgThink !== !!S.bgThink) {
     S.bgThink = !!p.bgThink; setupCh = true;
     try { if (!S.bgThink) { bgThinkStop(); bgThinkHaltEngine(); } } catch (eB1) {}
+  }
+  if (p.dynTime !== undefined && p.dynTime !== null && !!p.dynTime !== (S.dynTime !== false)) {
+    S.dynTime = !!p.dynTime; setupCh = true;
   }
   if (p.cores !== undefined && +p.cores >= 1 && +p.cores !== +S.cores) { S.cores = +p.cores | 0; setupCh = true; engCh = true; }
   if (p.hashMB !== undefined && +p.hashMB >= 16 && +p.hashMB !== +S.hashMB) { S.hashMB = +p.hashMB; setupCh = true; engCh = true; }
@@ -7741,14 +8578,22 @@ function setPatchApply(p) {
   }
   if (p.showNum !== undefined && p.showNum !== null && !!p.showNum !== !!S.showNum) { S.showNum = !!p.showNum; setupCh = true; }
   if (p.previewOn !== undefined && p.previewOn !== null && !!p.previewOn !== (S.previewOn !== false)) { S.previewOn = !!p.previewOn; setupCh = true; }
+  if (p.uiFont && typeof p.uiFont === 'object') {
+    var nf = normalizeFontCfg(p.uiFont);
+    if (JSON.stringify(nf) !== JSON.stringify(fontCfg())) { S.uiFont = nf; fontCh = true; }
+  }
 
-  if (!langCh && !lookCh && !cardCh && !setupCh) return;
+  if (!langCh && !lookCh && !cardCh && !setupCh && !fontCh) return;
   if (SET_MODE) {   // settings page: light path (no board / engine on this side)
     try { if (lookCh) applyTheme(); } catch (eS1) {}
     try { syncSetSetup(); syncSetKeys(); } catch (eS2) {}
-    try { save(); } catch (eS3) {}
+    try { if (fontCh) applyFontPrefs(); } catch (eS3) {}
+    // following the main window must not write a patch back: the settings page may still
+    // hold a boot-time snapshot and would echo stale play state over the main window.
+    if (!fromMain) { try { save(); } catch (eS4) {} }
     return;
   }
+  try { if (fontCh) applyFontPrefs(); } catch (eF0) {}
   try { if (lookCh) applyTheme(); } catch (e1) {}
   try { if (cardCh) applyCardVis(); } catch (e2) {}
   try { if (engCh) applyEngineConfig(); } catch (e5) {}
@@ -7777,25 +8622,94 @@ function buildSetPane() {
     '<div class="sp-scroll">' +
       '<div class="sp-rows">' +
         '<div class="sp-row">' +
-          '<button id="sp_color" class="sp-key"><span class="sp-kn" id="t_spColor">颜色</span></button>' +
+          '<button id="sp_color" class="sp-key"><span class="sp-kn" id="t_spColor">主题</span></button>' +
+          '<button id="sp_font" class="sp-key"><span class="sp-kn" id="t_spFont">字体</span></button>' +
           '<button id="sp_lang" class="sp-key sp-keylang"><b class="sp-v" id="spLangVal">EN</b></button>' +
         '</div>' +
-        '<div class="sp-row">' +
-          '<button class="sp-tgl" data-card="engine"><span class="sw"><i></i></span><span class="sp-kn" id="t_spEngine">引擎仪表盘</span></button>' +
-          '<button class="sp-tgl" data-card="analysis"><span class="sw"><i></i></span><span class="sp-kn" id="t_spAnalysis">计算评估</span></button>' +
-          '<button class="sp-tgl" data-card="setup"><span class="sw"><i></i></span><span class="sp-kn" id="t_spSetup">对局设置</span></button>' +
+        '<div class="sp-sec">' +
+          '<div class="sec-h"><span class="sec-t" id="t_spCards">窗口功能卡片展示</span></div>' +
+          '<div class="sp-row">' +
+            '<button class="sp-tgl" data-card="engine"><span class="sw"><i></i></span><span class="sp-kn" id="t_spEngine">引擎仪表盘</span></button>' +
+            '<button class="sp-tgl" data-card="analysis"><span class="sw"><i></i></span><span class="sp-kn" id="t_spAnalysis">计算评估</span></button>' +
+            '<button class="sp-tgl" data-card="setup"><span class="sw"><i></i></span><span class="sp-kn" id="t_spSetup">对局设置</span></button>' +
+          '</div>' +
         '</div>' +
       '</div>' +
       '<div class="sp-setup" id="spSetupBody"></div>' +
     '</div>' +
     '<div class="sp-color" id="spColorBox">' +
       '<div class="sp-color-h"><button id="sp_back" class="btn sq2">&lt;</button>' +
-        '<span class="sp-ttl" id="t_spColorTtl">颜色</span></div>' +
+        '<span class="sp-ttl" id="t_spColorTtl">主题</span></div>' +
+    '</div>' +
+    '<div class="sp-font" id="spFontBox">' +
+      '<div class="sp-color-h"><button id="spf_back" class="btn sq2">&lt;</button>' +
+        '<span class="sp-ttl" id="t_spFontTtl">字体设置</span></div>' +
+      '<div class="spf-body">' +
+        '<div class="spf-size">' +
+          '<div class="spf-lbl" id="t_fontSize">字体大小</div>' +
+          '<div class="spf-seg" id="spf_size">' +
+            '<button data-size="small" id="t_fontSmall">较小</button>' +
+            '<button data-size="normal" id="t_fontNormal">合适</button>' +
+            '<button data-size="large" id="t_fontLarge">较大</button>' +
+          '</div>' +
+        '</div>' +
+
+        
+        '<div class="spf-panel">' +
+          '<div class="spf-tabs" id="spf_tabs">' +
+            '<button type="button" data-tab="ui" id="t_fontTabUi">系统</button>' +
+            '<button type="button" data-tab="log" id="t_fontTabLog">提示</button>' +
+            '<button type="button" data-tab="num" id="t_fontTabNum">棋子</button>' +
+          '</div>' +
+          '<div class="spf-list" id="spf_list"></div>' +
+
+          
+          '<div class="spf-foot">' +
+            '<div class="spf-fbar" id="spf_fbar1">' +
+              '<div class="spf-wlbl">' +
+                '<span class="spf-lbl2" id="t_fontWeight">粗细</span>' +
+                '<b class="spf-wname" id="spf_wNow"></b>' +
+              '</div>' +
+              '<div class="spf-wsl" id="spf_weight" role="slider" aria-valuemin="1" aria-valuemax="5" aria-valuenow="2">' +
+                '<i class="spf-wsl-line"></i>' +
+                '<button type="button" class="spf-wdot" data-weight="300"></button>' +
+                '<button type="button" class="spf-wdot" data-weight="400"></button>' +
+                '<button type="button" class="spf-wdot" data-weight="500"></button>' +
+                '<button type="button" class="spf-wdot" data-weight="700"></button>' +
+                '<button type="button" class="spf-wdot" data-weight="900"></button>' +
+              '</div>' +
+              '<button type="button" id="spf_italic" class="spf-it" aria-pressed="false">斜体</button>' +
+              '<button type="button" id="spf_ok" class="btn spf-ok">确定</button>' +
+            '</div>' +
+            '<div class="spf-fbar spf-fbar-stone" id="spf_stoneRow" hidden>' +
+              '<div class="spf-stones flat" id="spf_stones" hidden>' +
+                '<div class="spf-stone blk"><span id="spf_stone_b">1</span></div>' +
+                '<div class="spf-stone wht"><span id="spf_stone_w">2</span></div>' +
+              '</div>' +
+              '<div class="spf-seg spf-numseg" id="spf_numsize" hidden>' +
+                '<button type="button" data-numsize="small" id="t_fontNumSmall">小</button>' +
+                '<button type="button" data-numsize="normal" id="t_fontNumNormal">中</button>' +
+                '<button type="button" data-numsize="large" id="t_fontNumLarge">大</button>' +
+              '</div>' +
+              '<div class="spf-seg spf-stoneseg" id="spf_stonestyle" hidden>' +
+                '<button type="button" data-stone="real" id="t_fontStoneReal">仿真</button>' +
+                '<button type="button" data-stone="jade" id="t_fontStoneJade">玉石</button>' +
+                '<button type="button" data-stone="flat" id="t_fontStoneFlat">扁平</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
     '</div>';
   document.body.appendChild(host);
   var cp = document.getElementById('colorPop');
   var box = document.getElementById('spColorBox');
   if (cp && box) box.appendChild(cp);
+  // the custom key sits at the right end of the page header - the grid itself belongs to the
+  // presets and should not repeat the entry underneath (space goes to the 36 swatches)
+  var custKey = document.getElementById('cp_custom');
+  var cpHead = box ? box.querySelector('.sp-color-h') : null;
+  if (custKey && cpHead) { custKey.classList.add('sp-cust-key'); cpHead.appendChild(custKey); }
   // the setup card ships in this very document: move it below the key rows and strip its header
   var sc = document.querySelector('.card[data-id="setup"]');
   var bodyBox = document.getElementById('spSetupBody');
@@ -7807,8 +8721,251 @@ function buildSetPane() {
 }
 
 function setColorView(on) {
+  if (on) document.body.classList.remove('sp-fonting');
   document.body.classList.toggle('sp-coloring', !!on);
   if (on) openColorPop(); else closeColorPop();
+}
+
+// ---- settings: font page ---------------------------------------------------------------
+function setFontView(on) {
+  if (on) setColorView(false);
+  document.body.classList.toggle('sp-fonting', !!on);
+  if (on) { try { syncFontPane(); } catch (eSF0) {} try { spfLoadLocalFonts(); } catch (eSF1) {} }
+}
+
+var SPF_LOCAL_FONTS = null;
+var SPF_FALLBACK_FONTS = [
+  'Microsoft YaHei', 'Microsoft JhengHei', 'SimSun', 'SimHei', 'KaiTi', 'FangSong', 'DengXian',
+  'Source Han Sans SC', 'Source Han Serif SC', 'Noto Sans SC', 'Noto Serif SC',
+  'Consolas', 'Cascadia Mono', 'Segoe UI', 'Arial', 'Times New Roman', 'Georgia',
+  'Verdana', 'Tahoma', 'Trebuchet MS', 'Cambria', 'Calibri'
+];
+function spfFontNames() {
+  var out = [], seen = {};
+  function add(n) {
+    n = String(n || '').trim();
+    if (!n || seen[n]) return;
+    seen[n] = 1; out.push(n);
+  }
+  (SPF_FALLBACK_FONTS || []).forEach(add);
+  (SPF_LOCAL_FONTS || []).forEach(add);
+  return out.sort(function (a, b) { return a.localeCompare(b); });
+}
+function spfLoadLocalFonts() {
+  spfRenderList();
+  if (SPF_LOCAL_FONTS || !window.queryLocalFonts) return;
+  try {
+    window.queryLocalFonts().then(function (list) {
+      var names = [];
+      (list || []).forEach(function (f) { if (f && f.family) names.push(f.family); });
+      SPF_LOCAL_FONTS = names;
+      spfRenderList(true);
+    }).catch(function () { SPF_LOCAL_FONTS = []; });
+  } catch (e) { SPF_LOCAL_FONTS = []; }
+}
+function spfSetSeg(id, attr, val) {
+  var box = document.getElementById(id);
+  if (!box) return;
+  [].forEach.call(box.querySelectorAll('button'), function (b) {
+    b.classList.toggle('on', b.getAttribute(attr) === val);
+  });
+}
+
+var SPF_TAB = 'ui';
+var SPF_PICK = { ui: '', log: '', num: '' };
+var SPF_PICK_SIZE = 'normal';
+var SPF_PICK_W = { ui: 400, log: 400, num: 700 };
+var SPF_PICK_I = { ui: false, log: false, num: false };
+var STONE_KINDS = ['real', 'jade', 'flat'];
+var SPF_PICK_STONE = 'flat';
+var SPF_COMMIT = null;          // last committed config seen by the pane
+var SPF_LIST_SIG = '';          // avoids rebuilding the list on every patch
+var SPF_OK_TIMER = 0;
+
+function spfEnts(tab) {
+  var out = [{ v: '', n: T('fontDefault') }];
+  var names = spfFontNames();
+  var cur = String(SPF_PICK[tab] || '').trim();
+  if (cur && names.indexOf(cur) < 0) names.push(cur);
+  names.sort(function (a, b) { return a.localeCompare(b); });
+  names.forEach(function (n) { out.push({ v: n, n: n }); });
+  return out;
+}
+function spfFam(tab, v) {
+  var dflt = (tab === 'num') ? FONT_NUM_DEFAULT : FONT_UI_DEFAULT;
+  return v ? fontFamilyCss(v, dflt) : dflt;
+}
+function spfSample(tab) {
+  if (tab === 'log') return T('fontSampleLog');
+  if (tab === 'num') return T('fontSampleNum');
+  return T('fontSampleUi');
+}
+function spfRenderList(force) {
+  var box = document.getElementById('spf_list');
+  if (!box) return;
+  var ents = spfEnts(SPF_TAB);
+  var w = SPF_PICK_W[SPF_TAB] || FONT_WEIGHT_DEFAULT;
+  var ital = !!SPF_PICK_I[SPF_TAB];
+  var sig = SPF_TAB + '|' + ents.length + '|' + (SPF_PICK[SPF_TAB] || '') + '|' + S.lang +
+            '|' + w + '|' + (ital ? 1 : 0);
+  if (!force && SPF_LIST_SIG === sig) return;
+  SPF_LIST_SIG = sig;
+  var sample = spfSample(SPF_TAB);
+  var frag = document.createDocumentFragment();
+  ents.forEach(function (e) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'spf-row';
+    if (!e.v) b.classList.add('spf-def');   
+    b.setAttribute('data-v', e.v);
+    b.style.fontFamily = spfFam(SPF_TAB, e.v);
+    b.style.fontWeight = String(w);
+    b.style.fontStyle = ital ? 'italic' : 'normal';
+    if (e.v === (SPF_PICK[SPF_TAB] || '')) b.classList.add('on');
+    var n = document.createElement('span');
+    n.className = 'spf-row-n';
+    n.textContent = e.n;
+    var s = document.createElement('span');
+    s.className = 'spf-row-s';
+    s.textContent = sample;
+    b.appendChild(n); b.appendChild(s);
+    if (SPF_TAB === 'num') {
+      try { s.style.fontSize = '1.02rem'; } catch (eNS) {}
+    }
+    frag.appendChild(b);
+  });
+  box.innerHTML = '';
+  box.appendChild(frag);
+  // keep the selected row in view after a pick / tab switch
+  var on = box.querySelector('.spf-row.on');
+  if (on && on.scrollIntoView) { try { on.scrollIntoView({ block: 'nearest' }); } catch (eSV) {} }
+}
+function spfStonePaint() {
+  var scale = FONT_NUM_SCALE[SPF_PICK_SIZE] || FONT_NUM_SCALE.normal;
+  var fam = spfFam('num', SPF_PICK.num);
+  var w = SPF_PICK_W.num || FONT_NUM_WEIGHT_DEFAULT;
+  var ital = !!SPF_PICK_I.num;
+  var box = document.getElementById('spf_stones');
+  if (box) {
+    box.classList.toggle('real', SPF_PICK_STONE === 'real');
+    box.classList.toggle('jade', SPF_PICK_STONE === 'jade');
+    box.classList.toggle('flat', SPF_PICK_STONE === 'flat');
+  }
+  ['spf_stone_b', 'spf_stone_w'].forEach(function (id) {
+    var e = document.getElementById(id);
+    if (!e) return;
+    e.style.fontFamily = fam;
+    e.style.fontWeight = String(w);
+    e.style.fontStyle = ital ? 'italic' : 'normal';
+    e.style.fontSize = (2.7 * scale) + 'rem';
+  });
+}
+function spfWeightName(w) {
+  var n = Math.round(+w);
+  if (n >= 900) return T('fontWBlack');
+  if (n >= 700) return T('fontWBold');
+  if (n >= 500) return T('fontWMedium');
+  if (n >= 400) return T('fontWNormal');
+  return T('fontWLight');
+}
+function spfFootSync() {
+  var isNum = (SPF_TAB === 'num');
+  function show(id, on) {
+    var e = document.getElementById(id);
+    if (!e) return;
+    e.hidden = !on;
+    e.style.display = on ? 'flex' : 'none';
+  }
+  var srow = document.getElementById('spf_stoneRow');
+  if (srow) { srow.hidden = !isNum; srow.style.display = isNum ? 'flex' : 'none'; }
+  show('spf_stones', isNum);
+  show('spf_numsize', isNum);
+  show('spf_stonestyle', isNum);
+  
+  var ok = document.getElementById('spf_ok');
+  var okRow = isNum ? srow : document.getElementById('spf_fbar1');
+  if (ok && okRow && ok.parentNode !== okRow) okRow.appendChild(ok);
+  spfSetSeg('spf_numsize', 'data-numsize', SPF_PICK_SIZE);
+  spfSetSeg('spf_stonestyle', 'data-stone', SPF_PICK_STONE);
+  spfSetSeg('spf_weight', 'data-weight', String(SPF_PICK_W[SPF_TAB]));
+  var wi = FONT_WEIGHTS.indexOf(SPF_PICK_W[SPF_TAB]);
+  var wsl = document.getElementById('spf_weight');
+  if (wsl) wsl.setAttribute('aria-valuenow', String((wi >= 0 ? wi : 1) + 1));
+  var wn = document.getElementById('spf_wNow');
+  if (wn) wn.textContent = spfWeightName(SPF_PICK_W[SPF_TAB]);
+  var it = document.getElementById('spf_italic');
+  if (it) {
+    var onI = !!SPF_PICK_I[SPF_TAB];
+    it.classList.toggle('on', onI);
+    it.setAttribute('aria-pressed', onI ? 'true' : 'false');
+  }
+  spfStonePaint();
+}
+function spfTabSet(tab) {
+  if (tab !== 'ui' && tab !== 'log' && tab !== 'num') return;
+  SPF_TAB = tab;
+  [].forEach.call(document.querySelectorAll('#spf_tabs button'), function (b) {
+    b.classList.toggle('on', b.getAttribute('data-tab') === SPF_TAB);
+  });
+  spfRenderList(true);
+  spfFootSync();
+}
+function spfPick(v) {
+  SPF_PICK[SPF_TAB] = String(v || '');
+  spfRenderList(true);
+  spfFootSync();
+}
+function spfOkFlash() {
+  var ok = document.getElementById('spf_ok');
+  if (!ok) return;
+  ok.textContent = T('fontApplied');
+  ok.classList.add('spf-ok-done');
+  if (SPF_OK_TIMER) clearTimeout(SPF_OK_TIMER);
+  SPF_OK_TIMER = setTimeout(function () {
+    SPF_OK_TIMER = 0;
+    var b = document.getElementById('spf_ok');
+    if (b) { b.textContent = T('fontOk'); b.classList.remove('spf-ok-done'); }
+  }, 1300);
+}
+function spfApply() {
+  if (SPF_TAB === 'ui') {
+    fontPrefSet({ ui: SPF_PICK.ui, uiWeight: SPF_PICK_W.ui, uiItalic: !!SPF_PICK_I.ui });
+  } else if (SPF_TAB === 'log') {
+    fontPrefSet({ log: SPF_PICK.log, logWeight: SPF_PICK_W.log, logItalic: !!SPF_PICK_I.log });
+  } else {
+    fontPrefSet({ num: SPF_PICK.num, numSize: SPF_PICK_SIZE,
+                  numWeight: SPF_PICK_W.num, numItalic: !!SPF_PICK_I.num,
+                  stone: SPF_PICK_STONE });
+  }
+  spfOkFlash();
+}
+function syncFontPane() {
+  if (!SET_MODE) return;
+  var f = fontCfg();
+  spfSetSeg('spf_size', 'data-size', f.size);
+  var c = SPF_COMMIT || {};
+  // only fields whose committed value really changed reset the pending pick, so an
+  // unsaved choice is not wiped by an unrelated patch / language refresh
+  if (c.ui !== f.ui) SPF_PICK.ui = f.ui;
+  if (c.uiWeight !== f.uiWeight) SPF_PICK_W.ui = f.uiWeight;
+  if (c.uiItalic !== f.uiItalic) SPF_PICK_I.ui = !!f.uiItalic;
+  if (c.log !== f.log) SPF_PICK.log = f.log;
+  if (c.logWeight !== f.logWeight) SPF_PICK_W.log = f.logWeight;
+  if (c.logItalic !== f.logItalic) SPF_PICK_I.log = !!f.logItalic;
+  if (c.num !== f.num) SPF_PICK.num = f.num;
+  if (c.numWeight !== f.numWeight) SPF_PICK_W.num = f.numWeight;
+  if (c.numItalic !== f.numItalic) SPF_PICK_I.num = !!f.numItalic;
+  if (c.numSize !== f.numSize) SPF_PICK_SIZE = f.numSize;
+  if (c.stone !== f.stone) SPF_PICK_STONE = f.stone;
+  SPF_COMMIT = { ui: f.ui, uiWeight: f.uiWeight, uiItalic: !!f.uiItalic,
+                 log: f.log, logWeight: f.logWeight, logItalic: !!f.logItalic,
+                 num: f.num, numWeight: f.numWeight, numItalic: !!f.numItalic,
+                 numSize: f.numSize, stone: f.stone, size: f.size };
+  [].forEach.call(document.querySelectorAll('#spf_tabs button'), function (b) {
+    b.classList.toggle('on', b.getAttribute('data-tab') === SPF_TAB);
+  });
+  spfRenderList();
+  spfFootSync();
 }
 
 function syncSetKeys() {
@@ -7825,12 +8982,48 @@ function syncSetLabels() {
   var d = I18N[S.lang] || I18N.zh;
   function tx(id, v) { var e = document.getElementById(id); if (e && v != null) e.textContent = v; }
   tx('t_spColor', d.color);
+  tx('t_spLang', d.lang);
   tx('t_spEngine', d.engine);
   tx('t_spAnalysis', d.analysis);
   tx('t_spSetup', d.setup);
-  tx('t_spColorTtl', d.color);
+  
+  tx('t_spColorTtl', document.body.classList.contains('sp-custing') ? d.cpCustom : d.color);
+  tx('t_spFont', d.font);
+  tx('t_spFontTtl', d.fontTtl);
+  tx('t_fontSize', d.fontSize);
+  tx('t_fontSmall', d.fontSmall);
+  tx('t_fontNormal', d.fontNormal);
+  tx('t_fontLarge', d.fontLarge);
+  tx('t_fontTabUi', d.fontTabUi);
+  tx('t_fontTabLog', d.fontTabLog);
+  tx('t_fontTabNum', d.fontTabNum);
+  tx('t_fontNumSmall', d.fontNumS);
+  tx('t_fontNumNormal', d.fontNumM);
+  tx('t_fontNumLarge', d.fontNumL);
+  tx('t_fontWeight', d.fontWeight);
+  
+  var wNames = {
+    300: d.fontWLight, 400: d.fontWNormal, 500: d.fontWMedium,
+    700: d.fontWBold, 900: d.fontWBlack
+  };
+  [].forEach.call(document.querySelectorAll('#spf_weight button'), function (b) {
+    var nm = wNames[parseInt(b.getAttribute('data-weight'), 10)];
+    if (nm) { b.title = nm; b.setAttribute('aria-label', nm); }
+  });
+  tx('spf_italic', d.fontItalic);
+  tx('t_fontStoneReal', d.fontStoneReal);
+  tx('t_fontStoneJade', d.fontStoneJade);
+  tx('t_fontStoneFlat', d.fontStoneFlat);
+  tx('spf_ok', d.fontOk);
+  try { syncFontPane(); } catch (eFL) {}
   // the native window title follows the UI language too
   if (SET_MODE && HOST) { try { tellHost({ type: 'setTitle', txt: d.setWin }); } catch (eTT) {} }
+  // 2026-10-31: the new "dynamic time" row (game section) - label + one-line explanation
+  tx('t_spCards', d.spCards);
+  // keep the sky-blue label colour in sync when the window opens / theme changes
+  try { syncLabelAccent(); } catch (eLA2) {}
+  tx('t_dynTime', d.dynTime);
+  tx('t_dynTimeHint', d.dynTimeHint);
 }
 
 function buildCardMenu() {
@@ -7846,7 +9039,99 @@ function wireSetPane() {
   var ck = document.getElementById('sp_color');
   if (ck) ck.onclick = function () { setColorView(true); };
   var bk = document.getElementById('sp_back');
-  if (bk) bk.onclick = function () { setColorView(false); };
+  if (bk) bk.onclick = function () {
+    // the palette lives inside the theme page: one step back returns to the swatches, not
+    // straight to the settings list (and no extra header row is spent on it)
+    if (document.body.classList.contains('sp-custing')) { cpShowCustom(false); return; }
+    setColorView(false);
+  };
+  // ---- font page ----
+  var fk = document.getElementById('sp_font');
+  if (fk) fk.onclick = function () { setFontView(true); };
+  var fbk = document.getElementById('spf_back');
+  if (fbk) fbk.onclick = function () { setFontView(false); };
+  var szBox = document.getElementById('spf_size');
+  if (szBox) szBox.onclick = function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    fontPrefSet({ size: b.getAttribute('data-size') });
+  };
+  var tabs = document.getElementById('spf_tabs');
+  if (tabs) tabs.onclick = function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    spfTabSet(b.getAttribute('data-tab'));
+  };
+  var list = document.getElementById('spf_list');
+  if (list) list.onclick = function (e) {
+    var b = e.target.closest('.spf-row'); if (!b) return;
+    spfPick(b.getAttribute('data-v'));
+  };
+  
+  var nsBox = document.getElementById('spf_numsize');
+  if (nsBox) nsBox.onclick = function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    SPF_PICK_SIZE = b.getAttribute('data-numsize');
+    spfSetSeg('spf_numsize', 'data-numsize', SPF_PICK_SIZE);
+    spfStonePaint();
+  };
+  
+  var wBox = document.getElementById('spf_weight');
+  if (wBox) {
+    var wApply = function (b) {
+      if (!b) return;
+      var w = parseInt(b.getAttribute('data-weight'), 10) || FONT_WEIGHT_DEFAULT;
+      if (SPF_PICK_W[SPF_TAB] === w) return;
+      SPF_PICK_W[SPF_TAB] = w;
+      spfRenderList(true);
+      spfFootSync();
+    };
+    var wNearest = function (clientX) {
+      var dots = [].slice.call(wBox.querySelectorAll('button'));
+      var best = null, bestD = Infinity;
+      var rect = wBox.getBoundingClientRect();
+      var x = isFinite(clientX) ? clientX : rect.left + rect.width / 2;
+      dots.forEach(function (b) {
+        var br = b.getBoundingClientRect();
+        var d = Math.abs((br.left + br.width / 2) - x);
+        if (d < bestD) { bestD = d; best = b; }
+      });
+      return best;
+    };
+    wBox.onpointerdown = function (e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      try { wBox.setPointerCapture(e.pointerId); } catch (er) {}
+      wBox._drag = true;
+      wApply(wNearest(e.clientX));
+      e.preventDefault();
+    };
+    wBox.onpointermove = function (e) { if (wBox._drag) wApply(wNearest(e.clientX)); };
+    var wEnd = function (e) {
+      wBox._drag = false;
+      try { wBox.releasePointerCapture(e.pointerId); } catch (er) {}
+    };
+    wBox.onpointerup = wEnd;
+    wBox.onpointercancel = wEnd;
+    wBox.onclick = function (e) {
+      var b = e.target.closest('button');
+      if (b) wApply(b);
+    };
+  }
+  var itBtn = document.getElementById('spf_italic');
+  if (itBtn) itBtn.onclick = function () {
+    SPF_PICK_I[SPF_TAB] = !SPF_PICK_I[SPF_TAB];
+    spfRenderList(true);
+    spfFootSync();
+  };
+  
+  var stBox = document.getElementById('spf_stonestyle');
+  if (stBox) stBox.onclick = function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    SPF_PICK_STONE = b.getAttribute('data-stone') || 'flat';
+    if (STONE_KINDS.indexOf(SPF_PICK_STONE) < 0) SPF_PICK_STONE = 'flat';
+    spfSetSeg('spf_stonestyle', 'data-stone', SPF_PICK_STONE);
+    spfStonePaint();
+  };
+  var okBtn = document.getElementById('spf_ok');
+  if (okBtn) okBtn.onclick = function () { spfApply(); };
   // no footer close key: the native title bar closes the window
   [].forEach.call(document.querySelectorAll('#setPane .sp-tgl'), function (b) {
     b.onclick = function () {
@@ -7881,6 +9166,8 @@ function syncSetSetup() {
   var sr = q('#sel_rule'); if (sr) sr.value = String(+S.rule);
   var bt = q('#btn_bgThink');
   if (bt) { bt.classList.toggle('on', !!S.bgThink); bt.setAttribute('aria-pressed', S.bgThink ? 'true' : 'false'); }
+  var dt = q('#btn_dynTime');
+  if (dt) { var dOn = S.dynTime !== false; dt.classList.toggle('on', dOn); dt.setAttribute('aria-pressed', dOn ? 'true' : 'false'); }
   var cn = q('#chk_num'); if (cn) cn.checked = !!S.showNum;
   var cpv = q('#chk_preview'); if (cpv) cpv.checked = S.previewOn !== false;
   function sel(id, v) { var e = q(id); if (e) e.value = String(v); }
@@ -7935,6 +9222,8 @@ function wireSetSetup() {
   };
   var bt = q('#btn_bgThink');
   if (bt) bt.onclick = function () { S.bgThink = !S.bgThink; save(); syncSetSetup(); };
+  var dtb = q('#btn_dynTime');
+  if (dtb) dtb.onclick = function () { S.dynTime = (S.dynTime === false); save(); setPatchWrite(); syncSetSetup(); };
   var cr = q('#sel_cores');
   if (cr) cr.onchange = function () {
     S.cores = Math.max(MIN_THREADS, +cr.value | 0);
@@ -7992,7 +9281,7 @@ function wireSetSetup() {
     else {
       m = parseFloat(raw);
       if (!isFinite(m) || m <= 0) m = 0.1;
-      if (m > 256) m = 256;
+      if (m > 4096) m = 4096;
       m = Math.round(m * 10) / 10;
     }
     iMn.value = m ? String(m) : '';
@@ -8020,29 +9309,52 @@ function bootSet() {
   document.body.setAttribute('data-theme', themeKey());
   try { applyColorVars(S.cssVars); } catch (e1) {}
 
-  document.documentElement.style.fontSize = '13px';
+  applyFontVars();
   buildSetPane();
   wireSetPane();
+  try { applyFontPrefs(); } catch (eFontSet) {}
+  try { spfLoadLocalFonts(); } catch (eFontList) {}
   try { buildSelects(); } catch (eS0) {}   // fill the engine selects (no host relay here)
   try { wireColors(); } catch (e3) {}
   // from now on every "save" in this page is the narrow patch + owned-field merge
   save = function () { setPatchWrite(); };
   try {
     var pt = JSON.parse(localStorage.getItem(SETKEY) || 'null');
-    if (pt) setPatchApply(pt);
+    if (pt) setPatchApply(pt, true);
   } catch (e2) {}
+  // the palette migration must run AFTER the boot patch is applied, otherwise the stale patch
+  // would write the old (harsher) colours straight back over it
+  try { cpMigrateThemes(); } catch (eMig2) {}
+  // 2026-10-31 (user): background pondering is OFF by default - it keeps the engine busy while
+  // the human thinks, and a real ask that arrives meanwhile gets queued behind it. The flag is
+  // applied once so a user who explicitly turns it on in Settings keeps that choice.
+  if (!migFlag('bgThinkOffDefault')) { S.bgThink = false; try { setPatchWrite(); } catch (eBT0) {} }
+  // 2026-10-31 (user): realistic stones are the default look. Applied once, so a user who picks
+  // flat or jade afterwards keeps that choice. (The jade set stays available in the same row.)
+  if (!migFlag('stoneRealDefault')) {
+    try {
+      var uf = fontCfg(); uf.stone = 'real'; S.uiFont = uf;
+      applyFontVars();
+      setPatchWrite();
+    } catch (eJS) {}
+  }
   try { applyLang(); } catch (e4) {}
   syncSetLabels();
   syncSetKeys();
   syncSetSetup();
-  setPatchWrite();
+  
+  // before the main window finished booting (mode / AI sides / card visibility can be one
+  // step stale). Broadcasting it made the main window jump back to pve a second after launch
+  // (and could re-show cards the first-run migration had just hidden). The main window is
+  // the master for play state: it pushes mainSync whenever it saves, so only real user edits
+  // in this window should ever be broadcast - never the boot snapshot.
   if (HOST) {
     try {
       window.chrome.webview.addEventListener('message', function (ev) {
         var m = ev.data; if (!m || !m.type) return;
-        if (m.type === 'setSync') { try { setPatchApply(m.patch || null); } catch (eS1) {} return; }
+        if (m.type === 'setSync') { try { setPatchApply(m.patch || null, true); } catch (eS1) {} return; }
         if (m.type === 'mainSync') {    // the main window changed something: follow it
-          try { setPatchApply(m.patch || null); } catch (eS2) {} return;
+          try { setPatchApply(m.patch || null, true); } catch (eS2) {} return;
         }
         if (m.type === 'host') {          // engine handshake: fills the threads/hash option lists
           G.host = { cpu: m.cpu || 4, threadsDefault: m.threadsDefault || 2, threadsMax: m.threadsMax || 3,
@@ -8070,10 +9382,11 @@ function bootSet() {
           return;
         }
       });
+
+      try { var b = document.querySelector('#boot'); if (b && b.parentNode) b.parentNode.removeChild(b); } catch (e5) {}
       window.chrome.webview.postMessage({ type: 'ready', theme: themeKey(), bg: pageBgHex(), lang: S.lang });
     } catch (eH) {}
   }
-  try { var b = document.querySelector('#boot'); if (b) b.style.display = 'none'; } catch (e5) {}
 }
 
 function toggleLangNow() {
@@ -8087,8 +9400,11 @@ function toggleLangNow() {
 function cardOrderBySelect(id) {
   var card = document.querySelector('.card[data-id="' + id + '"]');
   if (!card || card.hidden || !card.parentNode) return;
-  // In link mode cards opened from Settings land in the left dock as well.
-  var target = (linkSessionOn() && els.dockL) ? els.dockL : card.parentNode;
+  // In link mode cards opened from Settings land in the left dock as well; in a narrow window
+  // they join the single (remembered) side so the board stays usable.
+  var target = card.parentNode;
+  if (linkSessionOn() && els.dockL) target = els.dockL;
+  else if (isCompactLayout() && els.dockL) target = dockBySide(LAY_SIDE);
   target.appendChild(card);
 }
 
@@ -8263,7 +9579,7 @@ function anaLiveRun(kind, topN, tagKey) {
       setPvLine((cs[0] && cs[0].line) || [], side);
     }
     var now = Date.now();
-    if (now - lastUi >= 280) {
+    if (now - lastUi >= 600) {
       lastUi = now;
       if (depth) els.st_depth.textContent = String(depth);
       if (cs[0].eval != null && String(cs[0].eval) !== '') dashEvalSet(cs[0].eval, side);
@@ -8272,7 +9588,7 @@ function anaLiveRun(kind, topN, tagKey) {
       els.st_time.textContent = ((now - t0) / 1000).toFixed(1) + ' s';
       renderAna(T(kind === 'calc' ? 'anCalcRun' : 'anNbestRun').replace('{d}', String(depth || 0)));
     }
-    if (now - lastPaint >= 200) { lastPaint = now; paint(); }
+    if (now - lastPaint >= 260) { lastPaint = now; paint(); }
   }, function (ev) {
     ended = true;
     if (gen !== G.ana.gen) return;
@@ -8557,6 +9873,7 @@ function liveAnaToggle() {
   LIVE_AN.on = !LIVE_AN.on;
   liveAnaUI();
   if (LIVE_AN.on) {
+    if (PLACE_EVAL.on) { PLACE_EVAL.on = false; placeEvalHaltJob(); placeEvalUI(); }
     aiStandDown();
     bgThinkStop();
     anaLiveStop();
@@ -8600,12 +9917,12 @@ function liveAnaApply(res) {
     return { live: true, x: c.x, y: c.y, wr: c.wr, ev: c.ev, rank: i, depth: LIVE_AN.depth };
   });
   var now = Date.now();
-  if (now - LIVE_AN.lastUi >= 300) {
+  if (now - LIVE_AN.lastUi >= 620) {
     LIVE_AN.lastUi = now;
     liveAnaRows();
     renderAna(T('liveAnaRun').replace('{d}', String(LIVE_AN.depth || 0)), true);
   }
-  if (now - (LIVE_AN.lastPaint || 0) >= 120) { LIVE_AN.lastPaint = now; paint(); }
+  if (now - (LIVE_AN.lastPaint || 0) >= 260) { LIVE_AN.lastPaint = now; paint(); }
 }
 function liveAnaRows() {
   G.ana.rows = (LIVE_AN.picked || []).map(function (c, i) {
@@ -8617,6 +9934,8 @@ function liveAnaRows() {
 
 function liveAnaStart() {
   if (!LIVE_AN.on) return;
+
+  if (G.busy) { liveAnaScheduleRetry(220); return; }
   if (!liveAnaWanted()) return;
   var gen = ++LIVE_AN.gen;
   liveAnaStopJob();
@@ -8687,6 +10006,150 @@ function liveAnaTouch(restartMs) {
 
 function liveAnaBoardChanged() {
   liveAnaTouch(120);
+}
+
+var PLACE_EVAL = { on: false, gen: 0, handle: null, timer: 0, key: '', mvN: 0, side: 0, t0: 0,
+                   lastUi: 0, pending: null, uiTimer: 0, clearPending: false };
+
+function placeEvalWanted() {
+  if (SET_MODE || RV_MODE || G.review || G.over || linkSessionOn()) return false;
+  return PLACE_EVAL.on && S.mode === 'place';
+}
+function placeEvalHaltJob() {
+  PLACE_EVAL.gen++;
+  if (PLACE_EVAL.handle) { try { PLACE_EVAL.handle.stop(); } catch (ePE0) {} PLACE_EVAL.handle = null; }
+  if (PLACE_EVAL.timer) { clearTimeout(PLACE_EVAL.timer); PLACE_EVAL.timer = 0; }
+  if (PLACE_EVAL.uiTimer) { clearTimeout(PLACE_EVAL.uiTimer); PLACE_EVAL.uiTimer = 0; }
+  G.ana.busy = false;
+}
+function placeEvalUI() {
+  if (!els.btn_place_eval) return;
+  var show = !SET_MODE && !RV_MODE && !G.review && !linkSessionOn() && S.mode === 'place';
+  els.btn_place_eval.hidden = !show;
+  if (!show) {
+    if (PLACE_EVAL.on) { PLACE_EVAL.on = false; placeEvalHaltJob(); }
+    return;
+  }
+  els.btn_place_eval.classList.toggle('on', !!PLACE_EVAL.on);
+  els.btn_place_eval.textContent = PLACE_EVAL.on ? T('placeEvalStop') : T('placeEval');
+  els.btn_place_eval.title = T('placeEvalTip');
+  els.btn_place_eval.setAttribute('aria-pressed', PLACE_EVAL.on ? 'true' : 'false');
+}
+
+var PLACE_EVAL_UI_MS = 620;
+function placeEvalFlush() {
+  var p = PLACE_EVAL.pending;
+  if (!p) return;
+  PLACE_EVAL.pending = null;
+  if (PLACE_EVAL.uiTimer) { clearTimeout(PLACE_EVAL.uiTimer); PLACE_EVAL.uiTimer = 0; }
+  PLACE_EVAL.lastUi = Date.now();
+  placeEvalPaint(p.res, p.mvN, p.side);
+}
+function placeEvalPaint(res, mvN, side) {
+  var c0 = ((res && res.candidates) || []).filter(function (c) {
+    return c && typeof c.x === 'number' && typeof c.y === 'number' &&
+           !(G.board[c.y] && G.board[c.y][c.x]);
+  })[0];
+  if (!c0) return;
+  var depth = (res && res.depth) || c0.depth || 0;
+  var st = {
+    x: c0.x, y: c0.y, depth: depth, eval: c0.eval, side: side,
+    speed: (res && res.speed) || c0.speed || 0,
+    nodes: (res && res.nodes) || c0.nodes || 0,
+    timeMs: (res && res.timeMs) || c0.timeMs || 0,
+    line: c0.line || [],
+  };
+  G.lastStat = st;
+  setStat(st);
+  var ev = evalNum(c0.eval);
+  if (isFinite(ev)) {
+    pushCurve(mvN, ev, side === 1);
+    drawCurve();
+  }
+}
+function placeEvalApply(res, mvN, side) {
+  PLACE_EVAL.pending = { res: res, mvN: mvN, side: side };
+  var wait = PLACE_EVAL_UI_MS - (Date.now() - PLACE_EVAL.lastUi);
+  if (wait > 0) {
+    if (!PLACE_EVAL.uiTimer) {
+      PLACE_EVAL.uiTimer = setTimeout(function () { PLACE_EVAL.uiTimer = 0; placeEvalFlush(); }, wait);
+    }
+    return;
+  }
+  placeEvalFlush();
+}
+function placeEvalStart() {
+  if (!placeEvalWanted()) return;
+  placeEvalHaltJob();                 // bump gen + stop any previous live job
+  PLACE_EVAL.pending = null;          // never paint a frame from the previous job
+  var gen = ++PLACE_EVAL.gen;
+  var mvN = G.moves.length, side = curColor();
+  PLACE_EVAL.mvN = mvN; PLACE_EVAL.side = side;
+  PLACE_EVAL.key = boardFp();
+  if (!PLACE_EVAL.t0) PLACE_EVAL.t0 = Date.now();
+
+  
+  var clearNow = !!PLACE_EVAL.clearPending;
+  PLACE_EVAL.clearPending = false;
+  var ended = false;
+  var h = LocalAI.live({
+    board: G.board, moveList: [], matchMs: 600000, turnMs: 3600000, timeUsedMs: 0,
+    topN: 1, rule: engineRule(), cid: 'calc-eval-' + mvN, lane: 'main', side: side,
+    liveId: LocalAI.nextLiveId(), tag: T('placeEval'), clearHash: clearNow,
+  }, function (res) {
+    if (gen !== PLACE_EVAL.gen) return;
+    if (G.moves.length !== mvN || PLACE_EVAL.key !== boardFp()) {
+      if (PLACE_EVAL.on) {
+        PLACE_EVAL.timer = setTimeout(function () { PLACE_EVAL.timer = 0; placeEvalStart(); }, 120);
+      }
+      return;
+    }
+    placeEvalApply(res, mvN, side);
+  }, function () {
+    ended = true;
+    if (gen !== PLACE_EVAL.gen) return;
+    PLACE_EVAL.handle = null;
+    placeEvalFlush();
+    if (PLACE_EVAL.on && placeEvalWanted())
+      PLACE_EVAL.timer = setTimeout(function () { PLACE_EVAL.timer = 0; placeEvalStart(); }, 320);
+  });
+  if (!ended && gen === PLACE_EVAL.gen) PLACE_EVAL.handle = h;
+}
+// a stone was just dropped / taken back: analyse the new position at once
+function placeEvalKick() {
+  if (!PLACE_EVAL.on || S.mode !== 'place') return;
+  if (!placeEvalWanted()) return;
+
+  
+  if (PLACE_EVAL.timer) { clearTimeout(PLACE_EVAL.timer); PLACE_EVAL.timer = 0; }
+  placeEvalStart();
+}
+function placeEvalStop() {
+  PLACE_EVAL.on = false;
+  placeEvalHaltJob();
+  // keep whatever the engine produced last, even if the throttle had not painted it yet
+  try { placeEvalFlush(); } catch (ePS0) {}
+  if (PLACE_EVAL.pending) PLACE_EVAL.pending = null;
+  try { drawCurveInfo(true); } catch (ePS1) {}
+  placeEvalUI();
+}
+function placeEvalToggle() {
+  if (SET_MODE || linkSessionOn()) return;
+  // stopping must always work - even if some other window already changed the mode,
+  
+  if (PLACE_EVAL.on) { placeEvalStop(); return; }
+  if (S.mode !== 'place') { placeEvalUI(); return; }
+  PLACE_EVAL.on = true;
+  PLACE_EVAL.clearPending = true;     
+  aiStandDown(); bgThinkStop(); anaLiveStop();
+  if (LIVE_AN.on || LIVE_AN.frozen) { LIVE_AN.on = false; liveAnaClear(); liveAnaUI(); }
+  PLACE_EVAL.t0 = 0; PLACE_EVAL.lastUi = 0;
+  try {
+    var cv = cardVis();
+    if (!cv.engine) { cv.engine = 1; save(); applyCardVis(); syncDocks(); layoutBoard(); }
+  } catch (ePE1) {}
+  placeEvalStart();
+  placeEvalUI();
 }
 
 var BG_AN = { gen: 0, handle: null, key: '', timer: 0 };
@@ -10647,7 +12110,7 @@ function buildSelects() {
   renderSysInfo();
   var maxT = Math.max(1, host.threadsMax || 1);
   //     t=10 2879K nps / d22  ·  t=12 3567K / d29  ·  t=14~16 4.0M+ / d30
-  //     10s：T4 depth 23 / 0.73M      vs   T14 depth 22 / 2.36M
+  
   var physC = Math.max(0, host.physCores | 0);
   var lowCores = (physC > 1) ? (S.cores < physC) : (S.cores >= 10 && S.cores <= 12);
   if (lowCores && maxT > S.cores && !migFlag('threadsTopo4')) {
@@ -10672,14 +12135,12 @@ function buildSelects() {
     els.coresHint.textContent = T('coresHint')
       .replace('{n}', String(host.cpu || 0)).replace('{m}', String(maxT));
 
-  var native = !!host.native;
   var memMB = host.memMB | 0;
-  var maxH = native ? 6144 : 2048;
-  var hs = [256, 512, 768, 1024, 1536, 2048];
-  if (maxH > 2048) hs = hs.concat([3072, 4096, 6144]);
+  var maxH = 4096;
+  var hs = [128, 256, 512, 1024, 1536, 2048, 2560, 3072, 3584, 4096];
 
   // RAM-aware hash cap: grey out any option the machine cannot feed.
-  // cap = min(6GB hard limit, 80% of RAM, RAM minus 2GB system reserve).
+  // cap = min(4GB hard limit, 80% of RAM, RAM minus 2GB system reserve).
   var capMB = maxH;
   if (memMB > 0) {
     var byPct = Math.floor(memMB * 0.8);
@@ -10689,16 +12150,14 @@ function buildSelects() {
   var effH = (S.hashMB && hs.indexOf(S.hashMB) >= 0 && S.hashMB <= capMB)
     ? S.hashMB
     : (hs.filter(function (h) { return h <= capMB; }).pop() || 512);
-  if (!migFlag('hash1024')) {
-    if (S.hashMB === 1024) { S.hashMB = 512; enginePrefSet(S.cores, S.hashMB); save(); effH = 512; }
-  }
-  if (!S.hashMB) { S.hashMB = 2048; enginePrefSet(S.cores, S.hashMB); save(); effH = 2048; }
-  if (!migFlag('hash2048') && S.hashMB >= 256 && S.hashMB < 2048) {
-    S.hashMB = 2048;
+
+  if (!migFlag('hashDefault1024') && S.hashMB === 512 && capMB >= 1024) {
+    S.hashMB = 1024;
     enginePrefSet(S.cores, S.hashMB);
     save();
-    effH = Math.min(2048, capMB);
+    effH = 1024;
   }
+  if (!S.hashMB) { S.hashMB = 1024; enginePrefSet(S.cores, S.hashMB); save(); effH = 1024; }
   els.sel_hash.innerHTML = hs.map(function (h) {
     var off = (h > capMB);
     return '<option value="' + h + '"' + (h === effH ? ' selected' : '') +
@@ -10749,9 +12208,10 @@ function buildSelects() {
     selSyncCustom(els.sel_maxDepth, mdNow, function (x) { return String(x); });
   }
   if (els.inp_maxDepth) els.inp_maxDepth.value = mdNow ? String(mdNow) : '';
-  var MN_OPTS = [0, 1000000, 4000000, 16000000, 64000000, 256000000, 1000000000];
+
+  var MN_OPTS = [0, 16000000, 64000000, 128000000, 256000000, 512000000, 768000000, 1024000000];
   var mnNow = S.maxNodes;
-  if (!(mnNow === 0 || (mnNow >= 100000 && mnNow <= 1000000000))) mnNow = 0;
+  if (!(mnNow === 0 || (mnNow >= 100000 && mnNow <= 4096000000))) mnNow = 0;
   S.maxNodes = mnNow;
   if (els.sel_maxNodes) {
     els.sel_maxNodes.innerHTML = MN_OPTS.map(function (v) {
@@ -10791,12 +12251,11 @@ function boot() {
 
   // Move numbers are the default now, so switch existing profiles on once.
   if (!migFlag('showNumOn')) { S.showNum = true; try { save(); } catch (eSN) {} }
-  // Card visibility moved into the settings window. Profiles coming from the old build had the
-  // setup and analysis cards docked, so put them back once instead of silently hiding them.
-  if (!migFlag('cardsOn')) {
+
+  if (!migFlag('cardsEngineOnly')) {
     try {
       var cv0 = cardVis();
-      cv0.setup = 1; cv0.analysis = 1;
+      cv0.engine = 1; cv0.setup = 0; cv0.analysis = 0;
       save();
     } catch (eCV) {}
   }
@@ -10806,8 +12265,10 @@ function boot() {
   enginePrefEnsure();    // seed the engine key from legacy saves (one-time)
   enginePrefApplyToS();  // threads/hash: the engine key is the source of truth
   prefsApplyToS();       // remaining global prefs as fallback
+  try { applyFontVars(); } catch (eFontBoot) {}
   initPanels();
   applyLayout();
+  try { applyFontPrefs(); layoutBoard(); } catch (eFontBoot2) {}
   try { syncPinKeys(); } catch (e) {}
 
   wireColors();
@@ -10822,7 +12283,9 @@ function boot() {
     undoOne();
   });
   bindBoardHover();
-  window.addEventListener('resize', function () { fitFont(); layoutBoard(); visLayout(); });
+  window.addEventListener('resize', function () {
+    fitFont(); syncResponsiveDock(); layoutBoard(); visLayout();
+  });
   if (window.ResizeObserver) new ResizeObserver(function () { fitFont(); layoutBoard(); }).observe(els.boardWrap);
 
   if (els.btn_lang) els.btn_lang.onclick = function () { toggleLangNow(); };
@@ -11165,7 +12628,7 @@ function boot() {
       else {
         m = parseFloat(raw);
         if (!isFinite(m) || m <= 0) m = 0.1;
-        if (m > 256) m = 256;
+        if (m > 4096) m = 4096;
         m = Math.round(m * 10) / 10;
       }
       els.inp_maxNodes.value = m ? String(m) : '';
@@ -11215,6 +12678,7 @@ function boot() {
   els.chk_preview.onchange = function () { S.previewOn = !!els.chk_preview.checked; save(); paint(); };
 
   if (els.btn_live) els.btn_live.onclick = liveAnaToggle;
+  if (els.btn_place_eval) els.btn_place_eval.onclick = placeEvalToggle;
 
   els.btn_save_rv.onclick = savePos;
 
@@ -11238,8 +12702,6 @@ function boot() {
       tellHostDefer = true;
       try { onHostMsg(ev); } finally { tellHostDefer = false; }
     });
-    window.__gbReadySent = true;
-    window.chrome.webview.postMessage({ type: 'ready', theme: themeKey(), bg: pageBgHex(), lang: S.lang });
   } else {
     buildSelects();
   }
@@ -11397,10 +12859,23 @@ function boot() {
   // state pushed from the settings window while this page was closed
   try {
     var spt = JSON.parse(localStorage.getItem(SETKEY) || 'null');
-    if (spt) setPatchApply(spt);
+    if (spt) setPatchApply(spt, false, true);   // appearance comes from the stored snapshot
   } catch (eSP) {}
 
+  
+
   bootDone();
+  if (HOST) {
+    window.__gbReadySent = true;
+    window.chrome.webview.postMessage({ type: 'ready', theme: themeKey(), bg: pageBgHex(), lang: S.lang });
+    var _gbPainted = function () {
+      try { window.chrome.webview.postMessage({ type: 'painted' }); } catch (eP2) {}
+    };
+    
+    if (window.requestAnimationFrame)
+      requestAnimationFrame(function () { requestAnimationFrame(function () { setTimeout(_gbPainted, 0); }); });
+    else setTimeout(_gbPainted, 120);
+  }
   setTimeout(function () { renderDrawer(); }, 0);
 
   if ([5, 6, 7].indexOf(+S.rule) >= 0 && !G.moves.length) openStart();
@@ -11412,6 +12887,8 @@ function boot() {
 function bootDone() {
   var b = document.getElementById('boot');
   if (!b) return;
+
+  if (HOST) { if (b.parentNode) b.parentNode.removeChild(b); return; }
   b.classList.add('off');
   setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 260);
 }
@@ -11589,10 +13066,100 @@ function scheduleEngineRetry() {
   }, 2500);
 }
 
+// ---- global font preferences ----------------------------------------------------------------
+
+var FONT_LEVEL_PX = { small: 12.5, normal: 13.5, large: 14.8 };
+var FONT_NUM_SCALE = { small: 0.38, normal: 0.43, large: 0.50 };
+var FONT_UI_DEFAULT = '"Source Han Sans SC","Source Han Sans CN","Noto Sans SC","思源黑体","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif';
+var FONT_NUM_DEFAULT = '"Source Han Serif SC","Noto Serif SC","Noto Serif CJK SC","思源宋体","SimSun",serif';
+
+var FONT_WEIGHTS = [300, 400, 500, 700, 900];
+var FONT_WEIGHT_DEFAULT = 400;
+var FONT_NUM_WEIGHT_DEFAULT = 700;   
+var STONE_STYLE_DEFAULT = 'real';
+
+function fontWeightNum(v, dflt) {
+  var n = Math.round(+v);
+  
+  if (n === 600) return 700;
+  return (FONT_WEIGHTS.indexOf(n) >= 0) ? n : dflt;
+}
+
+function cleanFontName(v) {
+  return String(v || '').replace(/[\\"']/g, '').trim();
+}
+function normalizeFontCfg(o) {
+  var f = (o && typeof o === 'object') ? o : {};
+  var size = (f.size === 'small' || f.size === 'large') ? f.size : 'normal';
+  var numSize = (f.numSize === 'small' || f.numSize === 'large') ? f.numSize : 'normal';
+  return {
+    size: size,
+    ui: cleanFontName(f.ui),
+    uiWeight: fontWeightNum(f.uiWeight, FONT_WEIGHT_DEFAULT),
+    uiItalic: !!f.uiItalic,
+    log: cleanFontName(f.log),
+    logWeight: fontWeightNum(f.logWeight, FONT_WEIGHT_DEFAULT),
+    logItalic: !!f.logItalic,
+    num: cleanFontName(f.num),
+    numSize: numSize,
+    numWeight: fontWeightNum(f.numWeight, FONT_NUM_WEIGHT_DEFAULT),
+    numItalic: !!f.numItalic,
+    stone: (f.stone === 'jade' || f.stone === 'real') ? f.stone : STONE_STYLE_DEFAULT
+  };
+}
+function fontCfg() {
+  return normalizeFontCfg(S && S.uiFont);
+}
+function fontFamilyCss(name, fallback) {
+  var n = cleanFontName(name);
+  if (!n) return fallback;
+  return '"' + n + '", ' + fallback;
+}
+function fontRootPx() {
+  var f = fontCfg();
+  return FONT_LEVEL_PX[f.size] || FONT_LEVEL_PX.normal;
+}
+// 只改根字号 / CSS 变量 / 棋子绘制参数，不触发棋盘与曲线重绘：各窗口 boot 阶段先调它，
+// 等 DOM 与画布就绪后再由 applyFontPrefs() 做一次完整重绘。
+function applyFontVars() {
+  var f = fontCfg();
+  document.documentElement.style.fontSize = (FONT_LEVEL_PX[f.size] || FONT_LEVEL_PX.normal) + 'px';
+  var uiFam = fontFamilyCss(f.ui, FONT_UI_DEFAULT);
+  // ★ 2026-10-30（用户：提示文字没有用上所选字体）
+  //   旧值把 'inherit' 当成字体族拼进列表，得到 "用户字体", inherit —— 这不是合法的
+  //   font-family，整条声明会被浏览器丢弃，于是提示始终停在默认字体。回退必须是一个
+  //   真正的字体列表（用 UI 字体兜底），不能是 CSS 关键字。
+  var logFam = f.log ? fontFamilyCss(f.log, FONT_UI_DEFAULT) : uiFam;
+  var bs = document.body.style;
+  bs.setProperty('--font', uiFam);
+  bs.setProperty('--fontweight', String(f.uiWeight));
+  bs.setProperty('--fontstyle', f.uiItalic ? 'italic' : 'normal');
+  bs.setProperty('--logfont', logFam);
+  bs.setProperty('--logweight', String(f.logWeight));
+  bs.setProperty('--logstyle', f.logItalic ? 'italic' : 'normal');
+  NUM_FONT = fontFamilyCss(f.num, FONT_NUM_DEFAULT);
+  NUM_SCALE = FONT_NUM_SCALE[f.numSize] || FONT_NUM_SCALE.normal;
+  NUM_WEIGHT = f.numWeight;
+  NUM_ITALIC = !!f.numItalic;
+  STONE_STYLE = (f.stone === 'jade' || f.stone === 'real') ? f.stone : STONE_STYLE_DEFAULT;
+}
 function fitFont() {
-  var w = window.innerWidth, h = window.innerHeight;
-  var px = Math.max(12, Math.min(20, Math.min(w / 95, h / 48)));
-  document.documentElement.style.fontSize = px.toFixed(2) + 'px';
+  document.documentElement.style.fontSize = fontRootPx() + 'px';
+  try { applyFontVars(); } catch (eFF) {}
+}
+function applyFontPrefs() {
+  applyFontVars();
+  try { if (!SET_MODE && G.board && els.board) paint(); } catch (eF1) {}
+  try { if (!SET_MODE) drawCurve(); } catch (eF2) {}
+  try { if (!SET_MODE && typeof lkPaintBoard === 'function' && LK && LK.canvas) lkPaintBoard(); } catch (eF4) {}
+  try { syncFontPane(); } catch (eF3) {}
+}
+function fontPrefSet(patch) {
+  var f = fontCfg();
+  for (var k in patch) if (patch.hasOwnProperty(k)) f[k] = patch[k];
+  S.uiFont = f;
+  try { save(); } catch (eFS) {}
+  applyFontPrefs();
 }
 
 function linkSessionOn() { return !!(G && G.linkOn); }
@@ -11642,7 +13209,13 @@ function save() {
   // This keeps the main window's stored state untouched by a link session.
   if (LINK_MODE && HOST) {
     try {
-      var jLK = JSON.stringify(setPatchNow());
+      var pLK = setPatchNow();
+      // the link window only follows the main window's look; it never owns it. Sending the
+      // resolved light/dark key back would overwrite a custom / preset theme in the main window.
+      ['theme', 'customBase', 'cssVars', 'boardColor', 'pageBgColor', 'customColors'].forEach(function (f) {
+        delete pLK[f];
+      });
+      var jLK = JSON.stringify(pLK);
       if (jLK !== __linkPatchLast) { __linkPatchLast = jLK; tellHost({ type: 'settingsPatch', patch: jLK }); }
     } catch (eLK) {}
     return;
@@ -11664,59 +13237,24 @@ function save() {
 }
 
 var LINK_CFG_LAST = null;
+// ★ 2026-10-30（用户：「开启连线窗，改为主窗口不再改变」）
+//   旧实现在打开连线窗时会重新读一份存档、强制切到 pve、重设 AI 方、重排卡片并整页重绘，
+//   主窗口的盘面 / 模式 / 卡片位置因此全变。现在只维护 linkOn 状态与标题上的小标记：
+//   · 不 reload S、不切 mode、不重排卡片、不 repaint；
+//   · 主窗口当前局面、分析任务和设置保持原样；
+//   · 只把规则同步给联动窗（联动窗自己的参数从主窗口当前设置起步）。
 function setLinkMode(on) {
   if (!!G.linkOn === !!on) return;
 
-  var keepTheme = S.theme, keepCssVars = S.cssVars, keepCustomBase = S.customBase;
-  var keepLang = (S.lang === 'en') ? 'en' : 'zh';
-
-  try { localStorage.setItem('gbcalc.settings.v1', JSON.stringify(S)); } catch (e) {}
   G.linkOn = !!on;
   document.body.classList.toggle('linkOn', !!on);
   try { localStorage.setItem('gbcalc.link.active', on ? '1' : '0'); } catch (e) {}
 
   LINK_EVAL_BUSY = false; LINK_EVAL_PENDING = ''; LINK_EVAL_LASTFP = ''; LINK_HAS_FRAME = false;
 
-  var nk = 'gbcalc.settings.v1';
-  var st = null;
-  try { st = JSON.parse(localStorage.getItem(nk) || 'null'); } catch (e) {}
-  if (!st) {
-    st = JSON.parse(JSON.stringify(S));
-    try { localStorage.setItem(nk, JSON.stringify(st)); } catch (e) {}
-  }
-  for (var k in st) if (S.hasOwnProperty(k)) S[k] = st[k];
-  enginePrefApplyToS();  // threads/hash: the engine key is the source of truth
-  prefsApplyToS();   // link save must not override the other global prefs
-
-  S.theme = keepTheme; S.cssVars = keepCssVars; S.customBase = keepCustomBase;
-  S.lang = keepLang;
-
-  // (4.47) LINK_CFG_LAST is no longer re-applied here: the link window starts from the
-  // main window's settings, never the other way round.
-
   if (on) {
-    S.mode = 'pve';
-    G.heat = []; G.nums = [];
-    ++gAiGen; G.busy = false; G.think = [];
-    tellHost({ type: 'linkCfgSync', rule: +S.rule });
-  } else {
-    ++gAiGen; G.busy = false; G.think = [];
+    try { tellHost({ type: 'linkCfgSync', rule: +S.rule }); } catch (eLC) {}
   }
-
-  document.body.setAttribute('data-theme', S.theme);
-  applyColorVars(S.cssVars);
-  setAiSides(S.aiB, S.aiW);
-  if (els.seg_mode) [].forEach.call(els.seg_mode.querySelectorAll('button'), function (x) {
-    x.classList.toggle('on', x.getAttribute('data-mode') === S.mode);
-  });
-  if (els.num_turn) els.num_turn.value = ((+S.turnMs || 2000) / 1000).toFixed(3);
-  if (els.sel_rule) els.sel_rule.value = String(S.rule);
-  applyLayout();
-  // (4.47) the main window stays EXACTLY as it is when a link session opens -
-  // no card gathering, no layout persistence anymore.
-
-  applyLang();
-  buildSelects(); refreshUI(); paint();
 }
 
 function linkIngest(o) {
@@ -11925,7 +13463,7 @@ function lkPaintBoard() {
   var W = cv.width, H = cv.height, N = 15;
 
   var R = { inner: 4 / 15, coord: 13 / 15, gap: 6 / 15, top: 8 / 15, bot: 22 / 15,
-            font: 8 / 15, stone: 11 / 30, star: 2 / 15, line: 1 / 15 };
+            font: 8 / 15, stone: 21 / 50, star: 2 / 15, line: 1 / 15 };
   var uw = 14 + 2 * R.coord + 2 * R.inner, uh = R.top + 14 + R.bot;
   var cell = Math.min(W / uw, H / uh);
   var ox = (W - cell * uw) / 2 + cell * (R.inner + R.coord);
@@ -11937,7 +13475,10 @@ function lkPaintBoard() {
   ctx.fillRect(0, 0, W, H);
 
   ctx.strokeStyle = css('--line', '#24282c');
-  ctx.lineWidth = Math.max(1, cell * R.line);
+  // 2026-10-30: Link board grid lines at half the previous thickness; the frame keeps
+  // its 2:1 ratio to the inner grid. Stone outlines below stay unchanged.
+  var gridLw = Math.max(1, cell * R.line) * 0.5;
+  ctx.lineWidth = gridLw;
   ctx.beginPath();
   for (var i = 0; i < N; i++) {
     var o = cell * i;
@@ -11948,7 +13489,7 @@ function lkPaintBoard() {
 
   // Same as the main board: frame twice as thick as the inner lines.
   ctx.save();
-  ctx.lineWidth = Math.max(1, cell * R.line) * 2;
+  ctx.lineWidth = gridLw * 2;
   ctx.strokeRect(ox, oy, span, span);
   ctx.restore();
 
@@ -11987,24 +13528,24 @@ function lkPaintBoard() {
     var st = bd && bd[y] && bd[y][x];
     if (!st) continue;
     stoneN++;
-    ctx.beginPath(); ctx.arc(ox + x * cell, oy + y * cell, r, 0, Math.PI * 2);
-    if (st === 1) { ctx.fillStyle = css('--blk', '#111111'); ctx.fill(); ctx.strokeStyle = css('--blk-edge', '#e8ecf5'); }
-    else { ctx.fillStyle = css('--wht', '#fcfcfc'); ctx.fill(); ctx.strokeStyle = css('--blk', '#111111'); }
-    ctx.lineWidth = Math.max(0.75, cell * R.line * 0.75);
-    ctx.stroke();
+    stoneDraw(ctx, ox + x * cell, oy + y * cell, r, st, Math.max(0.75, cell * R.line * 0.75),
+              css('--blk', '#111111'), css('--blk-edge', '#e8ecf5'),
+              css('--wht', '#fcfcfc'), css('--blk', '#111111'));
   }
 
   // The link board is rebuilt from recognition, so it has no move order: numbering it would
   // just count scan order. Off by default, opt in through LK.nums.
   if (LK.nums && bd) {
     var bn = 0, wn = 0;
-    ctx.font = (cell * 0.42).toFixed(0) + 'px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (var y2 = 0; y2 < N; ++y2) for (var x2 = 0; x2 < N; ++x2) {
       var st3 = bd[y2] && bd[y2][x2];
       if (!st3) continue;
-      if (st3 === 1) { bn += 2; ctx.fillStyle = '#fff'; ctx.fillText(String(bn - 1), ox + x2 * cell, oy + y2 * cell); }
-      else { wn += 2; ctx.fillStyle = '#555'; ctx.fillText(String(wn), ox + x2 * cell, oy + y2 * cell); }
+      var lnTxt = '';
+      if (st3 === 1) { bn += 2; lnTxt = String(bn - 1); ctx.fillStyle = '#fff'; }
+      else { wn += 2; lnTxt = String(wn); ctx.fillStyle = '#555'; }
+      fitStoneNum(ctx, lnTxt, Math.max(6, cell * 0.42), r, NUM_WEIGHT);
+      ctx.fillText(lnTxt, ox + x2 * cell, oy + y2 * cell);
     }
   }
 
@@ -12105,7 +13646,9 @@ function bootLink() {
     var rgLk = loadRuleGlobal();
     if (rgLk != null) S.rule = rgLk;
   } catch (e) {}
-  document.body.setAttribute('data-theme', S.theme);
+  applyFontVars();
+  try { applyColors(); } catch (eLC0) {}
+  document.body.setAttribute('data-theme', themeKey());
   document.body.classList.add('link');
   document.title = lkL('Link', 'Link');
 
@@ -12116,7 +13659,7 @@ function bootLink() {
   var lkBootBrand = document.querySelector('#boot .brand');
   if (lkBootBrand) lkBootBrand.innerHTML = lkBrandHTML();
 
-  document.documentElement.style.fontSize = '13px';
+  applyFontVars();
   grab();
   var pane = document.createElement('div');
   pane.id = 'linkPane';
@@ -12932,6 +14475,9 @@ function bootLink() {
         window.GB_S.customTurnSec = Math.round(v * 100) / 100;
         window.GB_S.turnMs = Math.round(v * 1000);
       }
+      // (4.47) the link window owns no archive: push the change through the patch channel
+      S.turnMs = Math.round(v * 1000);
+      try { save(); } catch (eS) {}
       var st2 = document.getElementById('lkStatus');
       if (st2) st2.textContent = lkL('思考时间已设为 ' + v + ' 秒', 'Think time set to ' + v + ' s');
     };
@@ -12965,9 +14511,11 @@ function bootLink() {
     if (m.type === 'setSync') { try { setPatchApply(m.patch || null); } catch (eSL) {} return; }
     if (m.type === 'uiTheme') {
 
-      if (m.lang === 'zh' || m.lang === 'en') { S.lang = m.lang; }      if (m.theme === 'light' || m.theme === 'dark') { S.theme = m.theme; document.body.setAttribute('data-theme', S.theme); }
+      if (m.lang === 'zh' || m.lang === 'en') { S.lang = m.lang; }
+      if (m.theme === 'light' || m.theme === 'dark') document.body.setAttribute('data-theme', m.theme);
+      if (m.cssVars !== undefined) { S.cssVars = m.cssVars || null; applyColorVars(S.cssVars); }
       var BSS = window.GB_S;
-      if (BSS) { BSS.lang = S.lang; BSS.dark = (S.theme !== 'light'); }
+      if (BSS) { BSS.lang = S.lang; BSS.dark = (m.theme === 'dark'); }
       lkStatus(); lkSyncCount(); lkPaintBoard(); lkPaintCurve();
       var lkBe = document.getElementById('lkBrandEl'); if (lkBe) lkBe.innerHTML = lkBrandHTML();
       return;

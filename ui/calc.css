@@ -37,7 +37,11 @@
 html,body{height:100%}
 body{
   margin:0; background:var(--bg); color:var(--ink);
-  font:400 var(--fs)/1.5 var(--font);
+  font-family:var(--font);
+  font-weight:var(--fontweight,400);
+  font-style:var(--fontstyle,normal);
+  font-size:var(--fs);
+  line-height:1.5;
   display:flex; flex-direction:column; overflow:hidden;
 }
 
@@ -53,6 +57,8 @@ label, .unit, .k, .key, .kbd, .brand, .lk-brand, .lk-stat .k, .lk-count,
 input, textarea, select, [contenteditable="true"] {
   -webkit-user-select:text; -moz-user-select:text; -ms-user-select:text; user-select:text;
 }
+
+button[hidden]{display:none !important}
 
 .boot{
   position:fixed; inset:0; z-index:9999;
@@ -147,8 +153,9 @@ input, textarea, select, [contenteditable="true"] {
 }
 
 .dock:not(.has){flex:0 0 0; width:0; min-width:0; padding:0; overflow:hidden}
-.dock.has{flex:0 0 auto; width:20rem; min-width:15rem; max-width:26rem}
-#boardCol{flex:1 1 auto; display:flex; flex-direction:column; gap:.25rem; min-width:0; min-height:0; overflow:hidden; position:relative}
+/* fixed px width: maximising the window must not grow the cards (font size / board scale only) */
+.dock.has{flex:0 0 var(--dock-w,272px); width:var(--dock-w,272px); min-width:0; max-width:none}
+#boardCol{flex:1 1 auto; display:flex; flex-direction:column; gap:.25rem; min-width:378px; min-height:0; overflow:hidden; position:relative}
 
 *::-webkit-scrollbar{width:8px; height:8px}
 *::-webkit-scrollbar-thumb{background:var(--border); border-radius:4px}
@@ -156,13 +163,25 @@ input, textarea, select, [contenteditable="true"] {
 *::-webkit-scrollbar-track{background:transparent}
 *::-webkit-scrollbar-corner{background:transparent}
 
-/* responsive: narrow windows collapse the layout */
-@media (max-width:1100px){
-  .dock.has{width:17rem; min-width:12rem}
+/* responsive: three card width levels (272 / 236 / 189) */
+@media (max-width:1180px){
+  body.compactDock{--dock-w:236px}
+}
+@media (max-width:900px){
+  body.compactDock{--dock-w:189px}
 }
 @media (max-width:860px){
   #stage{gap:.5rem; padding:.5rem}
-  .dock.has{width:14rem; min-width:10.5rem}
+}
+@media (max-width:900px){
+  body.compactDock .card{padding:.42rem .44rem .48rem}
+  body.compactDock .card-h{font-size:.9rem; gap:.34rem}
+  body.compactDock .card .row{gap:.36rem}
+  body.compactDock .card .row>label{flex:0 0 4.5rem; font-size:.85rem}
+  body.compactDock .grid2{gap:.28rem}
+  body.compactDock .stat{padding:.2rem .36rem}
+  body.compactDock .stat .v{font-size:.94rem; overflow:hidden; text-overflow:ellipsis}
+  body.compactDock .eng-msg{padding:.2rem .34rem}
 }
 
 #boardWrap{
@@ -620,10 +639,12 @@ input[type=checkbox].chk-dot:focus-visible{outline:2px solid var(--accent); outl
 }
 .ci.cb{background-color:rgba(122,90,248,.10); border-color:rgba(122,90,248,.42);
   background-image:linear-gradient(to right, rgba(122,90,248,.50), rgba(122,90,248,0));
-  background-repeat:no-repeat; background-size:var(--wr,0%) 100%}
+  background-repeat:no-repeat; background-size:var(--wr,0%) 100%;
+  transition:background-size .34s cubic-bezier(.22,.61,.36,1), border-color .3s}
 .ci.cw{background-color:rgba(127,176,239,.11); border-color:rgba(127,176,239,.52);
   background-image:linear-gradient(to right, rgba(127,176,239,.52), rgba(127,176,239,0));
-  background-repeat:no-repeat; background-size:var(--wr,0%) 100%}
+  background-repeat:no-repeat; background-size:var(--wr,0%) 100%;
+  transition:background-size .34s cubic-bezier(.22,.61,.36,1), border-color .3s}
 .ci .cih{font-weight:700; font-size:.8rem; color:var(--ink)}
 .ci.cb .cih{color:#7a5af8}
 .ci.cw .cih{color:#5b96d8}
@@ -780,6 +801,52 @@ button.sq2{flex:0 0 auto; padding:.22rem .52rem; font-size:.82rem; border-radius
 }
 .cp-presets button:hover{border-color:var(--sub)}
 .cp-presets button.on{outline:2px solid var(--accent); outline-offset:1px}
+
+/* theme page: 20 cards (page / board / accent three-band swatch + name) */
+.cp-view{display:flex; flex-direction:column; gap:.55rem; min-width:0}
+.cp-view[hidden]{display:none!important}
+.cp-themes-view{flex:1 1 auto; min-height:0}
+.cp-themes{
+  display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:.4rem .34rem; align-content:start; min-width:0;
+}
+.cp-themes button{
+  display:flex; flex-direction:column; align-items:stretch; gap:.18rem;
+  padding:.24rem .24rem .2rem; min-width:0;
+  border:1px solid var(--border); border-radius:9px;
+  background:var(--card); color:var(--sub); cursor:pointer;
+  transition:border-color .15s, box-shadow .15s, color .15s;
+}
+.cp-themes button:hover{border-color:var(--sub)}
+.cp-themes button.on{
+  border-color:var(--accent); color:var(--accent);
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+.cp-th-sw{
+  position:relative; display:block; height:1.15rem; border-radius:5px; overflow:hidden;
+  border:1px solid rgba(0,0,0,.1);
+}
+.cp-th-sw i{position:absolute; top:0; bottom:0; left:56%; right:0; display:block}
+.cp-th-sw b{position:absolute; left:0; right:0; bottom:0; height:18%; display:block}
+.cp-th-nm{
+  font-size:.62rem; line-height:1.15; text-align:center;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.cp-themes button.on .cp-th-nm{font-weight:700}
+
+.cp-custom{
+  flex:0 0 auto; width:100%; height:2.1rem; margin-top:.15rem;
+  border:1px dashed var(--border); border-radius:9px;
+  background:var(--card); color:var(--ink);
+  font:inherit; font-size:.88rem; cursor:pointer;
+  transition:border-color .15s, color .15s, background .15s;
+}
+.cp-custom:hover{border-color:var(--sub)}
+.cp-custom.on{border-color:var(--accent); color:var(--accent); font-weight:700}
+.cp-custom-view{flex:1 1 auto; min-height:0}
+.cp-cush{display:flex; align-items:center; gap:.5rem; padding-bottom:.45rem}
+.cp-cus-ttl{font-size:.92rem; font-weight:600; color:var(--ink)}
+
 .cp-foot{display:flex; align-items:center; gap:.55rem; margin-top:.1rem; min-width:0}
 .cp-foot #cp_reset{flex:0 0 auto; white-space:nowrap; font-size:.78rem; height:1.7rem; padding:0 .55rem}
 .cp-prev{
@@ -1131,12 +1198,19 @@ body.link{overflow:hidden}
 
 .lk-status{
   font-size:.9rem; color:var(--sub); line-height:1.55;
-  box-sizing:border-box; min-height:7em;
+  box-sizing:border-box; height:7em; min-height:7em; max-height:7em;
   padding:.3rem .55rem;
   border:2px dashed var(--border); border-radius:6px;
   display:flex; flex-direction:column; align-items:flex-start; gap:.3rem;
-  max-height:12em; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain;
+  overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+  scrollbar-width:thin; scrollbar-color:var(--border) transparent;
+  overflow-wrap:anywhere; word-break:break-word;
 }
+.lk-status::-webkit-scrollbar{width:6px; height:6px}
+.lk-status::-webkit-scrollbar-track{background:transparent; border-radius:3px}
+.lk-status::-webkit-scrollbar-thumb{background:var(--border); border-radius:3px}
+.lk-status::-webkit-scrollbar-thumb:hover{background:var(--sub)}
 
 .btn.dim{opacity:.42; filter:grayscale(.55)}
 
@@ -1160,19 +1234,19 @@ body.link{overflow:hidden}
 
 @media (max-height: 600px){
   body.link #linkPane{padding:.42rem .6rem; gap:.3rem}
-  body.link .lk-status{font-size:.84rem; min-height:6.7em}
+  body.link .lk-status{font-size:.84rem; height:6.7em; min-height:6.7em; max-height:6.7em}
   body.link .lk-panel{gap:.3rem}
   body.link .lk-brand{font-size:.8rem; margin-top:.22rem}
 }
 @media (max-height: 520px){
-  body.link .lk-status{font-size:.78rem; min-height:5em}
+  body.link .lk-status{font-size:.78rem; height:5em; min-height:5em; max-height:5em}
   body.link .lk-stat .k{font-size:.54rem}
   body.link .lk-stat .v{font-size:.74rem}
   body.link .lk-btns .btn{font-size:.72rem}
   body.link .lk-brand{font-size:.74rem; margin-top:.16rem}
 }
 @media (max-height: 440px){
-  body.link .lk-status{font-size:.72rem; min-height:4.2em}
+  body.link .lk-status{font-size:.72rem; height:4.2em; min-height:4.2em; max-height:4.2em}
   body.link .lk-stats{gap:.2rem}
   body.link .lk-panel{gap:.24rem}
   body.link #linkPane{padding:.34rem .5rem; gap:.24rem}
@@ -1372,7 +1446,7 @@ body.setwin #ctxMenu, body.setwin #file_imp, body.setwin #file_vis{display:none 
 
 #setPane{
   position:fixed; inset:0; display:flex; flex-direction:column;
-  background:var(--bg); color:var(--ink); font-size:13px; min-height:0;
+  background:var(--bg); color:var(--ink); min-height:0;
 }
 .sp-ttl{margin-left:auto; font-weight:600; font-size:.88rem; color:var(--sub)}
 
@@ -1444,5 +1518,212 @@ body.setwin #colorPop .cp-card{
   width:100%; height:100%; max-height:none; border:0; border-radius:0; background:var(--bg);
 }
 body.setwin #colorPop .modal-head{display:none}
-body.setwin #colorPop .cp-body{padding:.55rem .82rem 1rem; overflow:auto}
+body.setwin #colorPop .cp-body{padding:.55rem .82rem 1rem; overflow:auto; flex:1 1 auto; min-height:0}
+/* 36 swatches (4 x 9) are laid out to fill the little settings window: the grid takes the
+   remaining height and every row shares it, so the keys end up taller than the old 5-row
+   block without leaving a blank half-page underneath. */
+body.setwin #cpThemesView{flex:1 1 auto; min-height:0; display:flex; flex-direction:column}
+body.setwin #cp_theme_presets{
+  flex:1 1 auto; min-height:0; align-content:stretch;
+  grid-auto-rows:minmax(0,1fr); gap:.3rem .34rem;
+}
+body.setwin .cp-themes button{padding:.26rem .26rem .22rem; gap:.2rem}
+body.setwin .cp-th-sw{height:auto; flex:1 1 auto; min-height:1.3rem}
+body.setwin .cp-th-nm{font-size:.66rem}
+body.setwin .sp-color-h .sp-cust-key{
+  margin:0 0 0 auto; flex:0 0 auto; width:auto; height:1.66rem;
+  padding:0 .82rem; font-size:.76rem; border-radius:8px; border-style:solid;
+}
+body.setwin .cp-themes-view .cp-custom{display:none}
+body.setwin .cp-custom-view .cp-cush{display:none}
+/* settings embed: the section headers sit on their own tinted bar - the extra hairline under
+   it (the body's top border) reads as a stray line, so drop it here only */
+body.setwin .sp-setup .sec-b{border-top:0}
 body.setwin #cp_sv, body.setwin #cp_hue{width:100%; height:auto; display:block}
+
+/* ---- settings: font page ------------------------------------------------------------ */
+.sp-font{flex:1 1 auto; min-height:0; display:none; flex-direction:column}
+body.sp-fonting .sp-scroll{display:none}
+body.sp-fonting .sp-font{display:flex}
+.spf-body{
+  flex:1 1 auto; min-height:0; overflow:hidden;
+  padding:.45rem .55rem .6rem; display:flex; flex-direction:column; gap:.5rem;
+}
+.spf-size{flex:0 0 auto; display:flex; flex-direction:row; align-items:center; gap:.55rem}
+.spf-lbl{flex:0 0 auto; font-weight:600; font-size:.88rem; color:var(--ink); white-space:nowrap}
+.spf-seg{display:flex; flex:1 1 auto; gap:.36rem; min-width:0}
+.spf-seg button{
+  flex:1 1 0; min-width:0; height:2rem; padding:0 .3rem;
+  border-radius:8px; border:1px solid var(--border); background:var(--card); color:var(--ink);
+  font:inherit; line-height:1.15; cursor:pointer; transition:background .15s, border-color .15s, color .15s;
+}
+.spf-seg button[data-size="small"]{font-size:.72rem}
+.spf-seg button[data-size="normal"]{font-size:.88rem}
+.spf-seg button[data-size="large"]{font-size:1.06rem}
+.spf-seg button:hover{border-color:var(--sub)}
+.spf-seg button.on{border-color:var(--accent); color:var(--accent); background:var(--card); font-weight:700}
+
+/* the big panel: light-sky-blue tabs on top, Word-like font list, pinned footer */
+.spf-panel{
+  flex:1 1 auto; min-height:0; display:flex; flex-direction:column; overflow:hidden;
+  border:1px solid var(--border); border-radius:12px; background:var(--card);
+}
+.spf-tabs{
+  flex:0 0 auto; display:flex; gap:.3rem; padding:.42rem .48rem;
+  border-bottom:1px solid var(--border); background:rgba(58,160,232,.04);
+}
+.spf-tabs button{
+  flex:1 1 0; min-width:0; height:1.9rem; padding:0 .4rem;
+  border-radius:8px; border:1px solid rgba(58,160,232,.42);
+  background:rgba(58,160,232,.12); color:var(--ink);
+  font:inherit; font-size:.85rem; cursor:pointer;
+  transition:background .15s, border-color .15s, color .15s;
+}
+.spf-tabs button:hover{background:rgba(58,160,232,.20)}
+.spf-tabs button.on{
+  background:rgba(58,160,232,.34); border-color:rgba(58,160,232,.88);
+  color:#0f5c8f; font-weight:700;
+}
+[data-theme="dark"] .spf-tabs button{color:var(--ink)}
+[data-theme="dark"] .spf-tabs button.on{color:#bfe4ff}
+.spf-list{
+  flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;
+  padding:.3rem .36rem; display:flex; flex-direction:column; gap:.22rem;
+  scrollbar-width:thin;
+}
+.spf-list::-webkit-scrollbar{width:6px}
+.spf-list::-webkit-scrollbar-thumb{background:var(--border); border-radius:6px}
+.spf-list::-webkit-scrollbar-track{background:transparent}
+/* each row draws its own sample in that very typeface (Word-style font picker) */
+.spf-row{
+  display:flex; flex-direction:column; align-items:flex-start; gap:.08rem; width:100%;
+  padding:.24rem .42rem .3rem; border-radius:8px; border:1px solid transparent;
+  background:transparent; color:var(--ink); text-align:left; cursor:pointer; font:inherit;
+}
+.spf-row:hover{background:rgba(58,160,232,.07)}
+/* the generic button.on rule paints text white - keep the picker readable */
+.spf-row.on{border-color:rgba(58,160,232,.78); background:rgba(58,160,232,.14); color:var(--ink)}
+.spf-row-n{font-size:.67rem; color:var(--sub); letter-spacing:.02em; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.spf-row-s{font-size:.98rem; line-height:1.28; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.spf-row.spf-def .spf-row-s{color:#2f86d6}
+[data-theme="dark"] .spf-row.spf-def .spf-row-s{color:#7cc7ff}
+
+.spf-foot{
+  flex:0 0 auto; display:flex; flex-direction:column; gap:.3rem;
+  padding:.36rem .5rem .44rem; border-top:1px solid var(--border);
+  background:rgba(58,160,232,.035);
+}
+.spf-fbar{display:flex; align-items:center; gap:.42rem; min-width:0}
+.spf-fbar[hidden]{display:none !important}
+.spf-fbar-stone{flex-wrap:nowrap; gap:5px; row-gap:0}
+.spf-fbar-stone .spf-stones{gap:5px; flex:0 0 auto}
+.spf-fbar-stone .spf-stone{width:33px; height:33px}
+.spf-fbar-stone .spf-numseg{flex:1 1 0; display:flex; gap:2px; min-width:0}
+.spf-fbar-stone .spf-numseg button{flex:1 1 0; width:auto; min-width:0; height:22px; padding:0; font-size:11px}
+.spf-fbar-stone .spf-stoneseg{flex:1.25 1 0; display:flex; gap:2px; min-width:0}
+.spf-fbar-stone .spf-stoneseg button{flex:1 1 0; width:auto; min-width:0; height:22px; padding:0; font-size:10.5px}
+.spf-fbar-stone .spf-ok{flex:0 0 auto; height:22px; padding:0 9px; font-size:10.5px; margin-left:0}
+.spf-wlbl{flex:0 0 auto; display:flex; align-items:baseline; gap:.26rem; min-width:0}
+.spf-lbl2{font-size:.72rem; font-weight:600; color:var(--sub); letter-spacing:.02em}
+.spf-wname{font-size:.7rem; font-weight:600; color:var(--accent); white-space:nowrap}
+.spf-wsl{
+  position:relative; flex:1 1 auto; min-width:4.6rem; height:1.5rem;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 .18rem; cursor:pointer; touch-action:none;
+}
+.spf-wsl-line{
+  position:absolute; left:.42rem; right:.42rem; top:50%; height:1px; border-radius:1px;
+  background:var(--border); transform:translateY(-50%); pointer-events:none;
+}
+.spf-wdot{
+  position:relative; z-index:1; width:.58rem; height:.58rem; padding:0; border-radius:50%;
+  border:1px solid var(--sub); background:var(--card); cursor:pointer; flex:0 0 auto;
+  transition:background .12s, border-color .12s, transform .12s, box-shadow .12s;
+}
+.spf-wdot:hover{border-color:var(--accent)}
+.spf-wdot.on{
+  background:var(--accent); border-color:var(--accent);
+  transform:scale(1.35); box-shadow:0 0 0 2px rgba(47,134,214,.16);
+}
+.spf-it{
+  flex:0 0 auto; height:1.82rem; padding:0 .58rem; border-radius:8px;
+  border:1px solid var(--border); background:var(--card); color:var(--ink);
+  font:inherit; font-size:.8rem; cursor:pointer;
+  transition:background .15s, border-color .15s, color .15s;
+}
+.spf-it:hover{border-color:var(--sub)}
+.spf-it.on{border-color:var(--accent); color:var(--accent); font-weight:700; font-style:italic}
+.spf-stones{flex:0 0 auto; display:flex; gap:.45rem; justify-content:flex-start}
+.spf-stone{
+  width:2.5rem; height:2.5rem; border-radius:50%; flex:0 0 auto;
+  display:flex; align-items:center; justify-content:center;
+}
+.spf-stones.flat .spf-stone.blk{
+  background:#191715; color:#f3efe4; border:1px solid #55504a; box-shadow:none;
+}
+.spf-stones.flat .spf-stone.wht{
+  background:#eeeadf; color:#26241f; border:1px solid #b8b2a4; box-shadow:none;
+}
+.spf-stones.real .spf-stone.blk{
+  background:radial-gradient(circle at 32% 28%, #726d67 0%, #4a4540 28%, #241f1b 68%, #080706 100%);
+  color:#f3efe4; border:1px solid rgba(255,255,255,.16);
+  box-shadow:inset 0 .08rem .18rem rgba(255,255,255,.16), 0 .1rem .28rem rgba(0,0,0,.3);
+}
+.spf-stones.real .spf-stone.wht{
+  background:radial-gradient(circle at 32% 28%, #fff 0%, #f8f3e7 42%, #e0d9c7 80%, #b8b1a0 100%);
+  color:#2e2b26; border:1px solid rgba(120,112,98,.55);
+  box-shadow:inset 0 .08rem .18rem rgba(255,255,255,.55), 0 .1rem .28rem rgba(0,0,0,.14);
+}
+.spf-stones.jade .spf-stone.blk{
+  background:
+    radial-gradient(circle at 30% 26%, rgba(255,255,255,.20) 0%, rgba(255,255,255,0) 48%, rgba(0,0,0,.30) 100%),
+    radial-gradient(120% 80% at 16% 80%, rgba(150,172,158,.22) 0%, rgba(150,172,158,0) 62%),
+    radial-gradient(circle at 40% 34%, #525a55 0%, #39403c 20%, #1e2422 62%, #0b0e0c 100%);
+  color:#eef3ee; border:1px solid rgba(210,226,214,.22);
+  box-shadow:inset 0 .06rem .2rem rgba(255,255,255,.12), inset 0 -.1rem .28rem rgba(0,0,0,.45), 0 .12rem .3rem rgba(0,0,0,.32);
+}
+.spf-stones.jade .spf-stone.wht{
+  background:
+    radial-gradient(circle at 30% 26%, rgba(255,255,255,.95) 0%, rgba(255,255,255,0) 54%),
+    radial-gradient(120% 80% at 16% 80%, rgba(176,166,136,.30) 0%, rgba(176,166,136,0) 64%),
+    radial-gradient(circle at 42% 36%, #fffdf7 0%, #f7f2e4 34%, #e6dfc9 72%, #cfc7ae 100%);
+  color:#39342a; border:1px solid rgba(96,88,68,.38);
+  box-shadow:inset 0 .06rem .2rem rgba(255,255,255,.7), inset 0 -.1rem .3rem rgba(120,108,80,.22), 0 .12rem .3rem rgba(0,0,0,.18);
+}
+.spf-stone span{line-height:1; font-variant-numeric:tabular-nums}
+.spf-numseg{flex:0 0 auto; width:auto}
+.spf-numseg button{flex:0 0 auto; width:1.86rem; height:1.56rem; padding:0; font-size:.78rem}
+.spf-stoneseg{flex:0 0 auto; width:auto}
+.spf-stoneseg button{flex:0 0 auto; width:2.02rem; height:1.56rem; padding:0; font-size:.74rem}
+.spf-ok{
+  flex:0 0 auto; margin-left:auto; height:1.56rem; padding:0 .78rem;
+  font-size:.8rem; font-weight:600;
+}
+.spf-ok-done{border-color:rgba(58,160,232,.9); color:#0f5c8f; background:rgba(58,160,232,.16)}
+[data-theme="dark"] .spf-ok-done{color:#bfe4ff}
+
+/* user-chosen hint face (--logfont / --logweight / --logstyle are set on body).
+   The fallback must be a real family list, never the `inherit` keyword: a keyword inside
+   the list makes the whole font-family declaration invalid and the hint silently stays
+   on the default face. */
+.eng-msg, .eng-msg .line, .hint, .pv-box, .lk-status, .fwd-body, .vis-msg{
+  font-family:var(--logfont, inherit);
+  font-weight:var(--logweight, inherit);
+  font-style:var(--logstyle, normal);
+}
+
+body.setwin .sp-setup .row>label,
+body.setwin .sp-setup .ab-sys-t,
+body.setwin .si-k{color:var(--lbl-accent,#2f9ae0); opacity:.92}
+
+/* the three main-window card toggles at the top get their own titled frame, same look as
+   the sections below (dashed frame + grey caption bar) */
+.sp-rows .sp-sec{
+  border:1px dashed rgba(58,160,232,.62); border-radius:10px;
+  margin:0; overflow:hidden; background:rgba(58,160,232,.028);
+}
+[data-theme="dark"] .sp-rows .sp-sec{
+  border-color:rgba(88,166,224,.58); background:rgba(88,166,224,.055);
+}
+.sp-rows .sp-sec .sec-h{background:rgba(0,0,0,.07); border-radius:0}
+.sp-rows .sp-sec .sp-row{padding:.4rem .5rem .46rem}

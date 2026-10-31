@@ -8,7 +8,7 @@ A Windows desktop assistant for Gomoku / Renju. It **reads the board you are alr
 
 > 📄 **Printable bilingual manual (PDF):** [docs/Meter-Gomoku-Manual.pdf](docs/Meter-Gomoku-Manual.pdf)
 
-Current version: **4.46** · Engine: **Rapfi 0.44.1** (mix9 NNUE shipped, mix10 in source)
+Current version: **4.48** · Engine: **Rapfi 0.44.1** (mix9 NNUE shipped, mix10 in source)
 
 ---
 
@@ -27,7 +27,7 @@ Current version: **4.46** · Engine: **Rapfi 0.44.1** (mix9 NNUE shipped, mix10 
 
 ## 2. Quick start
 
-1. Install **Meter Gomoku 4.46** (from the Releases page) and finish the installer.
+1. Install **Meter Gomoku 4.48** (from the Releases page) and finish the installer.
 2. Start the app, then open your Gomoku client (or a web board) and get to the game screen.
 3. In the main window click **Link** in the top bar — the small link window appears.
 4. Click **Frame Board** and drag a rectangle around the board *including its outer border*.
@@ -104,12 +104,19 @@ The card has three sections; each is shown below with its own explanation.
 <li><b>Mode</b> — <i>Play</i> · <i>Free</i> (place stones) · <i>Endgame</i> (mate problem).</li>
 <li><b>AI plays</b> — Black / White toggles; both off means you play both colours.</li>
 <li><b>Think time</b> — 0.2 s to 300 s. Shared with the link window; the two are always in step.</li>
-<li><b>Background thinking</b> — rebuilt on the engine-native <b>pondering</b> in 4.46: while it is on the engine works out your reply during the opponent's turn; while it is off the engine stops the moment it moves (no idle spinning).</li>
+<li><b>Background thinking</b> — rebuilt on the engine-native <b>pondering</b> in 4.46: while it is on the engine works out your reply during the opponent's turn; while it is off the engine stops the moment it moves (no idle spinning). Off by default.</li>
+<li><b>Dynamic time</b> — new in 4.48. Instead of a fixed number of seconds per move, the budget follows position difficulty, judged from the engine's own previous output: <i>0.40x</i> once a mate is found, <i>0.70x</i> when the score is decided, <i>0.85x</i> when clearly better or when the best move has stopped changing, <i>1.15x</i> while a level position is still unsettled. The seconds saved go into a bank that hard positions borrow from (bounded to −1xN … +2xN, so it can never snowball). Turn it off to think exactly N seconds every move.</li>
 <li><b>Rules</b> — Freestyle · Overline (a six-in-a-row does not win) · Renju (forbidden moves).</li>
 </ul>
 </td>
 </tr>
 </table>
+
+<p align="center">
+  <img src="docs/images/stones_jade.png" width="330" alt="Jade stones"> &nbsp;&nbsp;
+  <img src="docs/images/stones_real.png" width="330" alt="Realistic stones"><br>
+  <i>Stone materials on the same position: <b>Jade</b> (left) and <b>Realistic</b> (right) - rendered at 3x.</i>
+</p>
 
 #### 3.3.2 Engine
 
@@ -268,7 +275,29 @@ One click replaces the button area with the six thresholds; the statistics row f
 
 ---
 
-## 8. What's new in 4.46
+## 8. What's new
+
+### 4.48
+
+| Area | Change |
+|---|---|
+| **Stone material** | Font → stones now offers **Realistic** (default), **Jade** (layered pale tints with a glass-like sheen) and **Flat**; Realistic and Jade both cast a soft contact shadow so the stones sit on the board instead of floating. |
+| **HD board** | The board canvas renders at **2x supersampling** — stone edges, move counters, grid lines and coordinates are visibly sharper on any display. Contact shadows are baked sprites, so a full repaint of ~40 stones costs well under 1 ms. |
+| **Dynamic time** | New switch in the Game section (see 3.3.1): less time on trivial positions, up to +15 % on hard ones, 40 % on forced wins, with a bounded time bank. Off = exactly the configured seconds. |
+| **Forced-win responsiveness** | Fixed positions that took very long while the depth display stayed at 0: the engine no longer runs 24 empty iterations after finding a mate, and `START_DEPTH` resuming is capped (24 plies max, no resume on a cold hash, no resume on a short budget). |
+| **Settings look** | Option labels are sky blue — and switch to black or white automatically when the page colour is close to sky blue, so they never become unreadable. The three window-card switches gained a titled **Window cards** frame. |
+| **Stone row layout** | The Font → stones row uses fixed pixel sizes with the button groups sharing the remaining width, so Medium / Large no longer overflow the window; move-counter sizes were reduced one step. |
+
+### 4.47
+
+| Area | Change |
+|---|---|
+| **Settings window** | Now a standalone master panel: always on top, fixed 1:1.618 ratio that scales with the screen, pre-created at boot, and it minimises into its own taskbar entry. |
+| **Two-way sync** | AI side, threads, hash, candidate range, analysis points, theme and language apply to every window at once. |
+| **Link window** | Opening a link session no longer reshapes the main window and no longer keeps its own settings archive; link AI parameters start from the main window. |
+| **Board rendering** | Lines and coordinates are device-pixel aligned, the position-code box moved under the engine log, move numbers are on by default. |
+
+### 4.46
 
 | Area | Change |
 |---|---|

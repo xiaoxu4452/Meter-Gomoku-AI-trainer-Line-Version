@@ -37,7 +37,7 @@
   var th = 'light', lg = 'zh', st = null;
   try {
     st = JSON.parse(localStorage.getItem('gbcalc.settings.v1') || '{}') || {};
-    if (st.theme === 'dark') th = 'dark';
+    if (st.theme === 'dark' || (st.theme === 'custom' && st.customBase === 'dark')) th = 'dark';
     if (st.lang === 'en') lg = 'en';
   } catch (e) {}
   document.body.setAttribute('data-theme', th);
@@ -189,6 +189,7 @@
       <div class="bf-side bf-l">
 
         <button id="btn_live" class="btn bfkey">分析计算</button>
+        <button id="btn_place_eval" class="btn bfkey" hidden>评估</button>
       </div>
       <div id="boardBtns">
 
@@ -356,6 +357,10 @@
           <button id="btn_bgThink" class="tglbtn" type="button" aria-pressed="false"><span class="tgl"><i></i></span></button>
           <span class="hint" id="t_bgThinkHint"></span>
         </div>
+        <div class="row"><label id="t_dynTime">动态时间</label>
+          <button id="btn_dynTime" class="tglbtn" type="button" aria-pressed="true"><span class="tgl"><i></i></span></button>
+          <span class="hint" id="t_dynTimeHint"></span>
+        </div>
         <div class="row"><label id="t_rule">规则</label>
           <select id="sel_rule">
             <option value="0">无禁手</option>
@@ -411,7 +416,7 @@
         </div>
         <div class="row"><label id="t_maxNodes">最大节点</label>
           <span class="duo"><select id="sel_maxNodes"></select><input
-                 id="inp_maxNodes" class="num-in" type="number" min="0.1" max="256" step="0.1"
+                 id="inp_maxNodes" class="num-in" type="number" min="0.1" max="4096" step="0.1"
                  inputmode="decimal"><span
                  class="unit">M</span></span>
         </div>
@@ -599,48 +604,51 @@
 <div id="colorPop" class="modal" hidden>
   <div class="modal-card cp-card">
     <div class="modal-head">
-      <span class="modal-title" id="t_color">颜色</span>
+      <span class="modal-title" id="t_color">主题</span>
       <span class="grow"></span>
       <button id="cp_close" class="btn">关闭</button>
     </div>
     <div class="modal-body cp-body">
-      <div class="cp-row"><label id="t_cpTheme">主题</label>
+      <div class="cp-view cp-themes-view" id="cpThemesView">
+        <div class="cp-themes" id="cp_theme_presets"></div>
+        <button id="cp_custom" type="button" class="btn cp-custom">自定义</button>
+      </div>
 
-        <div class="seg s3" id="cp_theme">
-          <button data-th="light">浅色</button>
-          <button data-th="dark">深色</button>
-          <button data-th="custom">自定义</button>
+      <div class="cp-view cp-custom-view" id="cpCustomView" hidden>
+        <div class="cp-cush">
+          <button id="cp_custom_back" type="button" class="btn sq2" title="返回主题">‹</button>
+          <span class="cp-cus-ttl" id="t_cpCustom">自定义</span>
         </div>
-      </div>
-      <div class="cp-row"><label id="t_cpTarget">调色对象</label>
-        <div class="seg s2" id="cp_target">
-          <button data-tg="board" class="on">棋盘</button>
-          <button data-tg="page">背景</button>
+        <div class="cp-row"><label id="t_cpTarget">调色对象</label>
+          <div class="seg s2" id="cp_target">
+            <button data-tg="board" class="on">棋盘</button>
+            <button data-tg="page">背景</button>
+          </div>
         </div>
-      </div>
 
-      <div class="cp-picker">
-        <canvas id="cp_sv" width="288" height="150"></canvas>
-        <canvas id="cp_hue" width="288" height="16"></canvas>
-      </div>
+        <div class="cp-picker">
+          <canvas id="cp_sv" width="288" height="150"></canvas>
+          <canvas id="cp_hue" width="288" height="16"></canvas>
+        </div>
 
-      <div class="cp-sliders">
-        <label>R</label><input id="cp_rn" type="number" min="0" max="255" step="1">
-        <label>G</label><input id="cp_gn" type="number" min="0" max="255" step="1">
-        <label>B</label><input id="cp_bn" type="number" min="0" max="255" step="1">
-      </div>
-      <div class="cp-row"><label id="t_cpHex">RGB 代码</label>
-        <input id="cp_hex" spellcheck="false" placeholder="#d9b878">
-      </div>
+        <div class="cp-sliders">
+          <label>R</label><input id="cp_rn" type="number" min="0" max="255" step="1">
+          <label>G</label><input id="cp_gn" type="number" min="0" max="255" step="1">
+          <label>B</label><input id="cp_bn" type="number" min="0" max="255" step="1">
+        </div>
+        <div class="cp-row"><label id="t_cpHex">RGB 代码</label>
+          <input id="cp_hex" spellcheck="false" placeholder="#d9b878">
+        </div>
 
-      <div class="cp-row" id="cpPresetRow"><label id="t_cpPreset">预制色</label>
-        <div class="cp-presets" id="cp_presets"></div>
-      </div>
-      <div class="cp-foot">
-        <span class="cp-prev" id="cp_prev"></span>
-        <span class="hint" id="cp_hint"></span>
-        <span class="grow"></span>
-        <button id="cp_reset" class="btn">恢复默认</button>
+        <div class="cp-row" id="cpPresetRow"><label id="t_cpPreset">预制色</label>
+          <div class="cp-presets" id="cp_presets"></div>
+        </div>
+        <div class="cp-foot">
+          <span class="cp-prev" id="cp_prev"></span>
+          <span class="hint" id="cp_hint"></span>
+          <span class="grow"></span>
+          <button id="cp_reset" class="btn">恢复默认</button>
+        </div>
       </div>
     </div>
   </div>
