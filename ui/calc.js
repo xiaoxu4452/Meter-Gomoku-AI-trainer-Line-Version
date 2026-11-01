@@ -12225,6 +12225,7 @@ function kbStr(kb) {
 }
 
 function tbSay(txt) { if (els.tbHint) els.tbHint.textContent = txt; }
+function tbSayHtml(html) { if (els.tbHint) els.tbHint.innerHTML = html; }   // only our own markup
 function tbSetBusy(on) {
   var b = els.btn_tb;
   if (!b) return;
@@ -12260,7 +12261,9 @@ function tbResult(m) {
   var applied = m.best;
   if (curRow && bestRow && curRow.n * 100 >= bestRow.n * 92) applied = curRow.t;
   var rows = arr.map(function (r) {
-    return (r.t === applied ? '★' : '') + r.t + ':' + (r.d | 0) + T('tbD') + '/' + tbNum(r.n);
+    var txt = r.t + ':' + (r.d | 0) + T('tbD') + '/' + tbNum(r.n);
+    
+    return (r.t === applied) ? '<b class="tb-best">★' + txt + '</b>' : txt;
   });
   if (applied >= MIN_THREADS && applied !== S.cores) {
     S.cores = applied;
@@ -12271,8 +12274,8 @@ function tbResult(m) {
     try { applyEngineConfig(); } catch (e3) {}
     try { buildSelects(); } catch (e4) {}
   }
-  tbSay((applied === before ? T('tbKeep') : T('tbDone')).replace('{t}', String(applied)) +
-        ' · ' + rows.join(' · '));
+  tbSayHtml((applied === before ? T('tbKeep') : T('tbDone')).replace('{t}', String(applied)) +
+            ' · ' + rows.join(' · '));
 }
 
 function sysInfoCards() {
