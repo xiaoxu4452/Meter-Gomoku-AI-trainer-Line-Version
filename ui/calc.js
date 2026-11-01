@@ -81,7 +81,7 @@ var I18N = {
     turnYouBoth: '轮到你 · {c}（双方都你下）',
     showNum: '显示序号', showNumHint: '棋子上标出第几手',
     spCards: '窗口功能卡片展示',
-    dynTime: '动态时间', dynTimeHint: '难局最多 +15%，见杀局面只用 40%',
+    dynTime: '动态时间', dynTimeHint: '官方 Rapfi 时限控制：每手时间与整局总时限（10 分钟）都原样交给引擎 search/timecontrol.cpp —— 总时限充裕时用满每手时间（0.9 比例停止），紧张时才按着法稳定性 / 评估掉落自适应收手',
     bgThink: '后台思考', bgThinkHint: 'AI 落子后你在思考时，引擎在后台继续深算这一局面（算你的优势点 + 它的应对），你一落子它从热置换表接着算',
     bgThinkOffAi: 'AI 对打期间已自动关闭', bgThinkOffBusy: '有计算在跑，已自动暂停',
 
@@ -245,6 +245,9 @@ var I18N = {
 tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     tagLiveAna: '分析计算', tagBg: '后台思考', liveAna: '分析计算', liveAnaStop: '停止分析',
     liveAnaBan: 'AI 自打：黑白双方都由 AI 走，没有用户执子方可分析，功能键停用',
+
+    liveAnaEvalBusy: '「评估」正在运行 —— 先点「停止评估」，再开「分析计算」',
+    placeEvalAnaBusy: '「分析计算」正在运行 —— 先点「停止分析」，再开「评估」',
     liveAnaRun: '分析计算 · 持续深算中 · 当前深度 {d}',
     anCalcRun: '计算评估 · 持续深算中 · 当前深度 {d}',
     anNbestRun: '多点分析 · 持续深算中 · 当前深度 {d}',
@@ -599,7 +602,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     turnYouBoth: 'Your turn · {c} (both sides)',
     showNum: 'Move numbers', showNumHint: 'Mark each stone with its move number',
     spCards: 'Window cards',
-    dynTime: 'Dynamic time', dynTimeHint: '+15% on hard moves, 40% on forced wins',
+    dynTime: 'Dynamic time', dynTimeHint: 'Official Rapfi time control: the per-move budget and the 10-minute match clock go straight to search/timecontrol.cpp - full move time while the clock is ample, adaptive 0.9 stop only when it is tight',
     bgThink: 'Background thinking', bgThinkHint: 'After the AI moves, the engine keeps deepening this position while you think (your threats + its replies), so your move hits a hot transposition table',
     bgThinkOffAi: 'auto-off while AI plays both sides', bgThinkOffBusy: 'paused while a calculation runs',
 
@@ -759,6 +762,8 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
 tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     tagLiveAna: 'Live analysis', tagBg: 'Background thinking', liveAna: 'Analyze', liveAnaStop: 'Stop analysis',
     liveAnaBan: 'AI self-play: both sides are played by AI - no user side to analyze',
+    liveAnaEvalBusy: 'Evaluation is running - stop it first, then start analysis',
+    placeEvalAnaBusy: 'Analysis is running - stop it first, then start evaluation',
     liveAnaRun: 'Live analysis · deep search · depth {d}',
     anCalcRun: 'Eval · continuous deep search · depth {d}',
     anNbestRun: 'Multi-PV · continuous deep search · depth {d}',
@@ -1179,6 +1184,8 @@ function resetGame(keepLoaded) {
   clearHeat();
   clearCoach();
   anaReset();
+  
+  liveAnaBoardChanged();
   G.ana.autoDefend = false;
   if (els.swapPop) els.swapPop.hidden = true;
   G.missRings = []; G.redo = []; G.review = null; G.lastStat = null;
@@ -2484,7 +2491,10 @@ var LocalAI = (function () {
   var seq = 0, liveSeq = 0;
   var pend = {};
   var capWait = {};
-  var cur = null, wait = null;
+
+  
+  
+  var cur = null, curEv = null, wait = null;
 
   
   
@@ -2523,17 +2533,32 @@ var LocalAI = (function () {
                speed: r.speed || 0, nodes: r.nodes || 0,
                line: (c.pv || []).map(function (p) { return [p[0], p[1]]; }) };
     });
-    return { searching: true, t0: job.t0, cid: job.cid, lane: 'main', tag: job.tag,
+    return { searching: true, t0: job.t0, cid: job.cid,
+
+             lane: (job.lane === 'eval') ? 'eval' : 'main', tag: job.tag,
+
+             side: (r.side === 1 || r.side === 2) ? r.side :
+                   ((job.q && (job.q.side === 1 || job.q.side === 2)) ? job.q.side : 0),
              speed: r.speed || 0, nodes: r.nodes || 0, depth: r.depth || 0,
              eval: (pvs[0] && pvs[0].eval) || '', best: (pvs[0] ? [pvs[0].x, pvs[0].y] : null),
              pvs: pvs };
   }
   function emitLive(job, r) {
     if (job.liveId == null) return;
+
+    
+    if (job.lane === 'eval') return;
     try { onEngineLive(liveOf(job, r)); } catch (e) {}
   }
+  function slotSet(job) {
+    if (job.lane === 'eval') curEv = job; else cur = job;
+  }
+  function slotClear(job) {
+    if (job.lane === 'eval') { if (curEv === job) curEv = null; }
+    else if (cur === job) cur = null;
+  }
   function startJob(job) {
-    cur = job;
+    slotSet(job);
     job.t0 = Date.now();
     job.started = true;   
 
@@ -2541,7 +2566,7 @@ var LocalAI = (function () {
     pend[job.id] = job;
     if (job.op !== 'live') {
       job.timer = setTimeout(function () {
-        if (cur === job) cur = null;
+        slotClear(job);
         delete pend[job.id];
         if (job.op === 'balance') { markTtDirty(); job.res({ moves: [], eval: null, swap: false, error: 'timeout' }); }
         else job.rej(new Error('timeout'));
@@ -2549,7 +2574,7 @@ var LocalAI = (function () {
       }, job.timeoutMs);
     }
     if (!post({ engine: 1, op: job.op || 'ask', id: job.id, q: job.q })) {
-      clearTimeout(job.timer); delete pend[job.id]; cur = null;
+      clearTimeout(job.timer); delete pend[job.id]; slotClear(job);
       if (job.op === 'balance') { markTtDirty(); job.res({ moves: [], eval: null, swap: false, error: 'engine unavailable' }); }
       else if (job.onEnd) { try { job.onEnd({ error: 'engine unavailable', stopped: true }); } catch (e) {} }
       else job.rej(new Error('engine unavailable'));
@@ -2566,11 +2591,13 @@ var LocalAI = (function () {
   }
   function stopLiveJob(job) {
     if (!job) return;
+    var isEv = (job.lane === 'eval');
     if (wait === job) { wait = null; endJob(job, { stopped: true }); return; }
-    var running = (cur === job);
+    var running = isEv ? (curEv === job) : (cur === job);
     if (job.id != null && pend[job.id]) { delete pend[job.id]; clearTimeout(job.timer); running = true; }
-    if (cur === job) cur = null;
-    if (running) { try { post({ engine: 1, op: 'stop', id: ++seq, q: {} }); } catch (e) {} }
+    slotClear(job);
+
+    if (running) { try { post({ engine: 1, op: 'stop', id: ++seq, q: { lane: isEv ? 'eval' : 'main' } }); } catch (e) {} }
     endJob(job, { stopped: true });
     pump();
   }
@@ -2582,13 +2609,19 @@ var LocalAI = (function () {
   }
   function makeJob(body, timeoutMs, res, rej, op) {
     var b = body || {};
+    
+    var lane = (b.lane === 'eval') ? 'eval' : 'main';
     var q = { board: b.board,
               side: (b.side === 1 || b.side === 2) ? b.side : 0,
               rule: b.rule | 0,
               budgetMs: Math.max(200, b.turnMs | 0),
+
+              
               
               dyn: (b.dyn === 0) ? 0 : 1,
-              key: b.key || 0 };
+              matchMs: (b.matchMs > 0) ? (b.matchMs | 0) : 600000,
+              key: b.key || 0,
+              lane: lane };
     if (op === 'balance') {
       q.topN = 1; q.pondering = false;
       q.mode = (b.mode === 'two') ? 'two' : 'one';
@@ -2601,11 +2634,21 @@ var LocalAI = (function () {
     if (op === 'live' || b.live) { q.live = true; q.pondering = false; }
     
     if (b.clearHash) q.clearHash = true;
-    return { id: ++seq, timer: null, res: res, rej: rej, op: op || 'ask',
+    return { id: ++seq, timer: null, res: res, rej: rej, op: op || 'ask', lane: lane,
              liveId: (b.liveId == null ? null : b.liveId), tag: b.tag || '', cid: b.cid || '',
              exclusive: !!b.exclusive, timeoutMs: timeoutMs || 20000, t0: Date.now(), q: q };
   }
   function submit(job) {
+
+    if (job.lane === 'eval') {
+      if (curEv) {
+        var oldEv = curEv; curEv = null;
+        delete pend[oldEv.id]; clearTimeout(oldEv.timer);
+        endJob(oldEv, emptyRes(true));
+      }
+      startJob(job);
+      return;
+    }
     if (job.op === 'live') {
 
       
@@ -2670,7 +2713,7 @@ var LocalAI = (function () {
     if (!job) return;
     delete pend[m.id];
     clearTimeout(job.timer);
-    if (cur && cur.id === m.id) cur = null;
+    slotClear(job);
     if (job.op === 'balance') {
       var br = balanceResOf(m.res);
       if (m.ok === false && m.err) br.error = String(m.err);
@@ -2681,7 +2724,8 @@ var LocalAI = (function () {
       pump();
       return;
     }
-    if (job.liveId != null) {
+    if (job.liveId != null && job.lane !== 'eval') {
+
       try { onEngineLive({ lane: 'main', tag: job.tag, searching: false }); } catch (e) {}
     }
     if (m.ok === false) {
@@ -2714,11 +2758,14 @@ var LocalAI = (function () {
     emitLive(job, m.res);
   }
   function failAll(err) {
-    if (cur) {
-      clearTimeout(cur.timer); delete pend[cur.id];
-      if (cur.onEnd) { try { cur.onEnd({ stopped: true, error: String(err) }); } catch (e) {} }
-      else { try { cur.rej(err); } catch (e) {} }
-      cur = null;
+    var dying = [cur, curEv];
+    cur = null; curEv = null;
+    for (var i = 0; i < dying.length; i++) {
+      var d = dying[i];
+      if (!d) continue;
+      clearTimeout(d.timer); delete pend[d.id];
+      if (d.onEnd) { try { d.onEnd({ stopped: true, error: String(err) }); } catch (e) {} }
+      else { try { d.rej(err); } catch (e) {} }
     }
     for (var k in pend) {
       clearTimeout(pend[k].timer);
@@ -2777,7 +2824,8 @@ var LocalAI = (function () {
                   variant: extra.variant || '' } });
     },
     restart: function () {
-      post({ engine: 1, op: 'stop', id: ++seq, q: {} });
+      post({ engine: 1, op: 'stop', id: ++seq, q: { lane: 'main' } });
+      
       markTtDirty();
       failAll(new Error('engine reconnecting'));
     },
@@ -2785,7 +2833,8 @@ var LocalAI = (function () {
     markDirty: function () { markTtDirty(); },
     kick: function () { try { pump(); } catch (e) {} },
     stopLane: function (lane) {
-      post({ engine: 1, op: 'stop', id: ++seq, q: {} });
+      
+      post({ engine: 1, op: 'stop', id: ++seq, q: { lane: (lane === 'eval') ? 'eval' : 'main' } });
     },
     relay: function (m) {
       if (!m) return;
@@ -3693,6 +3742,9 @@ function syncSideUI() {
 var LIVE_LANES = {};
 function onEngineLive(d) {
   if (!d || !d.lane) return;
+
+  if (d.searching !== false && d.lane === 'main' && LIVE_AN.on && LIVE_AN.cid && d.cid && d.cid !== LIVE_AN.cid)
+    return;
   if (d.searching === false) {
 
     if (!(LIVE_AN.on && d.lane === 'main')) delete LIVE_LANES[d.lane];
@@ -3701,6 +3753,7 @@ function onEngineLive(d) {
   LIVE_LANES[d.lane] = {
     t0: d.t0 || Date.now(), speed: +d.speed || 0, nodes: +d.nodes || 0,
     depth: +d.depth || 0, eval: d.eval || '', tag: d.tag || '', best: d.best || null,
+    side: +d.side || 0, cid: d.cid || '',
   };
 
   if (!RV_MODE && G.ana.busy && G.ana.kind === 'calc' && d.lane === 'main' &&
@@ -3733,15 +3786,61 @@ function fmtSpeed(nps) {
 }
 function fmtNodes(n) { return fmtSpeed(n); }
 
+var LIVE_DASH_TMR = 0;
+var LIVE_DASH_MS = 400;
+
+function liveDashReset() {
+  if (RV_MODE) return;
+  delete LIVE_LANES.main;
+  if (els.st_depth) els.st_depth.textContent = '-';
+  if (els.st_speed) els.st_speed.textContent = '-';
+  if (els.st_nodes) els.st_nodes.textContent = '-';
+  if (els.st_time) els.st_time.textContent = '0.0 s';
+  if (els.st_eval) els.st_eval.textContent = '-';
+  if (els.st_best) els.st_best.textContent = '-';
+}
+
+function liveDashClockStart() {
+  if (LIVE_DASH_TMR) return;
+  LIVE_DASH_TMR = setInterval(liveDashClockTick, LIVE_DASH_MS);
+}
+function liveDashClockStop() {
+  if (LIVE_DASH_TMR) { clearInterval(LIVE_DASH_TMR); LIVE_DASH_TMR = 0; }
+}
+function liveDashClockTick() {
+  if (!LIVE_AN.on) { liveDashClockStop(); return; }
+  if (RV_MODE) return;
+  var L = LIVE_LANES.main;
+  var t0 = LIVE_AN.t0 || (L && L.t0) || 0;
+  
+  if (LIVE_AN.handle && t0 && els.st_time)
+    els.st_time.textContent = ((Date.now() - t0) / 1000).toFixed(1) + ' s';
+  
+  if (!LIVE_AN.handle && !LIVE_AN.timer && !LIVE_AN.frozen && !LIVE_AN.mate &&
+      !G.busy && !(G.ana.busy && G.ana.kind !== 'live') && liveAnaWanted())
+    liveAnaStart();
+}
+
 function paintLiveDash() {
   if (RV_MODE) return;
   var a = liveAgg();
-  if (!a) return;
+  if (!a) {
+    
+    if (LIVE_AN.on) liveDashReset();
+    return;
+  }
   if (a.depth) els.st_depth.textContent = String(a.depth);
   els.st_speed.textContent = fmtSpeed(a.speed);
   els.st_nodes.textContent = fmtNodes(a.nodes);
 
-  var tShow = a.t0 || (LIVE_AN.on ? LIVE_AN.t0 : 0) || Date.now();
+  var L = LIVE_LANES.main;
+  if (L) {
+    if (els.st_best) els.st_best.textContent = L.best ? coordName(L.best[0], L.best[1]) : '-';
+    dashEvalSet(L.eval, L.side || 0);
+  }
+
+  var tShow = (LIVE_AN.on && LIVE_AN.t0) ? LIVE_AN.t0 : (a.t0 || 0);
+  if (!tShow) tShow = Date.now();
   els.st_time.textContent = ((Date.now() - tShow) / 1000).toFixed(1) + ' s';
 
   if (linkSessionOn()) {
@@ -8900,6 +8999,8 @@ function spfFootSync() {
     it.setAttribute('aria-pressed', onI ? 'true' : 'false');
   }
   spfStonePaint();
+  
+  spfOkFixWidth();
 }
 function spfTabSet(tab) {
   if (tab !== 'ui' && tab !== 'log' && tab !== 'num') return;
@@ -8915,9 +9016,32 @@ function spfPick(v) {
   spfRenderList(true);
   spfFootSync();
 }
+var SPF_OK_MEAS = null;
+
+function spfOkFixWidth() {
+  var ok = document.getElementById('spf_ok');
+  if (!ok) return;
+  try {
+    var st = window.getComputedStyle(ok);
+    var fs = parseFloat(st.fontSize) || 13;
+    var fam = st.fontFamily || 'sans-serif';
+    var wt = st.fontWeight || '600';
+    var padL = parseFloat(st.paddingLeft) || 0;
+    var padR = parseFloat(st.paddingRight) || 0;
+    if (!SPF_OK_MEAS) SPF_OK_MEAS = document.createElement('canvas').getContext('2d');
+    SPF_OK_MEAS.font = wt + ' ' + fs + 'px ' + fam;
+    var w = Math.max(SPF_OK_MEAS.measureText(String(T('fontOk'))).width,
+                     SPF_OK_MEAS.measureText(String(T('fontApplied'))).width);
+
+    var px = Math.ceil(w + padL + padR + 8);
+    ok.style.minWidth = px + 'px';
+    ok.style.width = '';
+  } catch (eOW) {}
+}
 function spfOkFlash() {
   var ok = document.getElementById('spf_ok');
   if (!ok) return;
+  spfOkFixWidth();
   ok.textContent = T('fontApplied');
   ok.classList.add('spf-ok-done');
   if (SPF_OK_TIMER) clearTimeout(SPF_OK_TIMER);
@@ -9469,8 +9593,10 @@ function anaCalcUI() {
   if (!els.btn_an_calc) return;
   var liveOn = !!(typeof LIVE_AN !== 'undefined' && LIVE_AN && LIVE_AN.on);
   var ban = aiVsAi();
-  els.btn_an_calc.disabled = ban;
-  els.btn_an_calc.title = ban ? T('liveAnaBan') : '';
+  
+  var evOn = !!(typeof PLACE_EVAL !== 'undefined' && PLACE_EVAL && PLACE_EVAL.on);
+  els.btn_an_calc.disabled = ban || evOn;
+  els.btn_an_calc.title = ban ? T('liveAnaBan') : (evOn ? T('liveAnaEvalBusy') : '');
   els.btn_an_calc.classList.toggle('on', liveOn);
   els.btn_an_calc.textContent = liveOn ? T('liveAnaStop') : T('anCalc');
   if (els.btn_an_defend) {
@@ -9817,7 +9943,7 @@ function drawDefendMarks(ctx, cells, pad, gap) {
 
 var LIVE_AN = {
   on: false, gen: 0, handle: null, items: [], picked: [], depth: 0,
-  timer: 0, key: '', t0: 0, frozen: false, lastUi: 0,
+  timer: 0, key: '', cid: '', t0: 0, frozen: false, lastUi: 0,
 };
 
 // ---- live analysis: continuous deepening on the main lane, lowest priority ----
@@ -9832,6 +9958,7 @@ function liveAnaSide() {
   return sideByCount();
 }
 function liveAnaKeyNow() { return G.moves.length + ':' + liveAnaSide() + ':' + boardFp(); }
+function liveAnaCidNow() { return 'calc-live-' + G.moves.length; }
 
 function liveAnaStopJob() {
   if (LIVE_AN.handle) { try { LIVE_AN.handle.stop(); } catch (e) {} LIVE_AN.handle = null; }
@@ -9849,23 +9976,30 @@ function liveAnaClear() {
   LIVE_AN.gen++;
   liveAnaStopJob();
   LIVE_AN.items = []; LIVE_AN.picked = [];
-  LIVE_AN.key = ''; LIVE_AN.t0 = 0; LIVE_AN.depth = 0; LIVE_AN.frozen = false; LIVE_AN.lastUi = 0;
-  delete LIVE_LANES.main;
-  paintLiveDash();
+  LIVE_AN.key = ''; LIVE_AN.cid = ''; LIVE_AN.t0 = 0; LIVE_AN.depth = 0; LIVE_AN.frozen = false; LIVE_AN.lastUi = 0;
+  liveDashClockStop();
+  liveDashReset();
   paint();
 }
 function liveAnaUI() {
   if (aiVsAi() && LIVE_AN.on) { LIVE_AN.on = false; liveAnaClear(); }
+
+  var evOn = !!(typeof PLACE_EVAL !== 'undefined' && PLACE_EVAL && PLACE_EVAL.on);
   if (els.btn_live) {
-    els.btn_live.disabled = aiVsAi();
-    els.btn_live.title = aiVsAi() ? T('liveAnaBan') : '';
+    els.btn_live.disabled = aiVsAi() || evOn;
+    els.btn_live.title = aiVsAi() ? T('liveAnaBan') : (evOn ? T('liveAnaEvalBusy') : '');
     els.btn_live.classList.toggle('on', LIVE_AN.on);
     els.btn_live.textContent = LIVE_AN.on ? T('liveAnaStop') : T('liveAna');
   }
+  
+  if (els.btn_place_eval && !els.btn_place_eval.hidden)
+    els.btn_place_eval.disabled = !!LIVE_AN.on;
   anaCalcUI();
 }
 function liveAnaToggle() {
   if (aiVsAi()) { liveAnaUI(); return; }
+  
+  if (!LIVE_AN.on && PLACE_EVAL.on) { liveAnaUI(); return; }
   if (linkSessionOn()) {
     setStat(null, '连线会话中不使用「分析计算」—— 评估只针对 AI 执色方进行');
     return;
@@ -9878,9 +10012,11 @@ function liveAnaToggle() {
     bgThinkStop();
     anaLiveStop();
     liveAnaWipeMarks();
+    liveDashReset();
     LIVE_AN.frozen = false;
     LIVE_AN.t0 = 0; LIVE_AN.depth = 0;
     liveAnaStart();
+    liveDashClockStart();
   } else {
     liveAnaFreeze();
   }
@@ -9903,12 +10039,16 @@ function liveAnaApply(res) {
   var cs = ((res && res.candidates) || []).filter(function (c) {
     return c && c.x >= 0 && c.y >= 0 && !(G.board[c.y] && G.board[c.y][c.x]);
   }).map(function (c, i) {
-    return { x: c.x, y: c.y, ev: fmtEval(c.eval), wr: (typeof c.winrate === 'number') ? c.winrate : 0.5,
+    return { x: c.x, y: c.y, ev: fmtEval(c.eval), raw: c.eval,
+             wr: (typeof c.winrate === 'number') ? c.winrate : 0.5,
              depth: c.depth || 0, rank: i, line: c.line || [] };
   });
   LIVE_AN.items = cs;
   LIVE_AN.picked = liveAnaPick(cs, anaIp());
   setPvLine((cs[0] && cs[0].line) || [], liveAnaSide());
+
+  if (cs[0] && els.st_best) els.st_best.textContent = coordName(cs[0].x, cs[0].y);
+  if (cs[0]) dashEvalSet(cs[0].raw, liveAnaSide());
   if (LIVE_AN.picked.some(function (c) { return /^[+-]?M\d+$/i.test(String(c.ev)); }))
     LIVE_AN.mate = true;
   var d = (res && res.depth) || 0;
@@ -9941,6 +10081,8 @@ function liveAnaStart() {
   liveAnaStopJob();
   var mvN = G.moves.length;
   var side = liveAnaSide();
+  var cid = liveAnaCidNow();
+  LIVE_AN.cid = cid;
   LIVE_AN.key = liveAnaKeyNow();
   LIVE_AN.mate = false;
   if (!LIVE_AN.t0) LIVE_AN.t0 = Date.now();
@@ -9949,20 +10091,27 @@ function liveAnaStart() {
   var ended = false;
   var h = LocalAI.live({
     board: G.board, moveList: [], matchMs: 600000, turnMs: 3600000, timeUsedMs: 0,
-    topN: anaIp(), rule: engineRule(), cid: 'calc-live-' + mvN, lane: 'main', side: side,
+    topN: anaIp(), rule: engineRule(), cid: cid, lane: 'main', side: side,
     liveId: LocalAI.nextLiveId(), tag: T('tagLiveAna'),
   }, function (res) {
     if (gen !== LIVE_AN.gen) return;
     if (G.moves.length !== mvN || LIVE_AN.key !== liveAnaKeyNow()) { liveAnaBoardChanged(); return; }
     liveAnaApply(res);
-  }, function () {
+  }, function (res) {
     ended = true;
     if (gen !== LIVE_AN.gen) return;
+
+    
+    try {
+      if (res && res.candidates && res.candidates.length &&
+          G.moves.length === mvN && LIVE_AN.key === liveAnaKeyNow()) liveAnaApply(res);
+    } catch (eLE0) {}
     G.ana.busy = false;
     LIVE_AN.handle = null;
     if (LIVE_AN.on && !LIVE_AN.mate && liveAnaWanted()) liveAnaScheduleRetry(350);
   });
   if (!ended && gen === LIVE_AN.gen) LIVE_AN.handle = h;
+  if (LIVE_AN.on) liveDashClockStart();
 }
 function liveAnaScheduleRetry(ms) {
   if (!LIVE_AN.on || !liveAnaWanted()) return;
@@ -9975,6 +10124,7 @@ function liveAnaFreeze() {
   LIVE_AN.gen++;
   liveAnaStopJob();
   LIVE_AN.frozen = true;
+  liveDashClockStop();
   liveAnaUI();
   G.ana.busy = false; G.ana.kind = '';
   G.ana.marks = (LIVE_AN.picked || []).map(function (c, i) {
@@ -10005,6 +10155,12 @@ function liveAnaTouch(restartMs) {
 }
 
 function liveAnaBoardChanged() {
+
+  if (LIVE_AN.on || LIVE_AN.frozen) {
+    LIVE_AN.t0 = 0; LIVE_AN.key = '';
+    LIVE_AN.cid = liveAnaCidNow();
+    liveDashReset();
+  }
   liveAnaTouch(120);
 }
 
@@ -10028,12 +10184,18 @@ function placeEvalUI() {
   els.btn_place_eval.hidden = !show;
   if (!show) {
     if (PLACE_EVAL.on) { PLACE_EVAL.on = false; placeEvalHaltJob(); }
+    
+    if (els.btn_live) liveAnaUI();
     return;
   }
+  
+  els.btn_place_eval.disabled = !!LIVE_AN.on;
   els.btn_place_eval.classList.toggle('on', !!PLACE_EVAL.on);
   els.btn_place_eval.textContent = PLACE_EVAL.on ? T('placeEvalStop') : T('placeEval');
-  els.btn_place_eval.title = T('placeEvalTip');
+  els.btn_place_eval.title = LIVE_AN.on ? T('placeEvalAnaBusy') : T('placeEvalTip');
   els.btn_place_eval.setAttribute('aria-pressed', PLACE_EVAL.on ? 'true' : 'false');
+  
+  if (els.btn_live) liveAnaUI();
 }
 
 var PLACE_EVAL_UI_MS = 620;
@@ -10056,11 +10218,13 @@ function placeEvalPaint(res, mvN, side) {
     x: c0.x, y: c0.y, depth: depth, eval: c0.eval, side: side,
     speed: (res && res.speed) || c0.speed || 0,
     nodes: (res && res.nodes) || c0.nodes || 0,
-    timeMs: (res && res.timeMs) || c0.timeMs || 0,
+
+    timeMs: (res && res.timeMs) || (PLACE_EVAL.t0 ? (Date.now() - PLACE_EVAL.t0) : 0),
     line: c0.line || [],
   };
   G.lastStat = st;
-  setStat(st);
+
+  if (!LIVE_AN.on) setStat(st);
   var ev = evalNum(c0.eval);
   if (isFinite(ev)) {
     pushCurve(mvN, ev, side === 1);
@@ -10094,7 +10258,7 @@ function placeEvalStart() {
   var ended = false;
   var h = LocalAI.live({
     board: G.board, moveList: [], matchMs: 600000, turnMs: 3600000, timeUsedMs: 0,
-    topN: 1, rule: engineRule(), cid: 'calc-eval-' + mvN, lane: 'main', side: side,
+    topN: 1, rule: engineRule(), cid: 'calc-eval-' + mvN, lane: 'eval', side: side,
     liveId: LocalAI.nextLiveId(), tag: T('placeEval'), clearHash: clearNow,
   }, function (res) {
     if (gen !== PLACE_EVAL.gen) return;
@@ -10105,10 +10269,15 @@ function placeEvalStart() {
       return;
     }
     placeEvalApply(res, mvN, side);
-  }, function () {
+  }, function (res) {
     ended = true;
     if (gen !== PLACE_EVAL.gen) return;
     PLACE_EVAL.handle = null;
+
+    try {
+      if (PLACE_EVAL.on && res && res.candidates && res.candidates.length &&
+          G.moves.length === mvN && PLACE_EVAL.key === boardFp()) placeEvalApply(res, mvN, side);
+    } catch (ePE2) {}
     placeEvalFlush();
     if (PLACE_EVAL.on && placeEvalWanted())
       PLACE_EVAL.timer = setTimeout(function () { PLACE_EVAL.timer = 0; placeEvalStart(); }, 320);
@@ -10138,6 +10307,8 @@ function placeEvalToggle() {
   // stopping must always work - even if some other window already changed the mode,
   
   if (PLACE_EVAL.on) { placeEvalStop(); return; }
+  
+  if (LIVE_AN.on) { placeEvalUI(); return; }
   if (S.mode !== 'place') { placeEvalUI(); return; }
   PLACE_EVAL.on = true;
   PLACE_EVAL.clearPending = true;     
@@ -10170,8 +10341,11 @@ function bgThinkYield() {
 function bgThinkHintSync() {
   var h = els.t_bgThinkHint;
   if (!h) return;
-  if (!h.getAttribute('data-base')) h.setAttribute('data-base', h.textContent || '');
-  var base = h.getAttribute('data-base') || '';
+
+  
+  
+  var base = T('bgThinkHint') || '';
+  if (h.getAttribute('data-base') !== base) h.setAttribute('data-base', base);
   var why = bgThinkBusyBy();
   var tag = '';
   if (why === 'ai') tag = T('bgThinkOffAi');
@@ -12675,6 +12849,14 @@ function boot() {
     else { bgThinkStop(); bgThinkHaltEngine(); }
   };
 
+  
+
+  if (els.btn_dynTime) els.btn_dynTime.onclick = function () {
+    S.dynTime = (S.dynTime === false);
+    save();
+    syncSetSetup();
+  };
+
   els.chk_preview.onchange = function () { S.previewOn = !!els.chk_preview.checked; save(); paint(); };
 
   if (els.btn_live) els.btn_live.onclick = liveAnaToggle;
@@ -13078,6 +13260,10 @@ var FONT_WEIGHT_DEFAULT = 400;
 var FONT_NUM_WEIGHT_DEFAULT = 700;   
 var STONE_STYLE_DEFAULT = 'real';
 
+function stoneStyleOf(v) {
+  return (v === 'flat' || v === 'jade' || v === 'real') ? v : STONE_STYLE_DEFAULT;
+}
+
 function fontWeightNum(v, dflt) {
   var n = Math.round(+v);
   
@@ -13104,7 +13290,7 @@ function normalizeFontCfg(o) {
     numSize: numSize,
     numWeight: fontWeightNum(f.numWeight, FONT_NUM_WEIGHT_DEFAULT),
     numItalic: !!f.numItalic,
-    stone: (f.stone === 'jade' || f.stone === 'real') ? f.stone : STONE_STYLE_DEFAULT
+    stone: stoneStyleOf(f.stone)
   };
 }
 function fontCfg() {
@@ -13141,7 +13327,7 @@ function applyFontVars() {
   NUM_SCALE = FONT_NUM_SCALE[f.numSize] || FONT_NUM_SCALE.normal;
   NUM_WEIGHT = f.numWeight;
   NUM_ITALIC = !!f.numItalic;
-  STONE_STYLE = (f.stone === 'jade' || f.stone === 'real') ? f.stone : STONE_STYLE_DEFAULT;
+  STONE_STYLE = stoneStyleOf(f.stone);
 }
 function fitFont() {
   document.documentElement.style.fontSize = fontRootPx() + 'px';

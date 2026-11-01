@@ -238,6 +238,9 @@ static std::thread             g_worker;
 static bool                    g_workerRun = false;
 static bool                    g_workerStop = false;
 
+static std::thread             g_tickThread;
+static std::atomic<bool>       g_tickRun{false};
+
 static int g_usrThreads = 0;   
 static int g_usrHashMB  = 0;   
 
@@ -1107,106 +1110,9 @@ static int  g_seqSide = 0;
 static bool g_seqValid = false;    
 static bool g_seqNoIncr = false;   
 
-// 2026-10-31 (user): 0.96 -> 0.92. Keeping a wider margin means the last iteration is
-// almost always finished inside the budget instead of being cut mid-way, which is worth
-// more than the extra 4% of raw time (a cut iteration contributes nothing to the PV).
-static constexpr double GB_STOP_RATIO = 0.92;
-static uint64_t g_prevFp = 0;      
-static int      g_prevDepth = 0;   
-static bool     g_prevSup = false; 
-
-static bool     g_ttCold = true;
-static uint64_t g_curFp = 0;       
-
 static bool g_askIncr = false;
 
-//
-
-//
-
-static double g_timeBankMs   = 0.0;  
-static int    g_lastEvalCp   = 0;    
-static int    g_lastMateIn   = 0;    
-static int    g_lastBestX    = -1;
-static int    g_lastBestY    = -1;
-static int    g_sameBestRun  = 0;    
-static int    g_lastDepth    = 0;
-static double g_lastFactor   = 1.0;  
-
-// "25" / "-245" / "+M31" / "-M3" -> (cp, mate)
-static void ParseEvalToken(const std::string& tok, int& cp, int& mate) {
-  cp = 0; mate = 0;
-  if (tok.empty()) return;
-  size_t i = 0;
-  int sign = 1;
-  if (tok[0] == '+') i = 1;
-  else if (tok[0] == '-') { sign = -1; i = 1; }
-  if (i < tok.size() && (tok[i] == 'M' || tok[i] == 'm')) {
-    mate = sign * std::atoi(tok.c_str() + i + 1);
-    return;
-  }
-  cp = sign * std::atoi(tok.c_str() + i);
-}
-
-static double ComplexityFactor() {
-  if (g_lastMateIn != 0) return 0.40;          
-  int ae = std::abs(g_lastEvalCp);
-  if (ae >= 2500) return 0.70;                 
-  if (ae >= 900)  return 0.85;                 
-  if (g_lastEvalCp <= -1500) return 0.80;      
-  if (g_sameBestRun == 0) return 1.00 + 0.15;  
-  if (g_sameBestRun >= 2) return 1.00 - 0.15;  
-  return 1.00;
-}
-
-static int AllocBudget(int baseMs, double factor, double* outFactor) {
-  if (baseMs <= 0) return baseMs;
-  if (factor < 0.5) factor = 0.5;
-  if (factor > 1.5) factor = 1.5;
-  double want = baseMs * factor;
-  double total = want;
-  if (want > baseMs) {
-    double need = want - baseMs;
-
-    double headroom = baseMs + g_timeBankMs;   
-    if (headroom < 0) headroom = 0;
-    double borrow = (need < headroom) ? need : headroom;
-    g_timeBankMs -= borrow;
-    total = baseMs + borrow;
-  }
-  if (outFactor) *outFactor = factor;
-  return (int)(total + 0.5);
-}
-
-static void SettleTimeBank(int baseMs, int actualMs) {
-  if (baseMs <= 0 || actualMs < 0) return;
-  g_timeBankMs += (double)(baseMs - actualMs);
-  double cap = baseMs * 2.0;
-  if (g_timeBankMs > cap) g_timeBankMs = cap;
-  if (g_timeBankMs < -baseMs) g_timeBankMs = -baseMs;
-}
-
-static void UpdateTimeSignals(int evalCp, int mateIn, int bx, int by, int depth) {
-  g_lastEvalCp = evalCp;
-  g_lastMateIn = mateIn;
-  if (bx == g_lastBestX && by == g_lastBestY) g_sameBestRun++;
-  else g_sameBestRun = 0;
-  g_lastBestX = bx;
-  g_lastBestY = by;
-  g_lastDepth = depth;
-}
-
-static void ResetTimeBank(const char* why) {
-  g_timeBankMs  = 0.0;
-  g_lastEvalCp  = 0;
-  g_lastMateIn  = 0;
-  g_lastBestX   = -1;
-  g_lastBestY   = -1;
-  g_sameBestRun = 0;
-  g_lastDepth   = 0;
-  g_lastFactor  = 1.0;
-  ELOG(std::string("时间池已重置（") + why + "）");
-}
+static int  g_lastMatchMs = 0;
 
 static std::string BuildAskCmds(const AskRequest& req, bool forceFull) {
   std::vector<std::pair<int, int>> bl, wh;
@@ -1237,27 +1143,19 @@ static std::string BuildAskCmds(const AskRequest& req, bool forceFull) {
   int budget = req.budgetMs;
   if (req.live) {
 
-    budget = 3600000;
+    
+
+    
+
+    
+
+    budget = 0;
   } else {
     if (budget < 200)   budget = 200;
     if (budget > 60000) budget = 60000;
+
     
-    if (req.dynTime) {
-      double factor = 1.0;
-      budget = AllocBudget(budget, ComplexityFactor(), &factor);
-      g_lastFactor = factor;
-    } else {
-      
-      g_lastFactor = 1.0;
-      g_timeBankMs = 0.0;
-    }
-    // 2) Rapfi stops an iteration once `elapsed >= turnTime * advanced_stop_ratio`
-    // (config.toml [search.timectl] = 0.92) and keeps a 30 ms protocol reserve,
-    // so asking for exactly N ms would only use ~92% of every move. Ask for
-    // N/0.92 + 30 ms instead: the engine then really spends the budget the page
-    // promised, while still leaving enough slack to finish the last iteration.
-    budget = (int)((budget + 30) / GB_STOP_RATIO + 0.5);
-    if (budget > 62000) budget = 62000;
+
   }
   int topN = req.topN < 1 ? 1 : (req.topN > 8 ? 8 : req.topN);
 
@@ -1313,37 +1211,28 @@ static std::string BuildAskCmds(const AskRequest& req, bool forceFull) {
     if (g_maxNodes >= 1)  c += "INFO MAX_NODE "  + std::to_string(g_maxNodes) + "\n";
   }
   c += "INFO TIMEOUT_TURN " + std::to_string(budget) + "\n";
-  // ★ 2026-10-31 (0.44.01 adaptation): TIMEOUT_MATCH 0 = "turn time only"
-  //   (SearchOptions::setTimeControl). TimeControl::init then takes matchTimeLeft = infinity, so
-  //   ampleMatchTime is always true and the stop rule is exactly `elapsed >= 0.96*(turn-30)`.
-  //   With the old fixed 6,000,000 ms match budget a long think (>~93 s) made
-  //   `turn*min(movesLeft,64) > matchTimeLeft`, falling into the non-ample branch where
-  //   optimum is clamped to `maximum/1.7 * moveImportance(ply)` - i.e. a 100 s request was
-  //   silently cut to ~65 s. TIME_LEFT is meaningless without a match budget, so it goes too.
-  c += "INFO TIMEOUT_MATCH 0\n";
-  // Same board as the previous (preempted) ask -> its transposition table is still warm,
-  // so start iterative deepening where we left off instead of re-walking depth 1..N.
-  {
-    uint64_t fp = 1469598103934665603ull;
-    for (size_t y = 0; y < req.board.size(); ++y)
-      for (size_t x = 0; x < req.board[y].size(); ++x) {
-        fp ^= (uint64_t)(req.board[y][x] + 1);
-        fp *= 1099511628211ull;
-      }
-    int startDepth = 1;
-    if (!req.live && req.mode == 0 && topN <= 1 && g_prevSup && g_prevDepth >= 8 && fp == g_prevFp) {
-      startDepth = g_prevDepth - 2;
-      if (startDepth < 4) startDepth = 4;
 
-      
-      
-      if (startDepth > 24) startDepth = 24;
-      if (g_ttCold) startDepth = 1;
-      if (budget < 1200 && startDepth > 12) startDepth = 12;
-    }
-    c += "INFO START_DEPTH " + std::to_string(startDepth) + "\n";
-    g_curFp = fp;
+  
+
+  //     ample ⇔ TIMEOUT_TURN * min(movesLeft, moveHorizon=64) < TIMEOUT_MATCH
+
+  
+
+  
+
+  
+
+  
+  int64_t matchMs = 0;
+  if (!req.live && req.dynTime) {
+    matchMs = req.matchMs;
+    if (matchMs < 0) matchMs = 0;
+    const int64_t kMatchCap = 24LL * 3600 * 1000;   
+    if (matchMs > kMatchCap) matchMs = kMatchCap;
   }
+  g_lastMatchMs = (int)matchMs;
+  c += "INFO TIMEOUT_MATCH " + std::to_string(matchMs) + "\n";
+
   if (incr) {
     
     char tb[40];
@@ -1377,6 +1266,32 @@ static std::string BuildAskCmds(const AskRequest& req, bool forceFull) {
 static void PostTo(bool fromLink, const std::string& json) {
   if (fromLink) host::PostLink(json);
   else          host::PostPage(json);
+}
+
+static void PostTick(bool fromLink, int id, const std::string& json) {
+  PostTo(fromLink, "{\"type\":\"engineAsk\",\"id\":" + std::to_string(id) +
+                   ",\"phase\":\"tick\",\"res\":" + json + "}");
+}
+
+static void TickThreadMain() {
+  while (g_tickRun.load()) {
+    Sleep(100);
+    bool post = false, fromLink = false;
+    int id = 0;
+    std::string json;
+    {
+      std::lock_guard<std::mutex> lk(g_stMu);
+      if (!g_cur.active || g_cur.done || g_cur.superseded || !g_cur.alive) continue;
+      DWORD now = NowMs();
+      if (now - g_cur.lastTick < kTickMs) continue;
+      g_cur.lastTick = now;
+      post = true;
+      fromLink = g_cur.fromLink;
+      id = g_cur.id;
+      json = ResJson(g_cur);
+    }
+    if (post) PostTick(fromLink, id, json);
+  }
 }
 
 static void OnEngineLine(const std::string& line) {
@@ -1431,10 +1346,7 @@ static void OnEngineLine(const std::string& line) {
     }
   }
   if (justDone) g_stCv.notify_all();   
-  if (postTick) {
-    PostTo(fromLink, "{\"type\":\"engineAsk\",\"id\":" + std::to_string(id) +
-                     ",\"phase\":\"tick\",\"res\":" + tickJson + "}");
-  }
+  if (postTick) PostTick(fromLink, id, tickJson);
 }
 
 static void StartWorker() {
@@ -1547,9 +1459,6 @@ static void DoAsk(const AskRequest& req, int id, bool fromLink) {
     g_seqWh.clear();
     g_seqNoIncr = true;
     ELOG("置换表已清空（评估/对弈边界）");
-    
-    ResetTimeBank("置换表清空边界");
-    g_ttCold = true;   
   }
 
   WriteRaw(BuildAskCmds(req));
@@ -1646,23 +1555,6 @@ static void DoAsk(const AskRequest& req, int id, bool fromLink) {
     }
   }
 
-  
-  if (!req.live && req.mode == 0 && g_cur.done && !g_cur.superseded) {
-    int baseMs = req.budgetMs < 200 ? 200 : (req.budgetMs > 60000 ? 60000 : req.budgetMs);
-    SettleTimeBank(baseMs, (int)(NowMs() - g_cur.t0));
-    if (g_cur.ps.maxDepth >= 12 && g_cur.ps.totalNodes > 20000) g_ttCold = false;
-    if (!g_cur.ps.cands.empty()) {
-      int cp = 0, mate = 0;
-      ParseEvalToken(g_cur.ps.cands[0].eval, cp, mate);
-      UpdateTimeSignals(cp, mate, g_cur.ps.bestX, g_cur.ps.bestY, g_cur.ps.maxDepth);
-    }
-  }
-
-  // Remember this ask for the START_DEPTH resume path (same board + preempted => jump ahead).
-  g_prevFp = g_curFp;
-  g_prevDepth = g_cur.ps.maxDepth;
-  g_prevSup = g_cur.superseded || !g_cur.done;
-
   std::string res = ResJson(g_cur);
   std::string ack = "{\"type\":\"engineAck\",\"id\":" + std::to_string(id) + ",\"op\":" + JsonQuote(g_cur.opName) +
                     ",\"ok\":" + std::string(g_cur.done ? "true" : "false");
@@ -1680,16 +1572,474 @@ static void DoAsk(const AskRequest& req, int id, bool fromLink) {
        " speed=" + std::to_string(g_cur.ps.speed) +
        " ttime=" + std::to_string(g_cur.ps.timeMs) +
        " cands=" + std::to_string(g_cur.ps.cands.size()) + " numPv=" + std::to_string(g_cur.ps.numPv) +
-       " tplan=" + std::to_string((int)(g_lastFactor * 100 + 0.5)) + "/" +
-       std::to_string((int)(g_timeBankMs + 0.5)) + "ms" +
+       " timectl=" + (req.live ? std::string("analysis")
+                               : (req.dynTime ? ("match/" + std::to_string(g_lastMatchMs))
+                                              : std::string("turn-only"))) +
        (g_cur.opName == "balance" ? (" pts=" + std::to_string(g_cur.ps.movePts.size())) : std::string()) +
        (g_cur.superseded ? " [superseded]" : ""));
+}
+
+struct EvalLane {
+  bool                    workerRun = false;
+  bool                    workerStop = false;
+  std::deque<Pending>     q;
+  std::mutex              qMu;
+  std::condition_variable qCv;
+  std::thread             worker;
+
+  std::atomic<bool> alive{false};
+  HANDLE                  hProcess = nullptr;
+  HANDLE                  hStdin = nullptr;
+  std::mutex              writeMu;
+  std::mutex              spawnMu;   
+  int                     gen = 0;
+  std::atomic<bool>       ready{false};
+  DWORD                   lastSpawnFail = 0;
+
+  Cur                     cur;
+  std::mutex              stMu;
+  std::condition_variable stCv;
+  int                     drain = 0;
+  bool                    hashCleared = false;
+
+  std::atomic<bool>       tickRun{false};
+  std::thread             tick;
+
+  int                     appliedRule = 0;
+  std::string             diag;
+};
+static EvalLane g_ev;
+static const int EV_THREADS_MAX = 4;
+static const int EV_HASH_KB     = 128 * 1024;
+
+static void EvWriteRaw(const std::string& text) {
+  std::lock_guard<std::mutex> lk(g_ev.writeMu);
+  if (!g_ev.hStdin) return;
+  std::string s = text;
+  if (s.empty() || s.back() != '\n') s += "\n";
+  DWORD wr = 0;
+  if (!WriteFile(g_ev.hStdin, s.data(), (DWORD)s.size(), &wr, nullptr))
+    ELOG("[eval] write FAIL err=" + std::to_string(GetLastError()));
+}
+
+static void EvOnLine(const std::string& line);
+
+static void EvReaderThread(HANDLE out, int myGen) {
+  std::string pending;
+  char buf[8192];
+  for (;;) {
+
+    if (g_ev.gen != myGen) break;
+    DWORD n = 0;
+    if (!ReadFile(out, buf, sizeof(buf), &n, nullptr) || n == 0) break;
+    pending.append(buf, n);
+    size_t pos;
+    while ((pos = pending.find('\n')) != std::string::npos) {
+      std::string line = pending.substr(0, pos);
+      pending.erase(0, pos + 1);
+      if (!line.empty() && line.back() == '\r') line.pop_back();
+      if (line.empty()) continue;
+      if (line.compare(0, 12, "name=\"Rapfi\"") == 0) g_ev.ready = true;
+      EvOnLine(line);
+    }
+  }
+  CloseHandle(out);
+  if (g_ev.gen != myGen) return;
+  {
+    std::lock_guard<std::mutex> lk(g_ev.stMu);
+    g_ev.alive = false;
+    g_ev.cur.alive = false;
+    g_ev.cur.done = true;
+    g_ev.cur.ps.finished = false;
+    g_ev.drain = 0;
+  }
+  g_ev.stCv.notify_all();
+  DWORD code = 0;
+  if (g_ev.hProcess) GetExitCodeProcess(g_ev.hProcess, &code);
+  char cb[32];
+  snprintf(cb, sizeof(cb), "0x%lX", (unsigned long)code);
+  ELOG(std::string("[eval] 引擎进程退出 code=") + cb);
+}
+
+static void EvOnLine(const std::string& line) {
+  bool postTick = false, fromLink = false, justDone = false;
+  int id = 0;
+  std::string tickJson;
+  if (line.compare(0, 8, "MESSAGE ") == 0) {
+    if (line.find("Transposition table cleared") != std::string::npos) {
+      std::lock_guard<std::mutex> lk(g_ev.stMu);
+      g_ev.hashCleared = true;
+      g_ev.stCv.notify_all();
+    }
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> lk(g_ev.stMu);
+    if (!g_ev.cur.active) {
+      if (IsBareMove(line) || line == "SWAP") {
+        if (g_ev.drain > 0) { g_ev.drain--; if (g_ev.drain == 0) g_ev.stCv.notify_all(); }
+      }
+      return;
+    }
+    if (g_ev.drain > 0) {
+      if (IsBareMove(line) || line == "SWAP") {
+        g_ev.drain--;
+        if (g_ev.drain == 0) g_ev.stCv.notify_all();
+      }
+      return;
+    }
+    ParseLine(line, g_ev.cur.ps);
+    if (g_ev.cur.ps.finished && !g_ev.cur.done) {
+      if (g_ev.cur.outstanding > 0) g_ev.cur.outstanding--;
+      if (g_ev.cur.outstanding == 0) { g_ev.cur.done = true; justDone = true; }
+    }
+    if (!g_ev.cur.done) {
+      DWORD now = NowMs();
+      if (now - g_ev.cur.lastTick >= kTickMs) {
+        g_ev.cur.lastTick = now;
+        postTick = true;
+        fromLink = g_ev.cur.fromLink;
+        id = g_ev.cur.id;
+        tickJson = ResJson(g_ev.cur);
+      }
+    }
+  }
+  if (justDone) g_ev.stCv.notify_all();
+  if (postTick) PostTick(fromLink, id, tickJson);
+}
+
+static void EvTickThreadMain() {
+  while (g_ev.tickRun.load()) {
+    Sleep(100);
+    bool post = false, fromLink = false;
+    int id = 0;
+    std::string json;
+    {
+      std::lock_guard<std::mutex> lk(g_ev.stMu);
+      if (!g_ev.cur.active || g_ev.cur.done || g_ev.cur.superseded || !g_ev.cur.alive) continue;
+      DWORD now = NowMs();
+      if (now - g_ev.cur.lastTick < kTickMs) continue;
+      g_ev.cur.lastTick = now;
+      post = true;
+      fromLink = g_ev.cur.fromLink;
+      id = g_ev.cur.id;
+      json = ResJson(g_ev.cur);
+    }
+    if (post) PostTick(fromLink, id, json);
+  }
+}
+
+static void EvSpawnLocked() {
+  if (g_ev.hProcess) { TerminateProcess(g_ev.hProcess, 0); CloseHandle(g_ev.hProcess); g_ev.hProcess = nullptr; }
+  { std::lock_guard<std::mutex> lk(g_ev.writeMu); if (g_ev.hStdin) { CloseHandle(g_ev.hStdin); g_ev.hStdin = nullptr; } }
+  g_ev.alive = false;
+  g_ev.diag.clear();
+  std::wstring exe = Join(g_dir, std::wstring(L"RapfiEngine-") + Utf8ToWide(g_variant) + L".exe");
+  if (!FileExists(exe)) { g_ev.diag = "评估引擎 exe 不存在"; g_ev.lastSpawnFail = NowMs(); ELOG("[eval] " + g_ev.diag); return; }
+
+  SECURITY_ATTRIBUTES sa = {};
+  sa.nLength = sizeof(sa);
+  sa.bInheritHandle = TRUE;
+  HANDLE inR = nullptr, inW = nullptr, outR = nullptr, outW = nullptr;
+  if (!CreatePipe(&inR, &inW, &sa, 0)) return;
+  if (!CreatePipe(&outR, &outW, &sa, 0)) { CloseHandle(inR); CloseHandle(inW); return; }
+  SetHandleInformation(inW, HANDLE_FLAG_INHERIT, 0);
+  SetHandleInformation(outR, HANDLE_FLAG_INHERIT, 0);
+
+  STARTUPINFOW si = {};
+  si.cb = sizeof(si);
+  si.dwFlags = STARTF_USESTDHANDLES;
+  si.hStdInput = inR;
+  si.hStdOutput = outW;
+  si.hStdError = outW;
+  PROCESS_INFORMATION pi = {};
+  std::wstring cmd = L"\"" + exe + L"\"";
+  std::vector<wchar_t> buf(cmd.begin(), cmd.end());
+  buf.push_back(0);
+  BOOL ok = CreateProcessW(nullptr, buf.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
+                           nullptr, g_dir.c_str(), &si, &pi);
+  CloseHandle(inR);
+  CloseHandle(outW);
+  if (!ok) {
+    CloseHandle(inW); CloseHandle(outR);
+    g_ev.diag = "启动评估引擎进程失败 err=" + std::to_string(GetLastError());
+    g_ev.lastSpawnFail = NowMs();
+    ELOG("[eval] " + g_ev.diag);
+    return;
+  }
+  CloseHandle(pi.hThread);
+  HANDLE job = host::Job();
+  if (job) AssignProcessToJobObject(job, pi.hProcess);
+  host::ApplyAffinity(pi.hProcess);
+  SetPriorityClass(pi.hProcess, NORMAL_PRIORITY_CLASS);
+  host::ChildTracked(pi.hProcess);
+
+  g_ev.hProcess = pi.hProcess;
+  g_ev.hStdin   = inW;
+  int myGen = ++g_ev.gen;
+  g_ev.ready = false;
+  g_ev.alive = true;
+  std::thread(EvReaderThread, outR, myGen).detach();
+
+  g_ev.appliedRule = 0;
+  int th = std::max(1, std::min(EV_THREADS_MAX, EffectiveThreads() / 2));
+  int kb = EV_HASH_KB;
+  int cr = (g_candRange >= 0 && g_candRange <= 5) ? g_candRange : 3;
+  std::string boot = "INFO CAUTION_FACTOR " + std::to_string(cr) + "\n";
+  boot += "START 15\nINFO RULE 0\nINFO SHOW_DETAIL 2\n";
+  if (g_weightsMode == "classic") boot += "RELOADCONFIG config-classic.toml\n";
+  boot += "INFO THREAD_NUM " + std::to_string(th) + "\n";
+  boot += "INFO HASH_SIZE " + std::to_string(kb) + "\n";
+  boot += "ABOUT\n";
+  EvWriteRaw(boot);
+  
+  DWORD t0 = NowMs();
+  while (g_ev.alive.load() && !g_ev.ready.load() && NowMs() - t0 < 2500) Sleep(10);
+  ELOG("[eval] 已启动 " + WideToUtf8(exe) + " (gen=" + std::to_string(myGen) +
+       ", threads=" + std::to_string(th) + ", hashKB=" + std::to_string(kb) + ")");
+}
+
+static bool EvEnsureAlive() {
+  if (g_ev.alive.load() && g_ev.hStdin && g_ev.hProcess) return true;
+  if (g_variant.empty() || g_dir.empty()) { if (!Probe()) return false; }
+  if (g_variant.empty() || g_dir.empty()) return false;
+  if (g_ev.lastSpawnFail && NowMs() - g_ev.lastSpawnFail < 1500) return false;
+
+  std::lock_guard<std::mutex> lk(g_ev.spawnMu);
+  if (g_ev.alive.load() && g_ev.hStdin && g_ev.hProcess) return true;
+  EvSpawnLocked();
+  return g_ev.alive.load() && g_ev.hStdin != nullptr;
+}
+
+static std::string BuildEvalCmds(const AskRequest& req) {
+  std::vector<std::pair<int, int>> bl, wh;
+  for (size_t y = 0; y < req.board.size(); ++y)
+    for (size_t x = 0; x < req.board[y].size(); ++x) {
+      int v = req.board[y][x];
+      if (v == 1) bl.push_back({(int)x, (int)y});
+      else if (v == 2) wh.push_back({(int)x, (int)y});
+    }
+  std::string board = "YXBOARD";
+  size_t n = std::max(bl.size(), wh.size());
+  for (size_t i = 0; i < n; ++i) {
+    if (i < bl.size()) board += " " + std::to_string(bl[i].first) + "," + std::to_string(bl[i].second) + ",1";
+    if (i < wh.size()) board += " " + std::to_string(wh[i].first) + "," + std::to_string(wh[i].second) + ",2";
+  }
+  board += " DONE\n";
+
+  std::string c;
+  if (req.rule != g_ev.appliedRule) {
+    g_ev.appliedRule = req.rule;
+    c += "INFO RULE " + std::to_string(req.rule) + "\n";
+  }
+  c += "INFO PONDERING 0\n";
+  c += "INFO SWAPABLE " + std::string(req.rule == 5 ? "1" : "0") + "\n";
+  int cr = (g_candRange >= 0 && g_candRange <= 5) ? g_candRange : 3;
+  c += "INFO CAUTION_FACTOR " + std::to_string(cr) + "\n";
+
+  c += "INFO TIMEOUT_TURN 0\n";
+  c += "INFO TIMEOUT_MATCH 0\n";
+  c += board;
+  int topN = req.topN < 1 ? 1 : (req.topN > 8 ? 8 : req.topN);
+  c += "YXNBEST " + std::to_string(topN) + "\n";
+  return c;
+}
+
+static void EvDoAsk(const AskRequest& req, int id, bool fromLink) {
+  if (!EvEnsureAlive()) {
+    std::string err = g_ev.diag.empty() ? (g_diag.empty() ? "eval engine unavailable" : g_diag) : g_ev.diag;
+    PostTo(fromLink, "{\"type\":\"engineAck\",\"id\":" + std::to_string(id) +
+                     ",\"op\":\"live\",\"ok\":false,\"err\":" + JsonQuote(err) + "}");
+    ELOG("[eval] ack id=" + std::to_string(id) + " ok=0 err=" + err);
+    return;
+  }
+
+  
+  const int myGen = g_ev.gen;
+  {
+    std::unique_lock<std::mutex> lk(g_ev.stMu);
+    if (g_ev.cur.active && !g_ev.cur.done) {
+      g_ev.cur.superseded = true;
+      lk.unlock();
+      EvWriteRaw("STOP\n");
+      lk.lock();
+      g_ev.stCv.wait_for(lk, std::chrono::milliseconds(200), [myGen] {
+        return g_ev.cur.done || !g_ev.cur.alive || g_ev.gen != myGen;
+      });
+      if (g_ev.gen == myGen && !g_ev.cur.drainBooked) {
+        g_ev.drain += g_ev.cur.outstanding;
+        g_ev.cur.drainBooked = true;
+      }
+      g_ev.cur.active = false;
+    }
+    g_ev.cur = Cur();
+    g_ev.cur.active = true;
+    g_ev.cur.alive = g_ev.alive.load();
+    g_ev.cur.id = id;
+    g_ev.cur.key = req.key;
+    g_ev.cur.fromLink = fromLink;
+    g_ev.cur.opName = req.opName;
+    g_ev.cur.t0 = NowMs();
+    g_ev.cur.lastTick = g_ev.cur.t0;
+    int nb = 0, nw = 0;
+    for (const auto& row : req.board)
+      for (int v : row) { if (v == 1) nb++; else if (v == 2) nw++; }
+    g_ev.cur.side = (nb > nw) ? 2 : 1;
+    g_ev.cur.outstanding = 1;
+    if (g_ev.drain > 8) g_ev.drain = 0;
+  }
+  
+  if (g_ev.drain > 0) {
+    EvWriteRaw("STOP\n");
+    std::unique_lock<std::mutex> lk(g_ev.stMu);
+    g_ev.stCv.wait_for(lk, std::chrono::milliseconds(200), [myGen] {
+      return g_ev.drain == 0 || !g_ev.cur.alive || g_ev.gen != myGen;
+    });
+    if (g_ev.drain > 0) g_ev.drain = 0;
+  }
+  
+  if (req.clearHash) {
+    EvWriteRaw("STOP\n");
+    {
+      std::unique_lock<std::mutex> lk(g_ev.stMu);
+      g_ev.stCv.wait_for(lk, std::chrono::milliseconds(200), [myGen] {
+        return g_ev.drain == 0 || !g_ev.cur.alive || g_ev.gen != myGen;
+      });
+      if (g_ev.drain > 0) g_ev.drain = 0;
+      g_ev.hashCleared = false;
+    }
+    EvWriteRaw("YXHASHCLEAR\n");
+    {
+      std::unique_lock<std::mutex> lk(g_ev.stMu);
+      if (!g_ev.stCv.wait_for(lk, std::chrono::milliseconds(400), [myGen] {
+            return g_ev.hashCleared || !g_ev.cur.alive || g_ev.gen != myGen;
+          }))
+        ELOG("[eval] YXHASHCLEAR 无回执（继续）");
+    }
+    ELOG("[eval] 置换表已清空");
+  }
+  EvWriteRaw(BuildEvalCmds(req));
+  {
+    std::unique_lock<std::mutex> lk(g_ev.stMu);
+    if (req.live) {
+      while (!g_ev.cur.done && !g_ev.cur.superseded && g_ev.cur.alive && g_ev.gen == myGen)
+        g_ev.stCv.wait_for(lk, std::chrono::milliseconds(200));
+    } else {
+      int budget = req.budgetMs < 200 ? 200 : (req.budgetMs > 60000 ? 60000 : req.budgetMs);
+      auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(budget + 1500);
+      while (!g_ev.cur.done && !g_ev.cur.superseded && g_ev.cur.alive && g_ev.gen == myGen) {
+        if (g_ev.stCv.wait_for(lk, std::chrono::milliseconds(200)) == std::cv_status::timeout &&
+            std::chrono::steady_clock::now() >= deadline)
+          break;
+      }
+    }
+    if (!g_ev.cur.done && !g_ev.cur.superseded && g_ev.cur.alive && g_ev.gen == myGen) {
+      lk.unlock();
+      EvWriteRaw("STOP\n");
+      lk.lock();
+      g_ev.stCv.wait_for(lk, std::chrono::milliseconds(200), [myGen] {
+        return g_ev.cur.done || !g_ev.cur.alive || g_ev.gen != myGen;
+      });
+    }
+    g_ev.cur.active = false;
+    if (g_ev.gen != myGen) {
+
+      g_ev.drain = 0;
+    } else if (!g_ev.cur.done && !g_ev.cur.drainBooked) {
+      g_ev.drain += g_ev.cur.outstanding;
+      g_ev.cur.drainBooked = true;
+    }
+  }
+  std::string res = ResJson(g_ev.cur);
+  std::string ack = "{\"type\":\"engineAck\",\"id\":" + std::to_string(id) +
+                    ",\"op\":\"" + g_ev.cur.opName + "\",\"ok\":" +
+                    std::string(g_ev.cur.done ? "true" : "false");
+  if (!g_ev.cur.done)
+    ack += ",\"err\":" + JsonQuote(g_ev.cur.superseded ? "superseded" :
+                                   (!g_ev.cur.alive ? "engine down" : "search timeout"));
+  ack += ",\"res\":" + res + "}";
+  PostTo(fromLink, ack);
+  ELOG("[eval] ack id=" + std::to_string(id) + " ok=" + std::string(g_ev.cur.done ? "1" : "0") +
+       " side=" + std::to_string(g_ev.cur.side) +
+       " best=" + std::to_string(g_ev.cur.ps.bestX) + "," + std::to_string(g_ev.cur.ps.bestY) +
+       " eval=" + (g_ev.cur.ps.cands.empty() || g_ev.cur.ps.cands[0].eval.empty()
+                     ? std::string("-") : g_ev.cur.ps.cands[0].eval) +
+       " depth=" + std::to_string(g_ev.cur.ps.maxDepth) + "/" + std::to_string(g_ev.cur.ps.selDepth) +
+       " " + std::to_string(NowMs() - g_ev.cur.t0) + "ms nodes=" + std::to_string(g_ev.cur.ps.totalNodes) +
+       (g_ev.cur.superseded ? " [superseded]" : ""));
+}
+
+static void EvStopAsk(int id, bool fromLink) {
+  {
+    std::lock_guard<std::mutex> lk(g_ev.stMu);
+    if (g_ev.cur.active && !g_ev.cur.done) {
+      g_ev.cur.superseded = true;
+      if (!g_ev.cur.drainBooked) { g_ev.drain += g_ev.cur.outstanding; g_ev.cur.drainBooked = true; }
+      ELOG("[eval] stop id=" + std::to_string(id) + " (当前 id=" + std::to_string(g_ev.cur.id) + ")");
+    }
+    g_ev.stCv.notify_all();
+  }
+  EvWriteRaw("STOP\n");
+  PostTo(fromLink, "{\"type\":\"engineAck\",\"id\":" + std::to_string(id) +
+                   ",\"op\":\"stop\",\"ok\":true}");
+}
+
+static void EvStartWorker() {
+  if (!g_ev.tickRun.load()) {
+    g_ev.tickRun = true;
+    if (g_ev.tick.joinable()) g_ev.tick.join();
+    g_ev.tick = std::thread(EvTickThreadMain);
+  }
+  if (g_ev.workerRun) return;
+  g_ev.workerRun = true;
+  g_ev.worker = std::thread([] {
+    for (;;) {
+      Pending job;
+      {
+        std::unique_lock<std::mutex> lk(g_ev.qMu);
+        g_ev.qCv.wait(lk, [] { return g_ev.workerStop || !g_ev.q.empty(); });
+        if (g_ev.q.empty()) break;
+        job = g_ev.q.front();
+        g_ev.q.pop_front();
+      }
+      try { EvDoAsk(job.req, job.id, job.fromLink); }
+      catch (...) { ELOG("[eval] DoAsk 异常"); }
+    }
+  });
+}
+
+static void EvKill(const char* why) {
+  g_ev.gen++;   
+  {
+    std::lock_guard<std::mutex> lk(g_ev.stMu);
+    g_ev.alive = false;
+    g_ev.cur.active = false;
+    g_ev.cur.alive = false;
+    g_ev.cur.done = true;
+    g_ev.drain = 0;
+  }
+  g_ev.stCv.notify_all();
+  if (g_ev.hProcess) {
+    EvWriteRaw("STOP\nEND\n");
+    if (WaitForSingleObject(g_ev.hProcess, 600) != WAIT_OBJECT_0)
+      TerminateProcess(g_ev.hProcess, 0);
+    CloseHandle(g_ev.hProcess);
+    g_ev.hProcess = nullptr;
+  }
+  { std::lock_guard<std::mutex> lk(g_ev.writeMu); if (g_ev.hStdin) { CloseHandle(g_ev.hStdin); g_ev.hStdin = nullptr; } }
+  if (why && *why) ELOG(std::string("[eval] 引擎已停止：") + why);
 }
 
 static std::thread g_benchThread;
 
 bool Init() {
   StartWorker();
+  
+  if (!g_tickRun.load()) {
+    g_tickRun = true;
+    if (g_tickThread.joinable()) g_tickThread.join();
+    g_tickThread = std::thread(TickThreadMain);
+  }
   LoadPrefs();
   bool ok = Probe();
   ELOG(std::string("Init: ") + (ok ? "ok" : "failed") + " variant=" +
@@ -1718,6 +2068,23 @@ const std::string& Diag() { return g_diag; }
 
 void Shutdown() {
   g_benchRun = false;      
+
+  
+  g_ev.tickRun = false;
+  if (g_ev.tick.joinable()) g_ev.tick.join();
+  {
+    std::lock_guard<std::mutex> lk(g_ev.qMu);
+    g_ev.workerStop = true;
+    g_ev.q.clear();
+  }
+  g_ev.qCv.notify_all();
+  EvKill("宿主退出");
+  if (g_ev.worker.joinable()) g_ev.worker.join();
+  g_ev.workerRun  = false;
+  g_ev.workerStop = false;
+  
+  g_tickRun = false;
+  if (g_tickThread.joinable()) g_tickThread.join();
   if (g_e.hProcess) {
     WriteRaw("STOP\nEND\n");
     if (WaitForSingleObject(g_e.hProcess, 900) != WAIT_OBJECT_0)
@@ -1778,6 +2145,9 @@ Caps GetCaps() {
 }
 
 void HandleOp(const std::string& op, int id, const std::string& q, bool fromLink) {
+
+  
+  std::string lane = QStr(q, "lane");
   if (op == "ask" || op == "balance" || op == "live") {
     AskRequest req;
     req.board     = QInt2D(q, "board");
@@ -1785,6 +2155,8 @@ void HandleOp(const std::string& op, int id, const std::string& q, bool fromLink
     req.rule      = QInt(q, "rule");
     req.budgetMs  = QInt(q, "budgetMs");
     if (QHas(q, "dyn")) req.dynTime = QInt(q, "dyn") != 0;
+
+    if (QHas(q, "matchMs")) req.matchMs = QI64(q, "matchMs");
     req.topN      = QInt(q, "topN");
     req.pondering = QBool(q, "pondering");
     req.live      = (op == "live") || QBool(q, "live");
@@ -1801,6 +2173,35 @@ void HandleOp(const std::string& op, int id, const std::string& q, bool fromLink
       req.bias      = QInt(q, "bias");
       req.topN      = 1;
       req.pondering = false;
+    }
+
+    
+    if (lane == "eval" && op != "balance") {
+      EvStartWorker();
+      ELOG("[eval] " + op + " id=" + std::to_string(id) + (fromLink ? " [link]" : " [page]") +
+           " rule=" + std::to_string(req.rule) + " topN=" + std::to_string(req.topN) +
+           (req.clearHash ? " clearHash=1" : "") +
+           " key=" + std::to_string((long long)req.key));
+      
+      bool preempted = false;
+      {
+        std::lock_guard<std::mutex> lk(g_ev.stMu);
+        if (g_ev.cur.active && !g_ev.cur.done) {
+          g_ev.cur.superseded = true;
+          if (!g_ev.cur.drainBooked) { g_ev.drain += g_ev.cur.outstanding; g_ev.cur.drainBooked = true; }
+          preempted = true;
+        }
+      }
+      if (preempted) { g_ev.stCv.notify_all(); EvWriteRaw("STOP\n"); }
+      {
+        std::lock_guard<std::mutex> lk(g_ev.qMu);
+        g_ev.q.clear();
+        Pending p;
+        p.req = req; p.id = id; p.fromLink = fromLink;
+        g_ev.q.push_back(p);
+      }
+      g_ev.qCv.notify_all();
+      return;
     }
     StartWorker();
     ELOG(op + " id=" + std::to_string(id) + (fromLink ? " [link]" : " [page]") +
@@ -1833,6 +2234,11 @@ void HandleOp(const std::string& op, int id, const std::string& q, bool fromLink
     return;
   }
   if (op == "stop") {
+
+    if (lane == "eval") {
+      EvStopAsk(id, fromLink);
+      return;
+    }
     std::lock_guard<std::mutex> lk(g_stMu);
     if (g_cur.active && !g_cur.done) {
 
@@ -1915,6 +2321,8 @@ void HandleOp(const std::string& op, int id, const std::string& q, bool fromLink
       g_stCv.notify_all();
       ELOG("引擎权重切换 -> " + g_weightsMode + "（进程重启，下次 ask 生效）");
     }
+
+    if (wChanged || vChanged) EvKill("权重/变体切换");
     Caps c = GetCaps();
     PostTo(fromLink, "{\"type\":\"engineAck\",\"id\":" + std::to_string(id) +
                      ",\"op\":\"config\",\"ok\":true,\"res\":{\"threads\":" + std::to_string(c.threads) +

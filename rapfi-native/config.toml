@@ -1,10 +1,20 @@
-# Meter Gomoku - Rapfi engine config (NNUE weights, mix9svq, 15x15-specialised).
-# The freestyle rule (RULE 0, the default here) uses mix9svqstandard_bs15 - the 15x15-only
-# weight set - instead of the mixed-board-size bsmix set, because our board is always 15x15.
-# config-bsmix.toml holds the previous mapping as a fallback.
-# Tuned vs upstream/reference: candidate range square3_line4, 512 MB hash,
-# advanced_stop_ratio 0.92 (leave 8% slack so the last iteration always finishes),
-# max depth 100.
+# Meter Gomoku - Rapfi engine config (NNUE weights, mix9svq).
+# Weight mapping MUST keep one entry per rule, in this order:
+#   FREESTYLE (RULE 0, our default) -> mix9svqfreestyle_bsmix
+#   STANDARD  (RULE 1)              -> mix9svqstandard_bs15
+#   RENJU     (RULE 2)              -> mix9svqrenju_bs15_black / _white
+# mix9svqstandard_bs15 is not a FREESTYLE net (the engine refuses it for RULE 0), so
+# keeping it as the first entry makes every entry incompatible with FREESTYLE and the
+# engine prints "Evaluator mix9svq disabled: no compatible weight config found."
+# once per search thread and silently falls back to the classical evaluation.
+# Measured 2026-11-01: with the bs15-first mapping freestyle ran classical eval
+# (depth 25 in 2.2s, eval -103, best H6); with this mapping freestyle loads the NNUE
+# weights again (see notes below). Do not "optimise" this list without re-probing.
+# Tuned vs upstream/reference: candidate range square3_line4, 512 MB hash.
+# ★ 2026-11-01: advanced_stop_ratio / mate / singular / max_depth now match the
+# Rapfi-YixinBoard reference package and upstream defaults (0.9 / 24 / 24 / 99).
+# The host no longer rescales TIMEOUT_TURN, so the stop ratio MUST stay at the
+# engine's own 0.9 (see [search.timectl] below).
 
 [requirement]
 min_version = [0,43,1]
@@ -28,7 +38,7 @@ draw_black_winrate = 0.5
 draw_ratio = 1.0
 
 [[model.evaluator.weights]]
-weight_file = "mix9svqstandard_bs15.bin.lz4"
+weight_file = "mix9svqfreestyle_bsmix.bin.lz4"
 
 [[model.evaluator.weights]]
 weight_file = "mix9svqstandard_bs15.bin.lz4"
@@ -39,15 +49,23 @@ weight_file_white = "mix9svqrenju_bs15_white.bin.lz4"
 
 [search]
 aspiration_window = true
-num_iteration_after_mate = 4
-num_iteration_after_singular_root = 4
-max_search_depth = 100
+# ★ 2026-11-01（用户：「用 Rapfi-YixinBoard / dotb1ue/rapfi 的思路，不要自己发明」）：
+#   与参考整合包 config.toml 完全一致（该文件是官方 0.43.01 在 YixinBoard 里实测的配置）：
+#   mate / singular_root 都要继续验证 24 个迭代，而不是上游默认的 6/4 —— 这决定
+#   「看到杀棋后是否还会因为验证不足而换手」的战术准确度。
+num_iteration_after_mate = 24
+num_iteration_after_singular_root = 24
+max_search_depth = 99
 
 [search.timectl]
 match_space = 21.0
 match_space_min = 7.0
 average_branch_factor = 1.7
-advanced_stop_ratio = 0.92
+# ★ 2026-11-01：必须是官方默认 / 参考整合包的值 0.9（searchconfig.h:81）。
+#   宿主不在协议层反算时间，这个比例直接决定「每手实际用掉多少 TIMEOUT_TURN」：
+#   0.92 会让引擎比官方晚 2% 收手、最后一代迭代经常被切在半路（等于白烧），
+#   0.9 才是官方与参考包实测的平衡点。
+advanced_stop_ratio = 0.9
 move_horizon = 64
 
 [database]

@@ -56,7 +56,16 @@ struct AskRequest {
   
   bool     clearHash = false;
 
+  
+
+  
+  
   bool     dynTime = true;
+
+  
+
+  
+  int64_t  matchMs = 600000;
   uint64_t key = 0;                      
   
   int      mode = 0;                     

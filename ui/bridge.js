@@ -253,6 +253,8 @@ var pendingN = 0;
 var STABLE_FRAMES = 2;
 var forceScan = false;
 var busy = false, engineBusy = false;
+
+var chainBusy = false;
 var analyzeRetryTimer = null, analyzeRetryCount = 0;
 
 var pendingEvalKey = null;
@@ -268,10 +270,16 @@ try {
       var ch = [];
       if (typeof o.bgThink === 'boolean' && o.bgThink !== S.bgThink) {
         S.bgThink = o.bgThink;
-        if (!o.bgThink && bgChainTimer) { clearTimeout(bgChainTimer); bgChainTimer = 0; }
+
+        if (!o.bgThink && !engineBusy) { try { natEng().cancelAll(); } catch (eBT) {} }
         ch.push('bgThink=' + (o.bgThink ? 'on' : 'off'));
       }
       if (o.turnMs >= 200 && o.turnMs !== S.turnMs) { S.turnMs = o.turnMs; ch.push('turnMs=' + o.turnMs); }
+
+      if (typeof o.dynTime === 'boolean' && o.dynTime !== (S.dynTime !== false)) {
+        S.dynTime = o.dynTime;
+        ch.push('dynTime=' + (o.dynTime ? 'on' : 'off'));
+      }
       if (o.cores >= 2 && o.cores !== S.cores) { S.cores = o.cores; ch.push('cores=' + o.cores); }
       if (o.hashMB >= 1 && o.hashMB !== S.hashMB) { S.hashMB = o.hashMB; ch.push('hash=' + o.hashMB); }
       if (ch.length) { try { if (typeof bridgeDiag === 'function') bridgeDiag('LINK_CFG 同步主窗设置 ' + ch.join(' ')); } catch (e2) {} }
@@ -526,7 +534,11 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
                   side: (b.side === 1 || b.side === 2) ? b.side : 0,
                   rule: b.rule | 0,
                   budgetMs: Math.max(200, b.turnMs | 0),
-                  dyn: b.dyn ? 1 : 0,
+
+                  
+                  
+                  dyn: (b.dyn === undefined) ? ((S.dynTime === false) ? 0 : 1) : (b.dyn ? 1 : 0),
+                  matchMs: (b.matchMs > 0) ? (b.matchMs | 0) : ((S.matchMs > 0) ? (S.matchMs | 0) : 600000),
                   key: b.key || 0 };
         if (op === 'balance') {
           q.topN = 1; q.pondering = false;
@@ -537,12 +549,15 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
           q.pondering = !b.noPonder;
         }
         return { id: ++seq, timer: null, resolve: resolve, onTick: b.onTick, op: op || 'ask',
-                 exclusive: !!b.exclusive, timeoutMs: timeoutMs || 8000, q: q };
+                 exclusive: !!b.exclusive, chain: !!b.chain,
+                 timeoutMs: timeoutMs || 8000, q: q };
       }
       function submit(job) {
         if (wait) { wait.resolve(emptyRes(true)); wait = null; }
         if (!cur) { startJob(job); return; }
-        if (job.exclusive && !cur.exclusive) {
+
+        
+        if (job.exclusive && (!cur.exclusive || (cur.chain && !job.chain))) {
           var old = cur; cur = null; delete pend[old.id];
           clearTimeout(old.timer);
           try { post({ engine: 1, op: 'stop', id: ++seq, q: {} }); } catch (e) {}
@@ -653,8 +668,25 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         bridgeDiag('LINK_ENG_CANCEL_ALL n=' + jobs.length);
         return jobs.length;
       }
+      
+      function cancelChain() {
+        var n = 0;
+        if (cur && cur.chain) {
+          var c0 = cur; cur = null; delete pend[c0.id]; clearTimeout(c0.timer);
+          try { post({ engine: 1, op: 'stop', id: ++seq, q: {} }); } catch (e) {}
+          c0.resolve(emptyRes(true, 'chain cancelled'));
+          n++;
+        }
+        if (wait && wait.chain) {
+          var w0 = wait; wait = null; clearTimeout(w0.timer); delete pend[w0.id];
+          w0.resolve(emptyRes(true, 'chain cancelled'));
+          n++;
+        }
+        if (n) { bridgeDiag('LINK_ENG_CANCEL_CHAIN n=' + n); pump(); }
+        return n;
+      }
       return { call: call, status: caps, onAck: onAck, onOut: onOut, diag: diag,
-               reset: hardReset, cancelAll: cancelAll };
+               reset: hardReset, cancelAll: cancelAll, cancelChain: cancelChain };
     })();
     return NATENG;
   }
@@ -973,8 +1005,19 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     var fpNow = boardKey(bl, wh);
     var isChain = !!chain;
     if (bgChainTimer) { clearTimeout(bgChainTimer); bgChainTimer = 0; }
-    if (engineBusy) { pendingEvalKey = fpNow; return; }
+    if (engineBusy) {
+      pendingEvalKey = fpNow;
+
+      
+
+      if (!isChain) {
+        try { natEng().cancelChain(); } catch (eCA) {}
+        chainBusy = false;
+      }
+      return;
+    }
     engineBusy = true;
+    chainBusy = isChain;
     try {
       var ply = bl.length + wh.length;
       var rootSide = sideToMove(bl, wh);
@@ -984,12 +1027,9 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
       bridgeDiag('LINK_BUDGET base=' + (S.turnMs || 0) + ' opp=' + linkOppThinkMs +
                        ' ms=' + turnMsNow + ' ad=' + (adOn ? 1 : 0));
 
-      var tmc = rootSide;
-      var bmTac = boardMatrix(bl, wh);
-      var _tac = tacPlan(bmTac, tmc, turnMsNow);
-      turnMsNow = _tac.ms;
-      var _oppWin = _tac.oppWin, _oppFour = _tac.oppFour;
-      if (_tac.why) { bridgeDiag('LINK_TACTIC budget why=' + _tac.why + ' ms=' + turnMsNow); }
+      
+
+      
 
       var publish = function (r, final) {
         var c00 = r.candidates[0];
@@ -1056,12 +1096,25 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         } catch (eTK) {}
       };
       var res = await onMainLane(function () {
+
+        if (isChain && fpNow !== boardKey(lastBl, lastWh)) {
+          return { candidates: [], best: null, elapsed: 0, depth: 0, nodeCount: 0,
+                   superseded: true, error: '' };
+        }
+        chainBusy = isChain;
         return wsCall('analyze', {
           board: boardMatrix(bl, wh), moveList: [],
           matchMs: S.matchMs || 600000, turnMs: turnMsNow,
           timeUsedMs: 0, topN: 1, rule: engRuleOf(S.rule), cid: 'desktop-' + ply,
           side: rootSide,
           exclusive: true,
+          chain: isChain,
+
+          
+
+          
+          
+          noPonder: !S.bgThink,
           onTick: onTick,
         }, Math.max(12000, turnMsNow + 12000) + laneSlack);
       });
@@ -1103,39 +1156,25 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
       }
     } finally {
       engineBusy = false;
+      chainBusy = false;
 
-      if (pendingEvalKey && pendingEvalKey !== boardKey(lastBl, lastWh) && boardGeo) {
+      
+
+      
+      if (pendingEvalKey && pendingEvalKey !== fpNow && boardGeo) {
         var pk = pendingEvalKey; pendingEvalKey = null;
         analyze(lastBl, lastWh);
       } else {
         pendingEvalKey = null;
-        scheduleBgChain(fpNow);
+
+        
+
+        
       }
     }
   }
 
-  function bgChainWanted(fp) {
-    if (!S.bgThink) return false;
-    try {
-      if (engineBusy) return false;
-      if (typeof swBusy !== 'undefined' && swBusy) return false;
-      if (balBusy) return false;
-      if (!boardGeo) return false;
-      if (boardKey(lastBl, lastWh) !== fp) return false;
-      if ((lastBl.length + lastWh.length) < 1) return false;
-      return sideToMove(lastBl, lastWh) === myColOf();
-    } catch (e) { return false; }
-  }
-  function scheduleBgChain(fp) {
-    if (bgChainTimer) { clearTimeout(bgChainTimer); bgChainTimer = 0; }
-    if (!bgChainWanted(fp)) return;
-    bgChainTimer = setTimeout(function () {
-      bgChainTimer = 0;
-      if (!bgChainWanted(fp)) return;
-      try { bridgeDiag('LINK_BGCHAIN 接力续算（盘面未变，TT 热）'); } catch (e) {}
-      analyze(lastBl, lastWh, true);
-    }, 120);
-  }
+  
 
   function boardToScreen(x, y) {
     if (!boardGeo) return null;
@@ -2057,6 +2096,13 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
   }
 
   function waitOpponent() {
+
+    
+    if (bgChainTimer) { clearTimeout(bgChainTimer); bgChainTimer = 0; }
+    if (chainBusy) {
+      try { natEng().cancelChain(); } catch (eWO) {}
+      chainBusy = false;
+    }
     ui('setStatus', '<span style="color:#555;">' +
       (S.lang === 'en' ? 'Waiting for opponent…' : '等待对手落子…') + '</span>');
     if (S.lastStat && S.lastStat.c0) ui('setStatPanel', S.lastStat.c0, S.lastStat.elapsed);

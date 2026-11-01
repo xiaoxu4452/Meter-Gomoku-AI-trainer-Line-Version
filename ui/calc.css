@@ -1,4 +1,4 @@
-﻿/* Meter Gomoku Trainer - overlay UI stylesheet (board, panels, controls; adapts to light/dark theme). */
+﻿﻿﻿﻿/* Meter Gomoku Trainer - overlay UI stylesheet (board, panels, controls; adapts to light/dark theme). */
 
 /* design tokens: colours, radii, spacing (light / dark themes) */
 :root{
@@ -177,7 +177,12 @@ button[hidden]{display:none !important}
   body.compactDock .card{padding:.42rem .44rem .48rem}
   body.compactDock .card-h{font-size:.9rem; gap:.34rem}
   body.compactDock .card .row{gap:.36rem}
-  body.compactDock .card .row>label{flex:0 0 4.5rem; font-size:.85rem}
+  body.compactDock .card .row:not(.head)>label{flex:0 0 4.5rem; font-size:.85rem}
+  body.compactDock .card .row.head>label{flex:0 0 auto; font-size:.85rem}
+  body.compactDock #seg_side .tglbtn{gap:.2rem; padding:.3rem .12rem; font-size:.8rem}
+  body.compactDock #seg_side .tgl{width:1.5rem; height:.9rem}
+  body.compactDock #seg_side .tgl i{width:.68rem; height:.68rem; top:.05rem; left:.06rem}
+  body.compactDock #seg_side .tglbtn.on .tgl i{left:.67rem}
   body.compactDock .grid2{gap:.28rem}
   body.compactDock .stat{padding:.2rem .36rem}
   body.compactDock .stat .v{font-size:.94rem; overflow:hidden; text-overflow:ellipsis}
@@ -935,9 +940,19 @@ body.vis :is(#hdr,#dockL,#dockR,#openBar,#swapPop,#boardFoot,#rvBar){display:non
   color:var(--sub); line-height:1.45}
 .vis-acts{display:flex; align-items:center; gap:.38rem; flex-wrap:wrap; flex:0 0 auto}
 
-.vis-acts .btn{padding:.42rem .55rem; font-size:.9rem; white-space:nowrap}
+.vis-acts .btn{padding:.16rem .5rem; font-size:.86rem; white-space:nowrap}
 [data-lang="en"] .vis-acts .btn{font-size:.78rem}
 .vis-acts .btn[hidden]{display:none !important}
+
+.vis-imgbar .btn,
+.vis-codebar .btn,
+.vis-del,
+.crop-acts .btn,
+#visEditBar .btn{padding:.16rem .5rem; font-size:.86rem}
+.vis-imgbar .vis-pill{padding:.16rem .7rem; font-size:.86rem; min-width:3.4rem}
+[data-lang="en"] .vis-imgbar .btn,
+[data-lang="en"] #visEditBar .btn,
+[data-lang="en"] .crop-acts .btn{font-size:.78rem}
 
 .vis-rcbox{display:flex; flex-direction:column; gap:.3rem; min-width:0; flex:0 0 auto}
 .vis-rcbox[hidden]{display:none !important}
@@ -1698,6 +1713,7 @@ body.sp-fonting .sp-font{display:flex}
 .spf-ok{
   flex:0 0 auto; margin-left:auto; height:1.56rem; padding:0 .78rem;
   font-size:.8rem; font-weight:600;
+  white-space:nowrap; box-sizing:border-box; text-align:center;
 }
 .spf-ok-done{border-color:rgba(58,160,232,.9); color:#0f5c8f; background:rgba(58,160,232,.16)}
 [data-theme="dark"] .spf-ok-done{color:#bfe4ff}

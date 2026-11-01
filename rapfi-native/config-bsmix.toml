@@ -38,15 +38,15 @@ weight_file_white = "mix9svqrenju_bs15_white.bin.lz4"
 
 [search]
 aspiration_window = true
-num_iteration_after_mate = 4
-num_iteration_after_singular_root = 4
-max_search_depth = 100
+num_iteration_after_mate = 24
+num_iteration_after_singular_root = 24
+max_search_depth = 99
 
 [search.timectl]
 match_space = 21.0
 match_space_min = 7.0
 average_branch_factor = 1.7
-advanced_stop_ratio = 0.92
+advanced_stop_ratio = 0.9
 move_horizon = 64
 
 [database]
