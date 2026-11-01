@@ -1378,9 +1378,19 @@ function footLeaves(foot) {  var out = [];
   });
   return out;
 }
+
+var _footBaseH = 0;
+
 function layoutFootRows(force) {
   var foot = document.getElementById('boardFoot');
   if (!foot) return;
+  if (!foot.classList.contains('pop-ai') && !foot.classList.contains('pop-shift') &&
+      !foot.classList.contains('pop-mirror')) {
+    
+    foot.style.minHeight = '';
+    var h0 = foot.offsetHeight;
+    if (h0 > 0) _footBaseH = h0;
+  }
   var sig = foot.clientWidth + '|' + foot.className + '|' +
             ['btn_place_eval', 'btn_live', 'btn_aiside'].map(function (id) {
               var e = document.getElementById(id);
@@ -1428,6 +1438,8 @@ function syncFootPops() {
   });
   foot.classList.remove('pop-ai', 'pop-shift', 'pop-mirror');
   if (cls) foot.classList.add(cls);
+  
+  foot.style.minHeight = (cls && _footBaseH > 0) ? _footBaseH + 'px' : '';
   layoutFootRows(true);
 }
 function footPopsWatch() {

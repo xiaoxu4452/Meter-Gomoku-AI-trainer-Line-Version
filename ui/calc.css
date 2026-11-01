@@ -290,6 +290,7 @@ body.rv :is(#hdr,#dockL,#dockR){display:none}
 #boardFoot > #mirrorPop{
   margin:0; width:auto; max-width:none; flex:0 1 auto; min-width:0;
   padding:0 .45rem; gap:.4rem; border-radius:10px;
+  align-items:center; min-height:1.78rem;
 }
 #boardFoot > #shiftPop,
 #boardFoot > #mirrorPop{flex-direction:row; align-items:center; gap:.45rem}
@@ -297,9 +298,20 @@ body.rv :is(#hdr,#dockL,#dockR){display:none}
 #boardFoot > #aiSidePop .ai-turn{font-size:.78rem}
 #boardFoot > #aiSidePop .ainum{width:4.2rem}
 #boardFoot > #aiSidePop .tglbtn{padding:.06rem .3rem}
+#boardFoot > #aiSidePop .tgl{width:1.55rem; height:.88rem; border-radius:999px}
+#boardFoot > #aiSidePop .tgl i{width:.64rem; height:.64rem; top:.08rem; left:.1rem}
+#boardFoot > #aiSidePop .tglbtn.on .tgl i{left:.73rem}
+#boardFoot > #aiSidePop .ainum input{
+  padding:.14rem .4rem; font-size:.86rem; line-height:1.15;
+}
+#boardFoot > #aiSidePop .btn,
+#boardFoot > #shiftPop .btn,
+#boardFoot > #mirrorPop .btn{
+  height:1.64rem; display:inline-flex; align-items:center; justify-content:center;
+}
 #boardFoot > #aiSidePop .btn.ico,
 #boardFoot > #shiftPop .btn.ico,
-#boardFoot > #mirrorPop .btn.ico{padding:.14rem .42rem}
+#boardFoot > #mirrorPop .btn.ico{padding:0 .42rem}
 #boardFoot > #shiftPop .sp-btns .btn,
 #boardFoot > #mirrorPop .sp-btns .btn,
 #boardFoot > #shiftPop .sp-ttl,
