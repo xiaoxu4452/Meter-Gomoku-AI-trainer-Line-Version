@@ -536,6 +536,16 @@ body.dragging .card-h{cursor:grabbing}
 .num{font-variant-numeric:tabular-nums; font-size:.88rem; color:var(--sub); min-width:4.6rem}
 .hint{color:var(--sub); font-size:.8rem}
 .hint.bg-off{color:#c9822f}
+.tb-sec{
+  border:1px dashed rgba(58,160,232,.62); border-radius:10px;
+  margin:.34rem 0 .16rem; overflow:hidden; background:rgba(58,160,232,.028);
+}
+[data-theme="dark"] .tb-sec{
+  border-color:rgba(88,166,224,.58); background:rgba(88,166,224,.055);
+}
+.tb-sec .sec-h{background:rgba(0,0,0,.07); border-radius:0}
+.tb-sec .row{margin:.4rem .55rem .46rem}
+.tb-sec .tb-msg{flex:1 1 8rem; min-width:0; line-height:1.45}
 
 select{
   font:inherit; font-size:.92rem; padding:.3rem .45rem; border-radius:7px;
@@ -1219,7 +1229,6 @@ body.link{overflow:hidden}
   display:flex; flex-direction:column; align-items:flex-start; gap:.3rem;
   overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain;
   scrollbar-gutter:stable;
-  scrollbar-width:thin; scrollbar-color:var(--border) transparent;
   overflow-wrap:anywhere; word-break:break-word;
 }
 .lk-status::-webkit-scrollbar{width:6px; height:6px}
@@ -1604,7 +1613,6 @@ body.sp-fonting .sp-font{display:flex}
 .spf-list{
   flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;
   padding:.3rem .36rem; display:flex; flex-direction:column; gap:.22rem;
-  scrollbar-width:thin;
 }
 .spf-list::-webkit-scrollbar{width:6px}
 .spf-list::-webkit-scrollbar-thumb{background:var(--border); border-radius:6px}

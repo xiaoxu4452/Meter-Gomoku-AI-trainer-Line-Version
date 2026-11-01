@@ -20,6 +20,7 @@ namespace host {
 HANDLE       Job();            
 void         PostPage(const std::string& json);   
 void         PostLink(const std::string& json);   
+void         PostSet(const std::string& json);    
 void         Log(const std::string& s);           
 std::wstring EngineDir();                         // <ExeDir>/rapfi-native
 void         ChildTracked(HANDLE hProcess);       
@@ -30,6 +31,8 @@ void         OnVariantChanged();
 int          PhysCores();                         
 int          LogicCores();                        
 int          ThreadsMaxHost();                    
+int          ThreadsCapHost();                    
+int          PerfCoresHost();                     
 long long    TotalPhysKB();                       
 }  // namespace host
 
@@ -112,6 +115,8 @@ bool Available();
 const std::string& Diag();    
 
 void HandleOp(const std::string& op, int id, const std::string& qJson, bool fromLink);
+
+void StartThreadBench();
 
 Caps GetCaps();
 void SetUserPrefs(int threads, int hashMB);   

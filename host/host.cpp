@@ -346,6 +346,8 @@ static std::atomic<int> g_syncWhitePct(33);
 static std::vector<std::string> g_outboxPage;
 static std::vector<std::string> g_outboxRv;
 
+static std::vector<std::string> g_outboxSet;
+
 static void OutboxPush(std::vector<std::string>& q, const std::string& json) {
   std::lock_guard<std::mutex> lk(g_outboxMtx);
   if (q.size() >= GB_OUTBOX_CAP) {
@@ -372,6 +374,10 @@ static void PostToPageSoon(const std::string& json) {
 }
 static void PostToRvPageSoon(const std::string& json) {
   OutboxPush(g_outboxRv, json);
+  if (g_hwnd && IsWindow(g_hwnd)) SetTimer(g_hwnd, kMainTimerOutbox, 1, nullptr);
+}
+static void PostToSetPageSoon(const std::string& json) {
+  OutboxPush(g_outboxSet, json);
   if (g_hwnd && IsWindow(g_hwnd)) SetTimer(g_hwnd, kMainTimerOutbox, 1, nullptr);
 }
 
@@ -2267,18 +2273,56 @@ static int CpuCount() {
 
 static int PhysCoreCount();   
 
+static int PerfCoreCount() {
+  DWORD len = 0;
+  if (!GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &len) || !len) return 0;
+  std::vector<char> buf(len);
+  if (!GetLogicalProcessorInformationEx(RelationProcessorCore,
+          (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)buf.data(), &len)) return 0;
+  int best = 1 << 20;
+  DWORD o = 0;
+  while (o < len) {
+    PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX pi =
+        (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)(buf.data() + o);
+    if (pi->Relationship == RelationProcessorCore &&
+        (int)pi->Processor.EfficiencyClass < best)
+      best = (int)pi->Processor.EfficiencyClass;
+    o += pi->Size;
+  }
+  if (best >= (1 << 20)) return 0;
+  o = 0;
+  int n = 0;
+  while (o < len) {
+    PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX pi =
+        (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)(buf.data() + o);
+    if (pi->Relationship == RelationProcessorCore &&
+        (int)pi->Processor.EfficiencyClass == best) ++n;
+    o += pi->Size;
+  }
+  return n;
+}
+
 static int ThreadsMax() {
-
-  
-
-  
-
   int phys = PhysCoreCount();
   int n    = CpuCount();
   if (n < 1) n = 1;
   int t = (phys >= 2) ? phys : ((n >= 8) ? n - 2 : n - 1);
+  int perf = PerfCoreCount();
+  if (perf >= 1 && perf < t) t = perf;
   if (t < 1) t = 1;
   if (t > n) t = n;
+  return t;
+}
+
+static int ThreadsCap() {
+  int n = CpuCount();
+  int base = ThreadsMax();
+  if (n < 2) return base < 1 ? 1 : base;
+  int reserve = (n >= 8) ? 2 : 1;
+  int t = n - reserve;
+  if (t < base) t = base;
+  if (t > n) t = n;
+  if (t < 1) t = 1;
   return t;
 }
 
@@ -3809,6 +3853,7 @@ namespace host {
 HANDLE Job() { return g_job; }
 void PostPage(const std::string& json) { PostToPageSoon(json); }
 void PostLink(const std::string& json) { PostToLinkPageSoon(json); }
+void PostSet(const std::string& json) { PostToSetPageSoon(json); }
 void Log(const std::string& s) { LogMsg(s); }
 std::wstring EngineDir() { return ExeDir(); }
 void ChildTracked(HANDLE h) { ChildTrack(h); }
@@ -3821,6 +3866,8 @@ void OnVariantChanged() { PostToPage(SysInfoJson()); }
 int PhysCores() { return PhysCoreCount(); }
 int LogicCores() { return CpuCount(); }
 int ThreadsMaxHost() { return ThreadsMax(); }
+int ThreadsCapHost() { return ThreadsCap(); }
+int PerfCoresHost() { return PerfCoreCount(); }
 long long TotalPhysKB() { return (long long)MemTotalMB() * 1024; }
 
 }  // namespace host
@@ -3979,6 +4026,12 @@ class MsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
     
     if (s.find("\"openSettings\"") != std::string::npos) {
       OpenSetWindow();
+      return S_OK;
+    }
+
+    if (s.find("\"type\":\"threadBench\"") != std::string::npos) {
+      eng::StartThreadBench();
+      LogMsg("[bench] thread bench requested");
       return S_OK;
     }
     if (s.find("\"mainSync\"") != std::string::npos) {
@@ -4143,6 +4196,12 @@ static std::string SysInfoJson() {
 
   o += ",\"cpuName\":" + JsonQuote(CpuName());
   o += ",\"physCores\":" + std::to_string(PhysCoreCount());
+  
+  int _perf = PerfCoreCount();
+  int _phys = PhysCoreCount();
+  if (_perf < 1 || _perf > _phys) _perf = _phys;
+  o += ",\"pCores\":" + std::to_string(_perf);
+  o += ",\"eCores\":" + std::to_string(_phys > _perf ? _phys - _perf : 0);
   o += ",\"logiCores\":" + std::to_string((int)std::thread::hardware_concurrency());
   DWORD mhz = 0;
   if (RegDword(HKEY_LOCAL_MACHINE,
@@ -4241,37 +4300,54 @@ static std::string SysMemJson() {
 // host handshake: CPU/engine capability snapshot shared by the main page and the settings page
 static std::string HostHandshakeJson() {
   eng::Caps ec = eng::GetCaps();
-  char b[640];
-  snprintf(b, sizeof(b),
-           "{\"type\":\"host\",\"cpu\":%d,\"threadsDefault\":%d,\"threadsMax\":%d,"
-           "\"physCores\":%d,\"memMB\":%d,\"memAvailMB\":%d,\"native\":%s,"
-           
-           "\"userThreads\":%d,\"userHashMB\":%d,"
-           "\"variant\":%s,\"cpuName\":%s,"
 
-           
-           "\"sse\":%s,\"avx2\":%s,\"avx512\":%s,\"avx512vnni\":%s,\"avxvnni\":%s,"
-           "\"variantBench\":%s}",
-           CpuCount(), ThreadsDefault(), ThreadsMax(), PhysCoreCount(),
-           MemTotalMB(), MemAvailMB(),
-           ec.available ? "true" : "false",
-           ec.userThreads, ec.userHashMB,
-           JsonQuote(ec.variant).c_str(), JsonQuote(CpuName()).c_str(),
-           ec.hasSSE ? "true" : "false", ec.hasAVX2 ? "true" : "false",
-           ec.hasAVX512 ? "true" : "false", ec.hasAVX512VNNI ? "true" : "false",
-           ec.hasAVXVNNI ? "true" : "false",
-           JsonQuote(ec.benchVariant).c_str());
+  
+  int phys = PhysCoreCount();
+  int logi = CpuCount();
+  int perf = PerfCoreCount();
+  if (perf < 1 || perf > phys) perf = phys;
+  int eff = (phys > perf) ? phys - perf : 0;
 
-  LogMsg(std::string("[host] probe cpu=") + std::to_string(CpuCount()) +
+  std::string o = "{\"type\":\"host\"";
+  o += ",\"cpu\":" + std::to_string(logi);
+  o += ",\"threadsDefault\":" + std::to_string(ThreadsDefault());
+  o += ",\"threadsMax\":" + std::to_string(ThreadsMax());
+  o += ",\"threadsCap\":" + std::to_string(ThreadsCap());
+  o += ",\"physCores\":" + std::to_string(phys);
+  o += ",\"pCores\":" + std::to_string(perf);
+  o += ",\"eCores\":" + std::to_string(eff);
+  o += std::string(",\"hybrid\":") + (eff > 0 ? "true" : "false");
+  o += ",\"vendor\":" + JsonQuote(CpuVendor());
+  o += ",\"memMB\":" + std::to_string(MemTotalMB());
+  o += ",\"memAvailMB\":" + std::to_string(MemAvailMB());
+  o += std::string(",\"native\":") + (ec.available ? "true" : "false");
+  
+  o += ",\"userThreads\":" + std::to_string(ec.userThreads);
+  o += ",\"userHashMB\":" + std::to_string(ec.userHashMB);
+  o += ",\"variant\":" + JsonQuote(ec.variant);
+  o += ",\"cpuName\":" + JsonQuote(CpuName());
+
+  
+  o += std::string(",\"sse\":") + (ec.hasSSE ? "true" : "false");
+  o += std::string(",\"avx2\":") + (ec.hasAVX2 ? "true" : "false");
+  o += std::string(",\"avx512\":") + (ec.hasAVX512 ? "true" : "false");
+  o += std::string(",\"avx512vnni\":") + (ec.hasAVX512VNNI ? "true" : "false");
+  o += std::string(",\"avxvnni\":") + (ec.hasAVXVNNI ? "true" : "false");
+  o += ",\"variantBench\":" + JsonQuote(ec.benchVariant);
+  o += "}";
+
+  LogMsg(std::string("[host] probe cpu=") + std::to_string(logi) +
          " threadsDefault=" + std::to_string(ThreadsDefault()) +
          " threadsMax=" + std::to_string(ThreadsMax()) +
-         " phys=" + std::to_string(PhysCoreCount()) +
-         " smt=" + std::to_string(PhysCoreCount() > 0 ? CpuCount() / PhysCoreCount() : 0) +
+         " threadsCap=" + std::to_string(ThreadsCap()) +
+         " phys=" + std::to_string(phys) +
+         " pcore=" + std::to_string(perf) +
+         " smt=" + std::to_string(phys > 0 ? logi / phys : 0) +
          " vendor=" + CpuVendor() +
          " hybrid=" + std::to_string(HasHybridCores() ? 1 : 0) +
          " memMB=" + std::to_string(MemTotalMB()) +
          " hw=" + std::to_string((int)std::thread::hardware_concurrency()));
-  return std::string(b);
+  return o;
 }
 
 class DomHandler : public Cb<ICoreWebView2DOMContentLoadedEventHandler> {
@@ -4815,6 +4891,24 @@ static void DisableDwmTransitions(HWND h) {
   DwmSetWindowAttribute(h, DWMWA_TRANSITIONS_FORCEDISABLED, &on, sizeof(on));
 }
 
+static void EnableDwmTransitions(HWND h) {
+  if (!h || !IsWindow(h)) return;
+  BOOL off = FALSE;
+  DwmSetWindowAttribute(h, DWMWA_TRANSITIONS_FORCEDISABLED, &off, sizeof(off));
+}
+static std::vector<HWND> g_transPending;
+static void CALLBACK TransRestoreProc(HWND, UINT, UINT_PTR id, DWORD) {
+  for (size_t i = 0; i < g_transPending.size(); i++) EnableDwmTransitions(g_transPending[i]);
+  g_transPending.clear();
+  KillTimer(nullptr, id);
+}
+static void EnableTransitionsSoon(HWND h) {
+  if (!h || !IsWindow(h)) return;
+  bool first = g_transPending.empty();
+  g_transPending.push_back(h);
+  if (first) SetTimer(nullptr, 0x5452, 420, TransRestoreProc);
+}
+
 static void SetWebviewBg(ICoreWebView2Controller* ctl, COLORREF c) {
   if (!ctl) return;
   ICoreWebView2Controller2* c2 = nullptr;
@@ -5021,6 +5115,7 @@ static void FinishSplashLayer() {
   g_splashLayer = nullptr;
   g_splashAlpha = 255;
   LogMsg("[ui] splash layer off");
+  EnableTransitionsSoon(g_hwnd);   
 
   if (g_hwnd && IsWindow(g_hwnd))
     SetTimer(g_hwnd, kMainTimerPrewarmAll, kMainPrewarmDelayMs, nullptr);
@@ -5085,6 +5180,7 @@ static void ShowReviewWindow() {
   g_rvShown = true;
   ShowWindow(g_rvHwnd, SW_SHOWNORMAL);
   SetForegroundWindow(g_rvHwnd);
+  EnableTransitionsSoon(g_rvHwnd);
   LogMsg("[rv] review window shown");
 }
 
@@ -5372,6 +5468,7 @@ static void ShowVisWindow() {
   g_visShown = true;
   ShowWindow(g_visHwnd, SW_SHOWNORMAL);
   SetForegroundWindow(g_visHwnd);
+  EnableTransitionsSoon(g_visHwnd);
   LogMsg("[vis] vision window shown");
 }
 static void RevealVisPage() {
@@ -5661,6 +5758,12 @@ static void PostToLinkPageSoon(const std::string& json) {
   OutboxPush(g_outboxLink, json);     
   if (g_hwnd && IsWindow(g_hwnd)) PostMessageW(g_hwnd, kMsgFlushOutbox, 0, 0);
 }
+
+static void PostToSetPage(const std::string& json) {
+  if (!g_setWebview) return;
+  std::wstring w = Utf8ToWide(json);
+  g_setWebview->PostWebMessageAsJson(w.c_str());
+}
 static void LayoutLinkWebView() {
   if (!g_linkController || !g_linkHwnd) return;
   RECT r;
@@ -5682,6 +5785,7 @@ static void ShowLinkWindow() {
   g_linkShown = true;
   ShowWindow(g_linkHwnd, SW_SHOWNORMAL);
   SetForegroundWindow(g_linkHwnd);
+  EnableTransitionsSoon(g_linkHwnd);
   MarkerRaiseTopmost(g_linkHwnd);      
   LogMsg("[link] link window shown");
 }
@@ -8100,6 +8204,11 @@ class SetMsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
       if (!th.empty() && g_setHwnd) ApplyDarkTitleBar(g_setHwnd, th != "light");
       return S_OK;
     }
+    if (s.find("\"type\":\"threadBench\"") != std::string::npos) {
+      eng::StartThreadBench();
+      LogMsg("[bench] thread bench requested (settings page)");
+      return S_OK;
+    }
     return S_OK;
   }
 };
@@ -8181,6 +8290,7 @@ static void OpenSetWindow() {
     if (g_setPageReady) RevealSetPage();
     ShowWindow(g_setHwnd, SW_SHOWNORMAL);
     SetForegroundWindow(g_setHwnd);
+    EnableTransitionsSoon(g_setHwnd);
     LayoutSetWebView();
     InvalidateRect(g_setHwnd, nullptr, FALSE);
     return;
@@ -8193,6 +8303,7 @@ static void OpenSetWindow() {
   if (g_setHwnd) {
     ShowWindow(g_setHwnd, SW_SHOWNORMAL);
     SetForegroundWindow(g_setHwnd);
+    EnableTransitionsSoon(g_setHwnd);
   }
 }
 
@@ -8245,15 +8356,17 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     case kMsgFlushOutbox:
       
       {
-        std::vector<std::string> pg, rv, vs, lk;
+        std::vector<std::string> pg, rv, vs, lk, st;
         OutboxDrain(g_outboxPage, pg);
         OutboxDrain(g_outboxRv, rv);
         OutboxDrain(g_outboxVis, vs);
         OutboxDrain(g_outboxLink, lk);
+        OutboxDrain(g_outboxSet, st);
         for (size_t i = 0; i < pg.size(); ++i) PostToPage(pg[i]);
         for (size_t i = 0; i < rv.size(); ++i) PostToRvPage(rv[i]);
         for (size_t i = 0; i < vs.size(); ++i) PostToVisPage(vs[i]);
         for (size_t i = 0; i < lk.size(); ++i) PostToLinkPage(lk[i]);
+        for (size_t i = 0; i < st.size(); ++i) PostToSetPage(st[i]);
       }
       return 0;
     case WM_TIMER:
@@ -8332,13 +8445,15 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
       
       if (w == kMainTimerOutbox) {
         KillTimer(h, kMainTimerOutbox);
-        std::vector<std::string> pg, rv, lk;
+        std::vector<std::string> pg, rv, lk, st;
         OutboxDrain(g_outboxPage, pg);
         OutboxDrain(g_outboxRv, rv);
         OutboxDrain(g_outboxLink, lk);
+        OutboxDrain(g_outboxSet, st);
         for (size_t i = 0; i < pg.size(); ++i) PostToPage(pg[i]);
         for (size_t i = 0; i < rv.size(); ++i) PostToRvPage(rv[i]);
         for (size_t i = 0; i < lk.size(); ++i) PostToLinkPage(lk[i]);
+        for (size_t i = 0; i < st.size(); ++i) PostToSetPage(st[i]);
         return 0;
       }
       
