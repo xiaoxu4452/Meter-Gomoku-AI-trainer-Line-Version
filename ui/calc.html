@@ -206,33 +206,48 @@
           <button id="btn_shift" class="btn ico" title="局面步进（整体平移一格）">✥</button>
         </span>
       </div>
+      <div id="mirrorPop" hidden>
+        <span class="sp-ttl" id="t_mirrorTtl">翻转棋子布局</span>
+        <span class="sp-btns">
+          <button id="btn_mv_fv" class="btn" title="左右翻转">左右</button>
+          <button id="btn_mv_fh" class="btn" title="上下翻转">上下</button>
+          <button id="btn_mv_d1" class="btn" title="对角翻转（左上↔右下）">╲</button>
+          <button id="btn_mv_d2" class="btn" title="对角翻转（右上↔左下）">╱</button>
+          <button id="btn_mv_close" class="btn ico" title="关闭">✕</button>
+        </span>
+      </div>
+
+      <div id="shiftPop" hidden>
+        <span class="sp-ttl" id="t_shiftTtl">局面平移</span>
+        <span class="sp-btns">
+          <button id="btn_mv_left" class="btn ico" title="整体向左平移一格">←</button>
+          <button id="btn_mv_up" class="btn ico" title="整体向上平移一格">↑</button>
+          <button id="btn_mv_down" class="btn ico" title="整体向下平移一格">↓</button>
+          <button id="btn_mv_right" class="btn ico" title="整体向右平移一格">→</button>
+          <button id="btn_shift_close" class="btn ico" title="关闭">✕</button>
+        </span>
+      </div>
+
+      <div id="aiSidePop" hidden>
+        <span class="ai-grp">
+          <button id="ai_side_b" data-ai="b" class="tglbtn"><span class="tgl"><i></i></span><span class="tgl-txt">AI 执黑</span></button>
+          <button id="ai_side_w" data-ai="w" class="tglbtn"><span class="tgl"><i></i></span><span class="tgl-txt">AI 执白</span></button>
+        </span>
+        <span class="ai-grp">
+          <span class="ai-turn" id="t_aiTurn">思考时间</span>
+          <span class="numbox ainum">
+            <input id="num_turn2" type="number" min="0.2" max="300" step="0.1" value="2">
+            <span class="unit">s</span>
+          </span>
+        </span>
+        <button id="btn_ai_close" class="btn ico" title="关闭">✕</button>
+      </div>
+
       <div class="bf-side bf-r">
 
         <button id="btn_aiside" class="btn bfkey">AI 执子</button>
 
       </div>
-    </div>
-
-    <div id="mirrorPop" hidden>
-      <span class="sp-ttl" id="t_mirrorTtl">翻转棋子布局</span>
-      <span class="sp-btns">
-        <button id="btn_mv_fv" class="btn" title="左右翻转">左右</button>
-        <button id="btn_mv_fh" class="btn" title="上下翻转">上下</button>
-        <button id="btn_mv_d1" class="btn" title="对角翻转（左上↔右下）">╲</button>
-        <button id="btn_mv_d2" class="btn" title="对角翻转（右上↔左下）">╱</button>
-        <button id="btn_mv_close" class="btn ico" title="关闭">✕</button>
-      </span>
-    </div>
-
-    <div id="shiftPop" hidden>
-      <span class="sp-ttl" id="t_shiftTtl">局面平移</span>
-      <span class="sp-btns">
-        <button id="btn_mv_left" class="btn ico" title="整体向左平移一格">←</button>
-        <button id="btn_mv_up" class="btn ico" title="整体向上平移一格">↑</button>
-        <button id="btn_mv_down" class="btn ico" title="整体向下平移一格">↓</button>
-        <button id="btn_mv_right" class="btn ico" title="整体向右平移一格">→</button>
-        <button id="btn_shift_close" class="btn ico" title="关闭">✕</button>
-      </span>
     </div>
 
     <div id="openBar" hidden><span class="hint" id="openHint"></span>
@@ -255,22 +270,6 @@
         <button id="btn_swap_first" class="btn">先手 · 执黑</button>
         <button id="btn_swap_second" class="btn">后手 · 执白</button>
       </span>
-    </div>
-
-    <div id="aiSidePop" hidden>
-      <span class="ai-grp">
-
-        <button id="ai_side_b" data-ai="b" class="tglbtn"><span class="tgl"><i></i></span><span class="tgl-txt">AI 执黑</span></button>
-        <button id="ai_side_w" data-ai="w" class="tglbtn"><span class="tgl"><i></i></span><span class="tgl-txt">AI 执白</span></button>
-      </span>
-      <span class="ai-grp">
-        <span class="ai-turn" id="t_aiTurn">思考时间</span>
-        <span class="numbox ainum">
-          <input id="num_turn2" type="number" min="0.2" max="300" step="0.1" value="2">
-          <span class="unit">s</span>
-        </span>
-      </span>
-      <button id="btn_ai_close" class="btn ico" title="关闭">✕</button>
     </div>
 
     <div id="rvBar" hidden>

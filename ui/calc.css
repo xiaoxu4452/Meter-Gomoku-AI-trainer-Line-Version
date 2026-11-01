@@ -9,6 +9,8 @@
 
   --accent:#2f86d6; --accent-ink:#ffffff;
   --guide:#3aa0e8;
+  --dock-gap:.15rem;
+  --dock-sb:4px;
 
   --board:#d9b878; --line:#24282c; --star:#14171a; --axis:#3d4247;
   --blk:#1b1916; --blk-edge:#f2eee7; --wht:#eeeadf; --wht-edge:#c3bda9;
@@ -33,6 +35,9 @@
 }
 
 *{box-sizing:border-box}
+body{-webkit-user-select:none; user-select:none}
+input, textarea, select, [contenteditable="true"],
+#lkStatus, #visInput, #visCode, #codeText, .copyable{-webkit-user-select:text; user-select:text}
 /* page shell */
 html,body{height:100%}
 body{
@@ -145,12 +150,15 @@ button[hidden]{display:none !important}
 .hdr-actions{margin-left:auto; display:flex; gap:4px}
 
 /* app shell: board column + right dock */
-#stage{flex:1 1 auto; display:flex; gap:.42rem; padding:.4rem; min-height:0; overflow:hidden}
+#stage{flex:1 1 auto; display:flex; gap:var(--dock-gap); padding:.4rem; min-height:0; overflow:hidden}
 /* docks */
 .dock{
   display:flex; flex-direction:column; gap:.7rem;
-  overflow-y:auto; overflow-x:hidden; padding-right:.2rem; min-height:0;
+  overflow-y:auto; overflow-x:hidden; scrollbar-gutter:stable;
+  padding-right:var(--dock-gap); min-height:0;
 }
+.dock::-webkit-scrollbar{width:var(--dock-sb)}
+.dock::-webkit-scrollbar-thumb{border-radius:2px}
 
 .dock:not(.has){flex:0 0 0; width:0; min-width:0; padding:0; overflow:hidden}
 /* fixed px width: maximising the window must not grow the cards (font size / board scale only) */
@@ -276,6 +284,42 @@ body.rv :is(#hdr,#dockL,#dockR){display:none}
 #aiSidePop .ainum .unit{position:absolute; right:.35rem; top:50%; transform:translateY(-50%); font-size:.78rem; color:var(--sub)}
 #setPop .btn.on{color:var(--accent); border-color:var(--accent)}
 #aiSidePop .tglbtn .tgl-txt{font-size:.84rem}
+
+#boardFoot > #aiSidePop,
+#boardFoot > #shiftPop,
+#boardFoot > #mirrorPop{
+  margin:0; width:auto; max-width:none; flex:0 1 auto; min-width:0;
+  padding:0 .45rem; gap:.4rem; border-radius:10px;
+}
+#boardFoot > #shiftPop,
+#boardFoot > #mirrorPop{flex-direction:row; align-items:center; gap:.45rem}
+#boardFoot > #aiSidePop .ai-grp{padding:0 .34rem; gap:.32rem}
+#boardFoot > #aiSidePop .ai-turn{font-size:.78rem}
+#boardFoot > #aiSidePop .ainum{width:4.2rem}
+#boardFoot > #aiSidePop .tglbtn{padding:.06rem .3rem}
+#boardFoot > #aiSidePop .btn.ico,
+#boardFoot > #shiftPop .btn.ico,
+#boardFoot > #mirrorPop .btn.ico{padding:.14rem .42rem}
+#boardFoot > #shiftPop .sp-btns .btn,
+#boardFoot > #mirrorPop .sp-btns .btn,
+#boardFoot > #shiftPop .sp-ttl,
+#boardFoot > #mirrorPop .sp-ttl{white-space:nowrap}
+
+#boardFoot.pop-ai .bf-l,
+#boardFoot.pop-ai #boardBtns{display:none !important}
+#boardFoot.pop-shift .bf-l,
+#boardFoot.pop-shift #boardBtns > :not(.lay-group),
+#boardFoot.pop-shift .lay-group > :not(#btn_shift),
+#boardFoot.pop-mirror .bf-l,
+#boardFoot.pop-mirror #boardBtns > :not(.lay-group),
+#boardFoot.pop-mirror .lay-group > :not(#btn_mirror){display:none !important}
+
+#boardFoot.bf-two{row-gap:.28rem}
+#boardFoot.bf-two > .bf-l,
+#boardFoot.bf-two > .bf-r,
+#boardFoot.bf-two > #boardBtns{display:contents}
+#boardFoot.bf-two > #boardBtns[hidden]{display:none}
+#boardFoot .bf-brk{flex:0 0 100%; width:100%; height:0; margin:0; padding:0; border:0}
 
 .bgroup{display:inline-flex; align-items:center; gap:.25rem;
   padding:.18rem .5rem; border-radius:10px;
@@ -928,8 +972,9 @@ body.vis :is(#hdr,#dockL,#dockR,#openBar,#swapPop,#boardFoot,#rvBar){display:non
 .vis-big{padding:.8rem 1.7rem; font-size:1.05rem; border-radius:12px; min-width:9.5rem}
 .vis-view{flex:1 1 auto; display:flex; flex-direction:column; gap:.5rem; min-height:0;
   overflow-y:auto; overflow-x:hidden}
-.vis-imgbar{display:flex; align-items:center; gap:.4rem; flex:0 0 auto; flex-wrap:wrap}
-.vis-imgbar .pill{min-width:3.4rem; text-align:center}
+.vis-imgbar{display:flex; align-items:center; gap:.28rem; flex:0 0 auto; flex-wrap:nowrap; min-width:0}
+.vis-imgbar .btn{flex:0 1 auto; min-width:0; padding:.14rem .38rem; white-space:nowrap; overflow:hidden}
+.vis-imgbar .pill{min-width:2.7rem; text-align:center}
 
 .vis-box{position:relative; flex:0 0 auto; background:var(--card); border:1px solid var(--border);
   border-radius:var(--r); overflow:hidden}
@@ -961,7 +1006,7 @@ body.vis :is(#hdr,#dockL,#dockR,#openBar,#swapPop,#boardFoot,#rvBar){display:non
 .vis-del,
 .crop-acts .btn,
 #visEditBar .btn{padding:.16rem .5rem; font-size:.86rem}
-.vis-imgbar .vis-pill{padding:.16rem .7rem; font-size:.86rem; min-width:3.4rem}
+.vis-imgbar .vis-pill{padding:.14rem .45rem; font-size:.86rem; min-width:2.7rem}
 [data-lang="en"] .vis-imgbar .btn,
 [data-lang="en"] #visEditBar .btn,
 [data-lang="en"] .crop-acts .btn{font-size:.78rem}

@@ -1321,6 +1321,8 @@ var BOARD_MIN_DPR = 2;
 function boardDpr() { return Math.max(BOARD_MIN_DPR, window.devicePixelRatio || 1); }
 
 function layoutBoard() {
+  
+  try { layoutFootRows(); } catch (eFL) {}
   var box = els.boardWrap.getBoundingClientRect();
 
   var pad = 4;
@@ -1332,6 +1334,109 @@ function layoutBoard() {
   els.board.height = Math.round(side * dpr);
   paint();
   drawCurve();
+}
+
+var _footSig = '';
+function footIsHidden(el) {
+  if (!el) return true;
+  if (el.hidden) return true;
+  var cs = getComputedStyle(el);
+  return cs.display === 'none' || cs.visibility === 'hidden';
+}
+
+function footNeedWidth(foot) {
+  var cs = getComputedStyle(foot);
+  var gap = parseFloat(cs.columnGap) || 0;
+  var need = 0, n = 0;
+  [].forEach.call(foot.children, function (c) {
+    if (c.classList.contains('bf-brk') || footIsHidden(c)) return;
+    if (c.id === 'boardBtns' || c.classList.contains('bf-l') || c.classList.contains('bf-r')) {
+      var g = parseFloat(getComputedStyle(c).columnGap) || 0, w = 0, m = 0;
+      [].forEach.call(c.children, function (ch) {
+        if (footIsHidden(ch)) return;
+        w += ch.getBoundingClientRect().width;
+        ++m;
+      });
+      need += w + g * Math.max(0, m - 1);
+    } else {
+      need += c.getBoundingClientRect().width;
+    }
+    ++n;
+  });
+  return need + gap * Math.max(0, n - 1);
+}
+function footLeaves(foot) {  var out = [];
+  [].forEach.call(foot.children, function (c) {
+    if (c.classList.contains('bf-brk') || footIsHidden(c)) return;
+    if (c.id === 'boardBtns' || c.classList.contains('bf-l') || c.classList.contains('bf-r')) {
+      [].forEach.call(c.children, function (g) {
+        if (!footIsHidden(g)) out.push(g);
+      });
+    } else {
+      out.push(c);
+    }
+  });
+  return out;
+}
+function layoutFootRows(force) {
+  var foot = document.getElementById('boardFoot');
+  if (!foot) return;
+  var sig = foot.clientWidth + '|' + foot.className + '|' +
+            ['btn_place_eval', 'btn_live', 'btn_aiside'].map(function (id) {
+              var e = document.getElementById(id);
+              return e ? (footIsHidden(e) ? 0 : 1) : 0;
+            }).join('');
+  if (!force && sig === _footSig) return;
+  _footSig = sig;
+
+  var brk = foot.querySelector('.bf-brk');
+  if (brk && brk.parentNode) brk.parentNode.removeChild(brk);
+  foot.classList.remove('bf-two');
+
+  
+
+  var need = footNeedWidth(foot);
+  if (need <= foot.clientWidth + 2) return;
+
+  var items = footLeaves(foot);
+  if (items.length < 3) return;
+  var widths = items.map(function (e) { return e.getBoundingClientRect().width; });
+  var total = widths.reduce(function (a, b) { return a + b; }, 0);
+  var acc = 0, best = 0, bestDiff = Infinity;
+  for (var k = 1; k < items.length; ++k) {
+    acc += widths[k - 1];
+    var d = Math.abs(acc - (total - acc));
+    if (d < bestDiff) { bestDiff = d; best = k; }
+  }
+  if (best < 1) return;
+  foot.classList.add('bf-two');
+  var b = document.createElement('i');
+  b.className = 'bf-brk';
+  var anchor = items[best];
+  anchor.parentNode.insertBefore(b, anchor);
+}
+
+var _footObs = null;
+function syncFootPops() {
+  var foot = document.getElementById('boardFoot');
+  if (!foot) return;
+  var cls = '';
+  ['aiSidePop', 'shiftPop', 'mirrorPop'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (cls || !el || el.hidden) return;
+    cls = 'pop-' + id.replace('Pop', '').replace('aiSide', 'ai').toLowerCase();
+  });
+  foot.classList.remove('pop-ai', 'pop-shift', 'pop-mirror');
+  if (cls) foot.classList.add(cls);
+  layoutFootRows(true);
+}
+function footPopsWatch() {
+  if (_footObs || !window.MutationObserver) return;
+  _footObs = new MutationObserver(function () { syncFootPops(); });
+  ['aiSidePop', 'shiftPop', 'mirrorPop'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) _footObs.observe(el, { attributes: true, attributeFilter: ['hidden'] });
+  });
 }
 
 function css(name) {
@@ -12650,6 +12755,7 @@ function boot() {
       els.shiftPop.hidden = true;
     }
   });
+  footPopsWatch();   
 
   els.btn_review.onclick = openReviewFromBoard;
 
