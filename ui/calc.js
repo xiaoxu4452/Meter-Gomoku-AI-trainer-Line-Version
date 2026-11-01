@@ -64,16 +64,17 @@ var I18N = {
     phDepth: '4 ~ 128 的整数，留空 = 不限',
     phNodes: '0.1 ~ 4096（单位 M），留空 = 不限',
     coresHint: '本机 {p} 核 {l} 线程 · 推荐 {d} · 上限 {m}',
+    coresSmtWarn: '（超出物理核，评估会不稳，不建议）',
     coresRec: '推荐',
     tb: '性能测速',
     tbBtn: '一键测速',
-    tbHint: '实测本机几档线程，自动采用更快更准的一档',
+    tbHint: '实测本机几档线程：只在更深且吞吐明显更高时才换，否则保持原设置',
     tbBusy: '测速中…',
-    tbRunning: '正在比较 {n} 档线程（约 10 秒，请勿关闭设置窗）',
+    tbRunning: '正在比较 {n} 档线程（约 15 秒，请勿关闭设置窗）',
     tbDone: '已采用 {t} 线程',
     tbKeep: '维持 {t} 线程',
     tbD: '层',
-    tbProg: '测速中 {done}/{total}（每档约 1 秒）',
+    tbProg: '测速中 {done}/{total}（每档约 2 秒）',
     tbFail: '测速失败，请稍后再试',
     coach: '指导视图', coachHint: '方形四色热力：AI 帮你算最佳落点，落子即消失',
     heatBest: '最佳', heatGood: '良好', heatFair: '一般', heatPoor: '劣势',
@@ -597,16 +598,17 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     phDepth: 'Integer 4 ~ 128, empty = no limit',
     phNodes: '0.1 ~ 4096 (in M), empty = no limit',
     coresHint: '{p} cores / {l} threads · rec {d} · max {m}',
+    coresSmtWarn: ' (above physical cores: evaluation gets unstable, not recommended)',
     coresRec: 'rec.',
     tb: 'Thread benchmark',
     tbBtn: 'Auto-tune',
-    tbHint: 'Measure a few thread settings on this PC and keep the better one',
+    tbHint: 'Measure a few thread settings; only switch when it is deeper and clearly faster, otherwise keep',
     tbBusy: 'Testing…',
-    tbRunning: 'Comparing {n} thread settings (~10 s, keep this window open)',
+    tbRunning: 'Comparing {n} thread settings (~15 s, keep this window open)',
     tbDone: 'Applied {t} threads',
     tbKeep: 'Keeping {t} threads',
     tbD: 'd',
-    tbProg: 'Testing {done}/{total} (~1 s each)',
+    tbProg: 'Testing {done}/{total} (~2 s each)',
     tbFail: 'Benchmark failed, try again later',
     coach: 'Coach view', coachHint: 'Square 4-colour heat: AI computes your best spots; clears on move',
     heatBest: 'Best', heatGood: 'Good', heatFair: 'Fair', heatPoor: 'Poor',
@@ -1440,6 +1442,11 @@ function syncFootPops() {
   if (cls) foot.classList.add(cls);
   
   foot.style.minHeight = (cls && _footBaseH > 0) ? _footBaseH + 'px' : '';
+
+  ['aiSidePop', 'shiftPop', 'mirrorPop'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.style.minHeight = (cls && _footBaseH > 0) ? _footBaseH + 'px' : '';
+  });
   layoutFootRows(true);
 }
 function footPopsWatch() {
@@ -12539,6 +12546,10 @@ function buildSelects() {
       .replace('{d}', String(recT))
       .replace('{m}', String(maxT));
     if (hy) hn += zh ? ('（' + hy + '）') : (' (' + hy + ')');
+
+    
+    
+    if (physC >= 2 && effT > physC) hn += T('coresSmtWarn');
     els.coresHint.textContent = hn;
   }
 

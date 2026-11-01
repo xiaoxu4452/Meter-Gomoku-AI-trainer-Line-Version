@@ -619,10 +619,14 @@ static void ThreadBenchMain() {
     for (int x : cands) if (x == t) return;
     cands.push_back(t);
   };
-  addCand(rec / 2);
+
+  
+  
   addCand(rec);
   addCand((rec + cap) / 2);
   addCand(cap);
+  
+  addCand(EffectiveThreads());
 
   std::string variant = g_variant;
   if (variant.empty()) variant = "sse";
@@ -632,7 +636,8 @@ static void ThreadBenchMain() {
     return;
   }
 
-  const int TURN = 1000;
+  
+  const int TURN = 2000;
   host::PostSet("{\"type\":\"threadBenchStart\",\"cands\":" + std::to_string(cands.size()) +
                 ",\"turn\":" + std::to_string(TURN) + "}");
   
@@ -655,8 +660,7 @@ static void ThreadBenchMain() {
     }
 
   std::string rowsJson;
-  int bestT = 0, bestD = -1;
-  long long bestN = -1;
+  int bestD = -1;
   std::vector<std::pair<int, int>> depths;   // (threads, depth)
   std::vector<std::pair<int, long long>> nodesOf;
   for (auto& row : rows) {
@@ -664,8 +668,11 @@ static void ThreadBenchMain() {
     long long n = 0, sp = 0;
     for (auto& x : row.r) {
       if (!x.ok) continue;
+
+      
+      
+      if (cnt == 0 || x.depth < d) d = x.depth;
       ++cnt;
-      if (x.depth > d) d = x.depth;
       if (x.nodes > n) n = x.nodes;
       if (x.speed > sp) sp = x.speed;
     }
@@ -680,12 +687,35 @@ static void ThreadBenchMain() {
 
   
 
+  
+  int base = EffectiveThreads();
+  if (base < rec) base = rec;
+  if (base > cap) base = cap;
+  int baseD = -1;
+  long long baseN = 0;
+  for (size_t i = 0; i < depths.size(); ++i)
+    if (depths[i].first == base) { baseD = depths[i].second; baseN = nodesOf[i].second; }
+  if (baseD < 0) { baseD = bestD; baseN = 0; }   
+  int bestT = base;
+  long long bestN = baseN;
   for (size_t i = 0; i < depths.size(); ++i) {
-    if (depths[i].second < bestD - 1) continue;
+    if (depths[i].second < baseD) continue;      
     long long n = nodesOf[i].second;
     if (n > bestN) { bestN = n; bestT = depths[i].first; }
   }
-  if (bestT == 0) bestT = depths.empty() ? 0 : depths.front().first;
+  if (bestN * 100 < baseN * 105) bestT = base;   
+
+  
+  
+  int phys = host::PhysCores();
+  if (bestT > phys && phys >= 2) {
+    bool deeper = false;
+    for (size_t i = 0; i < depths.size(); ++i)
+      if (depths[i].first == bestT && depths[i].second > baseD) deeper = true;
+    if (!deeper || bestN * 100 < baseN * 125) bestT = base;
+  }
+  if (bestT == 0) bestT = (base >= 2) ? base : (depths.empty() ? 0 : depths.front().first);
+  if (bestT < rec && rec >= 2) bestT = rec;      
   g_tbRun = false;
   if (rowsJson.empty()) {
     host::PostSet("{\"type\":\"threadBenchResult\",\"ok\":false,\"why\":\"all-failed\"}");

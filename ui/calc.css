@@ -179,7 +179,7 @@ button[hidden]{display:none !important}
   body.compactDock{--dock-w:189px}
 }
 @media (max-width:860px){
-  #stage{gap:.5rem; padding:.5rem}
+  #stage{gap:var(--dock-gap); padding:.4rem}
 }
 @media (max-width:900px){
   body.compactDock .card{padding:.42rem .44rem .48rem}
@@ -290,7 +290,7 @@ body.rv :is(#hdr,#dockL,#dockR){display:none}
 #boardFoot > #mirrorPop{
   margin:0; width:auto; max-width:none; flex:0 1 auto; min-width:0;
   padding:0 .45rem; gap:.4rem; border-radius:10px;
-  align-items:center; min-height:1.78rem;
+  align-items:center; min-height:2.2rem;
 }
 #boardFoot > #shiftPop,
 #boardFoot > #mirrorPop{flex-direction:row; align-items:center; gap:.45rem}
