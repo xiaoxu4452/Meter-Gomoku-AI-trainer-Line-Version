@@ -63,19 +63,7 @@ var I18N = {
     phNone: '不限',
     phDepth: '4 ~ 128 的整数，留空 = 不限',
     phNodes: '0.1 ~ 4096（单位 M），留空 = 不限',
-    coresHint: '本机 {p} 核 {l} 线程 · 推荐 {d} · 上限 {m}',
-    coresSmtWarn: '（超出物理核，评估会不稳，不建议）',
-    coresRec: '推荐',
-    tb: '性能测速',
-    tbBtn: '一键测速',
-    tbHint: '实测本机几档线程：只在更深且吞吐明显更高时才换，否则保持原设置',
-    tbBusy: '测速中…',
-    tbRunning: '正在比较 {n} 档线程（约 15 秒，请勿关闭设置窗）',
-    tbDone: '已采用 {t} 线程',
-    tbKeep: '维持 {t} 线程',
-    tbD: '层',
-    tbProg: '测速中 {done}/{total}（每档约 2 秒）',
-    tbFail: '测速失败，请稍后再试',
+    coresHint: '本机 {n} 线程 · 上限 {m}',
     coach: '指导视图', coachHint: '方形四色热力：AI 帮你算最佳落点，落子即消失',
     heatBest: '最佳', heatGood: '良好', heatFair: '一般', heatPoor: '劣势',
 
@@ -597,19 +585,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     phNone: 'No limit',
     phDepth: 'Integer 4 ~ 128, empty = no limit',
     phNodes: '0.1 ~ 4096 (in M), empty = no limit',
-    coresHint: '{p} cores / {l} threads · rec {d} · max {m}',
-    coresSmtWarn: ' (above physical cores: evaluation gets unstable, not recommended)',
-    coresRec: 'rec.',
-    tb: 'Thread benchmark',
-    tbBtn: 'Auto-tune',
-    tbHint: 'Measure a few thread settings; only switch when it is deeper and clearly faster, otherwise keep',
-    tbBusy: 'Testing…',
-    tbRunning: 'Comparing {n} thread settings (~15 s, keep this window open)',
-    tbDone: 'Applied {t} threads',
-    tbKeep: 'Keeping {t} threads',
-    tbD: 'd',
-    tbProg: 'Testing {done}/{total} (~2 s each)',
-    tbFail: 'Benchmark failed, try again later',
+    coresHint: '{n} threads on this PC · max {m}',
     coach: 'Coach view', coachHint: 'Square 4-colour heat: AI computes your best spots; clears on move',
     heatBest: 'Best', heatGood: 'Good', heatFair: 'Fair', heatPoor: 'Poor',
 
@@ -1281,7 +1257,7 @@ function grab() {
    't_setup','seg_mode','seg_side','t_mode','t_side','t_turn','sideHint',
    'egBar','btn_eg_ok','btn_eg_seq','btn_eg_free','egKeys','btn_eg_b','btn_eg_w',
    'num_turn','t_rule','sel_rule','ruleHint',
-   'sysInfo','t_tb','btn_tb','tbHint','t_cores','sel_cores','coresHint','t_hash','sel_hash','t_variant','sel_variant','variantHint','t_weights','sel_weights','weightsHint','t_candRange','sel_candRange','candRangeHint','t_multiPv','sel_multiPv','multiPvHint',
+   'sysInfo','t_cores','sel_cores','coresHint','t_hash','sel_hash','t_variant','sel_variant','variantHint','t_weights','sel_weights','weightsHint','t_candRange','sel_candRange','candRangeHint','t_multiPv','sel_multiPv','multiPvHint',
    't_maxDepth','sel_maxDepth','inp_maxDepth','t_maxNodes','sel_maxNodes','inp_maxNodes',
 
    't_secGame','t_secEngine','t_secView','t_secCode',
@@ -7871,12 +7847,6 @@ window.GB_onHost = function (m) {
     G.host = G.host || {};
     G.host.threadsMax = m.threadsMax | 0;
     G.host.threadsDefault = m.threadsDefault | 0;
-
-    G.host.threadsCap = m.threadsCap | 0;
-    G.host.pCores = m.pCores | 0;
-    G.host.eCores = m.eCores | 0;
-    G.host.hybrid = !!m.hybrid;
-    G.host.vendor = m.vendor || '';
     G.host.cpu = m.cpu | 0;
     G.host.physCores = m.physCores | 0;
     G.host.userThreads = m.userThreads | 0;
@@ -9311,9 +9281,6 @@ function buildCardMenu() {
 }
 
 function wireSetPane() {
-  
-  var tbk = document.getElementById('btn_tb');
-  if (tbk) tbk.onclick = tbStart;
   var lk = document.getElementById('sp_lang');
   if (lk) lk.onclick = function () { toggleLangNow(); };
   var ck = document.getElementById('sp_color');
@@ -9636,21 +9603,8 @@ function bootSet() {
         if (m.type === 'mainSync') {    // the main window changed something: follow it
           try { setPatchApply(m.patch || null, true); } catch (eS2) {} return;
         }
-        if (m.type === 'threadBenchStart') {
-          tbSetBusy(true);
-          tbSay(T('tbRunning').replace('{n}', String(m.cands | 0 || 4)));
-          return;
-        }
-        if (m.type === 'threadBenchProgress') {
-          tbSetBusy(true);
-          tbSay(T('tbProg').replace('{done}', String(m.done | 0)).replace('{total}', String(m.total | 0)));
-          return;
-        }
-        if (m.type === 'threadBenchResult') { try { tbResult(m); } catch (eTB) {} return; }
         if (m.type === 'host') {          // engine handshake: fills the threads/hash option lists
           G.host = { cpu: m.cpu || 4, threadsDefault: m.threadsDefault || 2, threadsMax: m.threadsMax || 3,
-                     threadsCap: m.threadsCap | 0,
-                     pCores: m.pCores | 0, eCores: m.eCores | 0, hybrid: !!m.hybrid, vendor: m.vendor || '',
                      memMB: m.memMB || 0, native: !!m.native,
                      userThreads: m.userThreads | 0, userHashMB: m.userHashMB | 0,
                      physCores: m.physCores || 0, memAvailMB: m.memAvailMB || 0,
@@ -12348,60 +12302,6 @@ function kbStr(kb) {
   return kb >= 1024 ? (kb / 1024).toFixed(0) + 'MB' : kb + 'KB';
 }
 
-function tbSay(txt) { if (els.tbHint) els.tbHint.textContent = txt; }
-function tbSayHtml(html) { if (els.tbHint) els.tbHint.innerHTML = html; }   // only our own markup
-function tbSetBusy(on) {
-  var b = els.btn_tb;
-  if (!b) return;
-  b.disabled = !!on;
-  b.textContent = T(on ? 'tbBusy' : 'tbBtn');
-}
-function tbStart() {
-  if (!HOST || tbStart.busy) return;
-  tbStart.busy = true;
-  tbSetBusy(true);
-  var n = (G.host && G.host.threadsCap) || 0;
-  tbSay(T('tbRunning').replace('{n}', String(n || 4)));
-  tellHost({ type: 'threadBench' });
-}
-function tbNum(n) {
-  n = +n || 0;
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-  if (n >= 1e3) return Math.round(n / 1e3) + 'k';
-  return String(n);
-}
-function tbResult(m) {
-  tbStart.busy = false;
-  tbSetBusy(false);
-  if (!m || !m.ok) { tbSay(T('tbFail')); return; }
-  var before = S.cores;
-  var arr = m.rows || [];
-  var bestRow = null, curRow = null;
-  arr.forEach(function (r) {
-    if (r.t === m.best) bestRow = r;
-    if (r.t === S.cores) curRow = r;
-  });
-
-  var applied = m.best;
-  if (curRow && bestRow && curRow.n * 100 >= bestRow.n * 92) applied = curRow.t;
-  var rows = arr.map(function (r) {
-    var txt = r.t + ':' + (r.d | 0) + T('tbD') + '/' + tbNum(r.n);
-    
-    return (r.t === applied) ? '<b class="tb-best">★' + txt + '</b>' : txt;
-  });
-  if (applied >= MIN_THREADS && applied !== S.cores) {
-    S.cores = applied;
-    try { enginePrefSet(S.cores, S.hashMB); } catch (e1) {}
-
-    if (G.host) G.host.userThreads = applied;
-    try { save(); } catch (e2) {}
-    try { applyEngineConfig(); } catch (e3) {}
-    try { buildSelects(); } catch (e4) {}
-  }
-  tbSayHtml((applied === before ? T('tbKeep') : T('tbDone')).replace('{t}', String(applied)) +
-            ' · ' + rows.join(' · '));
-}
-
 function sysInfoCards() {
   var s = G.sysInfo;
   if (!s) return null;
@@ -12409,9 +12309,6 @@ function sysInfoCards() {
   var isa = s.isa || {};
 
   var cpuSub = T('abSysCores').replace('{p}', s.physCores | 0).replace('{l}', s.logiCores | 0);
-  
-  if ((s.pCores | 0) > 0 && (s.eCores | 0) > 0)
-    cpuSub += ' · ' + (s.pCores | 0) + 'P+' + (s.eCores | 0) + 'E';
   if (s.mhz) cpuSub += ' · ' + (s.mhz / 1000).toFixed(2) + 'GHz';
   if (ca.l1 || ca.l2 || ca.l3) {
     cpuSub += ' · ' + T('abSysCache')
@@ -12508,50 +12405,32 @@ function buildSelects() {
   if (host.userThreads >= MIN_THREADS || host.userHashMB >= 1) enginePrefSet(S.cores, S.hashMB);
   if (!(host.threadsMax >= 1)) return;
   renderSysInfo();
-
-  
-
-  var recT = Math.max(1, host.threadsDefault || host.threadsMax || 1);
-  var capT = Math.max(1, host.threadsCap || 0);
-  var maxT = Math.max(recT, capT || recT);
+  var maxT = Math.max(1, host.threadsMax || 1);
   //     t=10 2879K nps / d22  ·  t=12 3567K / d29  ·  t=14~16 4.0M+ / d30
   
   var physC = Math.max(0, host.physCores | 0);
   var lowCores = (physC > 1) ? (S.cores < physC) : (S.cores >= 10 && S.cores <= 12);
-  if (lowCores && recT > S.cores && !migFlag('threadsTopo4')) {
+  if (lowCores && maxT > S.cores && !migFlag('threadsTopo4')) {
     var _oldCores = S.cores;
-    S.cores = recT;                       
+    S.cores = maxT;
     try { enginePrefSet(S.cores, S.hashMB); } catch (eTT0) {}
     try { save(); } catch (eTT) {}
-    try { console.log('[threads] topo migrate ' + _oldCores + ' -> ' + recT); } catch (eTT2) {}
+    try { console.log('[threads] topo migrate ' + _oldCores + ' -> ' + maxT); } catch (eTT2) {}
   }
 
-  var factoryT = (host.threadsDefault >= 1 && host.threadsDefault <= maxT) ? host.threadsDefault : recT;
+  var factoryT = (host.threadsDefault >= 1 && host.threadsDefault <= maxT) ? host.threadsDefault : maxT;
   if (factoryT < MIN_THREADS) factoryT = Math.min(maxT, MIN_THREADS);
   if (!(S.cores >= MIN_THREADS)) { S.cores = factoryT; enginePrefSet(S.cores, S.hashMB); save(); }
   var effT = Math.max(Math.min(MIN_THREADS, maxT), Math.min(S.cores, maxT));
   var html = '';
   for (var t = Math.min(MIN_THREADS, maxT); t <= maxT; t++) {
-    var lab = String(t) + ((t === recT && maxT > recT) ? ' · ' + T('coresRec') : '');
-    html += '<option value="' + t + '"' + (t === effT ? ' selected' : '') + '>' + lab + '</option>';
+    html += '<option value="' + t + '"' + (t === effT ? ' selected' : '') + '>' + t + '</option>';
   }
   els.sel_cores.innerHTML = html;
 
-  if (els.coresHint) {
-    var zh = (S.lang === 'zh');
-    var hy = (host.eCores > 0) ? (String(host.pCores | 0) + 'P+' + String(host.eCores | 0) + 'E') : '';
-    var hn = T('coresHint')
-      .replace('{p}', String(physC))
-      .replace('{l}', String(host.cpu || 0))
-      .replace('{d}', String(recT))
-      .replace('{m}', String(maxT));
-    if (hy) hn += zh ? ('（' + hy + '）') : (' (' + hy + ')');
-
-    
-    
-    if (physC >= 2 && effT > physC) hn += T('coresSmtWarn');
-    els.coresHint.textContent = hn;
-  }
+  if (els.coresHint)
+    els.coresHint.textContent = T('coresHint')
+      .replace('{n}', String(host.cpu || 0)).replace('{m}', String(maxT));
 
   var memMB = host.memMB | 0;
   var maxH = 4096;
@@ -12998,7 +12877,6 @@ function boot() {
     enginePrefSet(S.cores, S.hashMB);   // explicit user change -> write the engine key
     save(); applyEngineConfig();
   };
-  if (els.btn_tb) els.btn_tb.onclick = tbStart;   
   els.sel_hash.onchange = function () {
     S.hashMB = +els.sel_hash.value;
     enginePrefSet(S.cores, S.hashMB);   // explicit user change -> write the engine key
@@ -13140,7 +13018,6 @@ function boot() {
     // the settings window pushed a patch through the host relay
     if (m.type === 'setSync') { try { setPatchApply(m.patch || null); } catch (eSS) {} return; }
     
-    if (m.type === 'threadBenchResult') { try { tbResult(m); } catch (eTB) {} return; }
     if (m.type === 'engineOut' || m.type === 'engineAck' || m.type === 'engineAsk') {
       try { LocalAI.relay(m); } catch (e) {}
       return;
@@ -13148,8 +13025,6 @@ function boot() {
     if (m.type === 'host') {
       G.host = {
         cpu: m.cpu || 4, threadsDefault: m.threadsDefault || 2, threadsMax: m.threadsMax || 3,
-        threadsCap: m.threadsCap | 0,
-        pCores: m.pCores | 0, eCores: m.eCores | 0, hybrid: !!m.hybrid, vendor: m.vendor || '',
         memMB: m.memMB || 0, native: !!m.native,
         // Host-persisted user engine prefs (0 = never set); buildSelects treats them as truth.
         userThreads: m.userThreads | 0, userHashMB: m.userHashMB | 0,

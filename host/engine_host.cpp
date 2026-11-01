@@ -409,26 +409,14 @@ static bool SmokeVariantOk(const std::wstring& dir, const std::string& name) {
   return sawMove && (code == 0 || code == STILL_ACTIVE);
 }
 
-struct BenchRoundRes {
-  bool      ok = false;
-  long long nodes = -1;
-  int       depth = 0;
-  int       seldepth = 0;
-  long long speed = 0;
-  int       ms = 0;
-};
-
-static BenchRoundRes BenchOneRoundEx(const std::wstring& dir, const std::string& name,
-                                     int threads, int turnMs, bool warm = false) {
-  BenchRoundRes res;
-  if (turnMs < 100) turnMs = 100;
+static long long BenchOneRound(const std::wstring& dir, const std::string& name, int threads) {
   std::wstring exe = Join(dir, std::wstring(L"RapfiEngine-") + Utf8ToWide(name) + L".exe");
   SECURITY_ATTRIBUTES sa = {};
   sa.nLength = sizeof(sa);
   sa.bInheritHandle = TRUE;
   HANDLE inR = nullptr, inW = nullptr, outR = nullptr, outW = nullptr;
-  if (!CreatePipe(&inR, &inW, &sa, 0)) return res;
-  if (!CreatePipe(&outR, &outW, &sa, 0)) { CloseHandle(inR); CloseHandle(inW); return res; }
+  if (!CreatePipe(&inR, &inW, &sa, 0)) return -1;
+  if (!CreatePipe(&outR, &outW, &sa, 0)) { CloseHandle(inR); CloseHandle(inW); return -1; }
   SetHandleInformation(inW, HANDLE_FLAG_INHERIT, 0);
   SetHandleInformation(outR, HANDLE_FLAG_INHERIT, 0);
   STARTUPINFOW si = {};
@@ -442,7 +430,7 @@ static BenchRoundRes BenchOneRoundEx(const std::wstring& dir, const std::string&
   if (!CreateProcessW(nullptr, cbuf.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
                       nullptr, dir.c_str(), &si, &pi)) {
     CloseHandle(inR); CloseHandle(inW); CloseHandle(outR); CloseHandle(outW);
-    return res;
+    return -1;
   }
   CloseHandle(pi.hThread);
   HANDLE job = host::Job();
@@ -453,7 +441,7 @@ static BenchRoundRes BenchOneRoundEx(const std::wstring& dir, const std::string&
   std::string script =
       "START 15\nINFO RULE 0\nINFO SHOW_DETAIL 2\nINFO THREAD_NUM " + std::to_string(threads) +
       "\nINFO HASH_SIZE 65536\nINFO PONDERING 0\nINFO TIMEOUT_MATCH 6000000\nINFO TIME_LEFT 6000000\n"
-      "INFO TIMEOUT_TURN " + std::to_string(turnMs) + "\n"
+      "INFO TIMEOUT_TURN 1000\n"
       "YXBOARD 7,7,1 7,8,2 8,8,1 6,7,2 8,7,1 6,8,2 9,9,1 DONE\nYXNBEST 1\n";
   DWORD written = 0;
   WriteFile(inW, script.data(), (DWORD)script.size(), &written, nullptr);
@@ -464,8 +452,7 @@ static BenchRoundRes BenchOneRoundEx(const std::wstring& dir, const std::string&
   std::string pending;
   char rb[4096];
   const DWORD t0 = NowMs();
-  const DWORD limit = warm ? 6000 : (DWORD)turnMs + 8000;
-  while (NowMs() - t0 < limit) {
+  while (NowMs() - t0 < 6000) {
     DWORD avail = 0;
     if (PeekNamedPipe(outR, nullptr, 0, nullptr, &avail, nullptr) && avail > 0) {
       DWORD n = 0;
@@ -477,19 +464,9 @@ static BenchRoundRes BenchOneRoundEx(const std::wstring& dir, const std::string&
           std::string line = pending.substr(0, pos);
           pending.erase(0, pos + 1);
           if (!line.empty() && line.back() == '\r') line.pop_back();
-          auto num = [&](size_t off) { return _atoi64(line.c_str() + off); };
           if (line.compare(0, 16, "INFO TOTALNODES ") == 0) {
-            long long v = num(16);
+            long long v = _atoi64(line.c_str() + 16);
             if (v > nodes) nodes = v;
-          } else if (line.compare(0, 11, "INFO DEPTH ") == 0) {
-            int v = (int)num(11);
-            if (v > res.depth) res.depth = v;
-          } else if (line.compare(0, 14, "INFO SELDEPTH ") == 0) {
-            int v = (int)num(14);
-            if (v > res.seldepth) res.seldepth = v;
-          } else if (line.compare(0, 11, "INFO SPEED ") == 0) {
-            long long v = num(11);
-            if (v > res.speed) res.speed = v;
           } else if (IsBareMove(line)) {
             sawMove = true;
           }
@@ -501,20 +478,12 @@ static BenchRoundRes BenchOneRoundEx(const std::wstring& dir, const std::string&
     if (GetExitCodeProcess(pi.hProcess, &code2) && code2 != STILL_ACTIVE) break;
     Sleep(30);
   }
-  res.ms = (int)(NowMs() - t0);
   DWORD code = 0;
   GetExitCodeProcess(pi.hProcess, &code);
   if (code == STILL_ACTIVE) TerminateProcess(pi.hProcess, 0);
   CloseHandle(pi.hProcess);
   CloseHandle(outR);
-  res.nodes = nodes;
-  res.ok = sawMove && nodes > 0;
-  return res;
-}
-
-static long long BenchOneRound(const std::wstring& dir, const std::string& name, int threads) {
-  BenchRoundRes r = BenchOneRoundEx(dir, name, threads, 1000);
-  return r.ok ? r.nodes : -1;
+  return sawMove ? nodes : -1;
 }
 
 static std::atomic<bool> g_benchRun{false};
@@ -604,134 +573,6 @@ static void BenchThreadMain() {
   }
   ELOG("auto-bench: 热切换 → " + best + "（下次 ask 生效）");
   host::OnVariantChanged();
-}
-
-static std::atomic<bool> g_tbRun{false};
-
-static void ThreadBenchMain() {
-  int rec = host::ThreadsMaxHost();
-  int cap = host::ThreadsCapHost();
-  if (rec < 2) rec = 2;
-  if (cap < rec) cap = rec;
-  std::vector<int> cands;
-  auto addCand = [&](int t) {
-    if (t < 2 || t > cap) return;
-    for (int x : cands) if (x == t) return;
-    cands.push_back(t);
-  };
-
-  
-  
-  addCand(rec);
-  addCand((rec + cap) / 2);
-  addCand(cap);
-  
-  addCand(EffectiveThreads());
-
-  std::string variant = g_variant;
-  if (variant.empty()) variant = "sse";
-  if (cands.size() < 2 || !g_avail) {
-    g_tbRun = false;
-    host::PostSet("{\"type\":\"threadBenchResult\",\"ok\":false,\"why\":\"no-candidates\"}");
-    return;
-  }
-
-  
-  const int TURN = 2000;
-  host::PostSet("{\"type\":\"threadBenchStart\",\"cands\":" + std::to_string(cands.size()) +
-                ",\"turn\":" + std::to_string(TURN) + "}");
-  
-  BenchOneRoundEx(g_dir, variant, rec, TURN, true);
-
-  struct Row { int t; BenchRoundRes r[2]; };
-  std::vector<Row> rows;
-  for (int t : cands) { Row w; w.t = t; rows.push_back(w); }
-  const int totalRuns = (int)cands.size() * 2;
-  int doneRuns = 0;
-  for (int rnd = 0; rnd < 2 && g_tbRun; ++rnd)
-    for (auto& row : rows) {
-      if (!g_tbRun) break;
-      row.r[rnd] = BenchOneRoundEx(g_dir, variant, row.t, TURN);
-      ++doneRuns;
-      
-      host::PostSet("{\"type\":\"threadBenchProgress\",\"done\":" + std::to_string(doneRuns) +
-                    ",\"total\":" + std::to_string(totalRuns) + ",\"t\":" +
-                    std::to_string(row.t) + "}");
-    }
-
-  std::string rowsJson;
-  int bestD = -1;
-  std::vector<std::pair<int, int>> depths;   // (threads, depth)
-  std::vector<std::pair<int, long long>> nodesOf;
-  for (auto& row : rows) {
-    int d = 0, cnt = 0;
-    long long n = 0, sp = 0;
-    for (auto& x : row.r) {
-      if (!x.ok) continue;
-
-      
-      
-      if (cnt == 0 || x.depth < d) d = x.depth;
-      ++cnt;
-      if (x.nodes > n) n = x.nodes;
-      if (x.speed > sp) sp = x.speed;
-    }
-    if (!cnt) continue;
-    if (!rowsJson.empty()) rowsJson += ",";
-    rowsJson += "{\"t\":" + std::to_string(row.t) + ",\"d\":" + std::to_string(d) +
-                ",\"n\":" + std::to_string(n) + ",\"s\":" + std::to_string(sp) + "}";
-    depths.push_back({row.t, d});
-    nodesOf.push_back({row.t, n});
-    if (d > bestD) bestD = d;
-  }
-
-  
-
-  
-  int base = EffectiveThreads();
-  if (base < rec) base = rec;
-  if (base > cap) base = cap;
-  int baseD = -1;
-  long long baseN = 0;
-  for (size_t i = 0; i < depths.size(); ++i)
-    if (depths[i].first == base) { baseD = depths[i].second; baseN = nodesOf[i].second; }
-  if (baseD < 0) { baseD = bestD; baseN = 0; }   
-  int bestT = base;
-  long long bestN = baseN;
-  for (size_t i = 0; i < depths.size(); ++i) {
-    if (depths[i].second < baseD) continue;      
-    long long n = nodesOf[i].second;
-    if (n > bestN) { bestN = n; bestT = depths[i].first; }
-  }
-  if (bestN * 100 < baseN * 105) bestT = base;   
-
-  
-  
-  int phys = host::PhysCores();
-  if (bestT > phys && phys >= 2) {
-    bool deeper = false;
-    for (size_t i = 0; i < depths.size(); ++i)
-      if (depths[i].first == bestT && depths[i].second > baseD) deeper = true;
-    if (!deeper || bestN * 100 < baseN * 125) bestT = base;
-  }
-  if (bestT == 0) bestT = (base >= 2) ? base : (depths.empty() ? 0 : depths.front().first);
-  if (bestT < rec && rec >= 2) bestT = rec;      
-  g_tbRun = false;
-  if (rowsJson.empty()) {
-    host::PostSet("{\"type\":\"threadBenchResult\",\"ok\":false,\"why\":\"all-failed\"}");
-    return;
-  }
-  ELOG("thread-bench: " + rowsJson + " -> T" + std::to_string(bestT));
-  std::string out = "{\"type\":\"threadBenchResult\",\"ok\":true,\"best\":" + std::to_string(bestT) +
-                    ",\"rec\":" + std::to_string(rec) + ",\"cap\":" + std::to_string(cap) +
-                    ",\"turn\":" + std::to_string(TURN) + ",\"rows\":[" + rowsJson + "]}";
-  host::PostSet(out);
-  host::PostPage(out);   
-}
-
-void StartThreadBench() {
-  if (g_tbRun.exchange(true)) return;      
-  std::thread([] { ThreadBenchMain(); }).detach();
 }
 
 static std::string ReadBenchCache() {
@@ -868,10 +709,6 @@ static bool Probe() {
 static int MaxThreads() {
   int phys = host::PhysCores();
   int mx = phys > 2 ? phys - 1 : (phys > 1 ? 2 : 1);
-
-  
-  int cap = host::ThreadsCapHost();
-  if (cap > mx) mx = cap;
   int hostMax = host::ThreadsMaxHost();
   if (hostMax > mx) mx = hostMax;   
   return mx < 1 ? 1 : mx;
@@ -2301,7 +2138,6 @@ Caps GetCaps() {
   o.push_back(std::max(1, phys / 2));
   o.push_back(std::max(1, phys - 1));
   if (host::ThreadsMaxHost() >= 2) o.push_back(host::ThreadsMaxHost());
-  if (host::ThreadsCapHost() >= 2) o.push_back(host::ThreadsCapHost());
   std::sort(o.begin(), o.end());
   o.erase(std::unique(o.begin(), o.end()), o.end());
   c.threadOptions = o;

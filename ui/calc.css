@@ -592,18 +592,6 @@ body.dragging .card-h{cursor:grabbing}
 .num{font-variant-numeric:tabular-nums; font-size:.88rem; color:var(--sub); min-width:4.6rem}
 .hint{color:var(--sub); font-size:.8rem}
 .hint.bg-off{color:#c9822f}
-.tb-sec{
-  border:1px dashed rgba(58,160,232,.62); border-radius:10px;
-  margin:.34rem 0 .16rem; overflow:hidden; background:rgba(58,160,232,.028);
-}
-[data-theme="dark"] .tb-sec{
-  border-color:rgba(88,166,224,.58); background:rgba(88,166,224,.055);
-}
-.tb-sec .sec-h{background:rgba(0,0,0,.07); border-radius:9px 9px 0 0}
-.sp-setup .tb-sec .sec-h{border-radius:9px 9px 0 0}
-.tb-sec .row{margin:.4rem .55rem .46rem}
-.tb-sec .tb-msg{flex:1 1 8rem; min-width:0; line-height:1.45}
-.tb-sec .tb-best{color:var(--lbl-accent,#2f9ae0); font-weight:600}
 
 select{
   font:inherit; font-size:.92rem; padding:.3rem .45rem; border-radius:7px;
