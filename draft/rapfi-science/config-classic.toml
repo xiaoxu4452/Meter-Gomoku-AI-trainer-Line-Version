@@ -1,0 +1,89 @@
+# Meter Gomoku - same as config.toml but with [model.evaluator] commented out,
+# so the engine runs on classical evaluation only (Weights: classical).
+# [SCI] Same scientific fixes as config.toml: official 260809 knots, upstream-safe hash default.
+
+[requirement]
+min_version = [0,43,3]
+
+[general]
+reload_config_each_move = false
+clear_hash_after_config_loaded = false
+default_thread_num = 1
+message_mode = "normal"
+coord_conversion_mode = "X_flipY"
+default_candidate_range = "square3_line4"
+memory_reserved_mb = 0
+default_tt_size_kb = 32768
+
+[model]
+binary_file = "model260809.bin"
+# [SCI] Official winrate calibration knots for model260809 (from rapfi-networks config-example).
+value_readout_knots = [0.0, 0.6655556577647762, 1.3147595695713945, 2.6539860186512536, 4.91760799866031, 7.3644430081849706]
+value_readout_knots_standard = [0.0, 0.5376945460648732, 1.2355266357499173, 2.82156114592412, 5.68564079623083, 7.323674507742356]
+value_readout_knots_renju_black = [0.0, 0.5396545700569862, 1.1969488359289335, 2.773769303482245, 5.6805632983918555, 8.580906646954922]
+value_readout_knots_renju_white = [0.0, 0.5407858527740186, 1.1381487167274864, 2.721783913646255, 5.6300009341782165, 8.7169953036721]
+
+# [model.evaluator]
+# type = "mix9svq"
+# draw_black_winrate = 0.5
+# draw_ratio = 1.0
+#
+# [[model.evaluator.weights]]
+# weight_file = "mix9svqfreestyle_bsmix.bin.lz4"
+#
+# [[model.evaluator.weights]]
+# weight_file = "mix9svqstandard_bs15.bin.lz4"
+#
+# [[model.evaluator.weights]]
+# weight_file_black = "mix9svqrenju_bs15_black.bin.lz4"
+# weight_file_white = "mix9svqrenju_bs15_white.bin.lz4"
+#
+[search]
+aspiration_window = true
+num_iteration_after_mate = 24
+num_iteration_after_singular_root = 24
+max_search_depth = 99
+
+[search.timectl]
+match_space = 21.0
+match_space_min = 7.0
+average_branch_factor = 1.7
+advanced_stop_ratio = 0.94
+move_horizon = 64
+
+[database]
+enable_by_default = false
+type = "yixindb"
+url = "rapfi.db"
+
+[database.yixindb]
+compressed_save = true
+save_on_close = true
+num_backups_on_save = 2
+ignore_corrupted = true
+
+[database.search]
+readonly_mode = true
+query_ply = 3
+pv_iter_per_ply_increment = 1
+nonpv_iter_per_ply_increment = 2
+pv_write_ply = 0
+pv_write_min_depth = 25
+write_value_range = 800
+mate_write_ply = 0
+mate_write_min_depth_exact = 24
+mate_write_min_depth_nonexact = 24
+mate_write_min_step = 0
+exact_overwrite_ply = 100
+nonexact_overwrite_ply = 0
+overwrite_rule = "better_value_depth_bound"
+overwrite_exact_bias = 4
+overwrite_depth_bound_bias = -1
+query_result_depth_bound_bias = 0
+
+[database.libfile]
+black_win_mark = "a"
+white_win_mark = "c"
+black_lose_mark = "c"
+white_lose_mark = "a"
+ignore_comment = false
