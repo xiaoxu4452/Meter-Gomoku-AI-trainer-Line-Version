@@ -13,7 +13,7 @@ and this repo's `host/engine_host.cpp`.
 | 2 | Fixed 512 MB hash table | `DefaultHashKB()=512*1024`, `default_tt_size_kb=524288`; upstream default is 32 MB | Large resident memory on weak PCs -> swapping, lag, fan spin |
 | 3 | Default search threads = all physical cores | `DefaultThreads()=ThreadsMaxHost()` = `PhysCoreCount()` (host.cpp:2222-2226) | Engine saturates CPU during every move -> fan storm on 4-8 core machines |
 | 4 | Startup AutoBench runs every variant 3 rounds, full threads, 6 s cap | `engine_host.cpp:382-456` (BenchOneRound 1 s/turn), auto-bench loop | Each app start pegs all cores for ~15-30 s -> fan storm + lag at launch |
-| 5 | `advanced_stop_ratio 0.94` vs official `0.9` | config compare | 0.94 searches more per turn (better accuracy, more CPU). Kept: accuracy is the goal; documented. |
+| 5 | `advanced_stop_ratio` | repo now uses upstream 0.9 (2026-11-01) | Correct per upstream; this draft keeps 0.9. |
 | 6 | Fixed `TIMEOUT_TURN 300` ms | `engine_host.cpp:338` | Shallow depth on complex midgames. Kept for UI responsiveness; depth improves once threads default drops. |
 | 7 | classical210901/220723 configs kept | Upstream README: older-named models = v8 format, zero policy residuals | Fine for classical-only mode (weaker by design). Documented, not a bug. |
 
@@ -36,7 +36,7 @@ and this repo's `host/engine_host.cpp`.
 ## 3. What was NOT changed (deliberately)
 
 - `TIMEOUT_TURN 300` ms (responsiveness) - depth improves via threading default fix.
-- `advanced_stop_ratio 0.94` (accuracy-first policy, upstream is 0.9).
+- `advanced_stop_ratio 0.9` (upstream value, already adopted by the repo).
 - Runtime engine binaries / weights / models - this draft is source + config only.
 - Existing behavior guarded by user prefs (`SetUserPrefs` still wins over defaults).
 

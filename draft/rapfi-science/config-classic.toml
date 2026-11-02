@@ -48,7 +48,7 @@ max_search_depth = 99
 match_space = 21.0
 match_space_min = 7.0
 average_branch_factor = 1.7
-advanced_stop_ratio = 0.94
+advanced_stop_ratio = 0.9
 move_horizon = 64
 
 [database]

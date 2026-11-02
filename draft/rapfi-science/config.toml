@@ -2,7 +2,7 @@
 # [SCI] Scientific review vs upstream dotb1ue/rapfi-networks official config:
 #   - added value_readout_knots (official 260809 calibration nodes) for accurate winrate mapping
 #   - host overrides thread/hash at runtime (INFO THREAD_NUM / HASH_SIZE), so defaults here are safe fallbacks
-#   - advanced_stop_ratio 0.94 kept (accuracy-first; upstream example uses 0.9)
+#   - advanced_stop_ratio 0.9 (upstream value, matches the repo as of 2026-11-01)
 
 [requirement]
 min_version = [0,43,3]
@@ -50,7 +50,7 @@ max_search_depth = 99
 match_space = 21.0
 match_space_min = 7.0
 average_branch_factor = 1.7
-advanced_stop_ratio = 0.94
+advanced_stop_ratio = 0.9
 move_horizon = 64
 
 [database]
