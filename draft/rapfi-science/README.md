@@ -82,3 +82,36 @@ Conclusions
 Release export (2026-11-01): draft `config.toml` / `config-classic.toml` copied to
 `Meter Gomoku\rapfi-native\` (originals kept as `config.toml.bak` /
 `config-classic.toml.bak`).
+
+## C++ driver review (engine_host.cpp, 2026-11-01)
+
+Audit of the host's engine driver (`desktop-connect/src/engine_host.cpp`, the real
+build source; the repo `host/engine_host.cpp` is now synced to it as of this commit). Scope: anything
+that affects search quality or burns CPU on a thin laptop.
+
+Reviewed clean (no junk, no change needed):
+- Spawn path: NORMAL priority, affinity pins host away, ABOUT readiness probe.
+- Reader/parse: INFO-only, round-commit on `INFO PV 0`, candidate dedupe at output.
+- ask orchestration: incremental `TURN` channel with watchdog, 200 ms STOP drain,
+  clearHash at evaluate/play boundaries, 4.46 time semantics (raw TIMEOUT_TURN +
+  fixed 6000000 MATCH/LEFT, no host-side time coefficients).
+- tick: 333 ms heartbeat only. Outbox timer fires once then kills itself.
+- host.cpp worker threads are one-shot / low-frequency; no busy-wait found.
+- auto variant bench is opt-in (`GB_VARIANT_BENCH=1`), already off by default.
+
+Fixed in the build source (9 replacements, `[SCI]` markers):
+
+| # | File:line | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| 1 | engine_host.cpp:957 | `INFO SHOW_DETAIL 3` | `2` | Comment already said "降到 2" but code still sent 3: REALTIME mode emits `MESSAGE REALTIME REFRESH/BEST` every iteration + `REALTIME POS/DONE/LOST/BEST` at the end - pure pipe noise the host never parses. 2 = INFO_DETAIL keeps every structured INFO frame. |
+| 2 | engine_host.cpp:499 | bench `SHOW_DETAIL 3` | `2` | Same noise (bench only reads TOTALNODES). |
+| 3 | engine_host.cpp:553-555 | `EffectiveThreads()` | `1` | Bench ranking is stable across thread counts; full-core bench burns CPU for nothing. |
+| 4 | engine_host.cpp:584-585 | `r < 3` (median-of-3) | `r < 1` | Deterministic engine, same position -> same result; 3 rounds triple bench cost. |
+| 5 | engine_host.cpp:501 | `TIMEOUT_TURN 1000` | `500` | Halve per-position bench budget. |
+| 6 | engine_host.cpp:512 | `t0 < 6000` | `t0 < 4000` | Cap bench wall time. |
+| 7 | engine_host.cpp:612 | log "3 轮中位数" | "1 轮" | Match actual rounds. |
+| 8 | engine_host.cpp:787-796 | fixed `512*1024` | RAM-adaptive: >=16 GB -> 512 MB, >=8 GB -> 256 MB, else 128 MB | Fixed 512 MB on an 8 GB thin laptop wastes RAM the OS/UI could use. |
+| 9 | engine_host.cpp:801 | floor `262144` | `131072` | TT floor 128 MB so the adaptive default actually applies on low-end machines. |
+
+Rebuild: `tools/build-connect-msvc.sh` -> new `Meter Gomoku\Desktop GomokuTrainer.exe`
+(2026-11-01 21:28 build predates these fixes; rebuild is the delivery step).
