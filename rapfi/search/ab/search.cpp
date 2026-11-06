@@ -44,6 +44,13 @@
 #include <optional>
 #include <random>
 #include <tuple>
+#ifdef GB_YBWC_ROOT
+    #include <atomic>
+    #include <condition_variable>
+    #include <cstdlib>
+    #include <mutex>
+    #include <vector>
+#endif
 
 using namespace Search;
 using namespace Search::AB;
@@ -225,6 +232,13 @@ void sortRootMoves(RootMoves::iterator begin,
 }
 
 void aspirationSearch(Rule rule, Board &board, SearchStack *ss, Value prevValue, Depth depth);
+
+#ifdef GB_YBWC_ROOT
+/// Runtime switch for the root-split prototype (see the definition below).
+bool ybwcRootEnabled();
+int  ybwcSplitDepth();
+int  ybwcHelperLimit();
+#endif
 template <NodeType NT = PV>
 Value search(Rule         rule,
              Board       &board,
@@ -317,6 +331,20 @@ const RootMove *ABSearcher::searchMain(SearchThread &th)
     // Init transposition table generation
     TT.incGeneration();
 
+#ifdef GB_YBWC_ROOT
+    // Decide the parallel mode for this session before workers are dispatched.
+    // The prototype only handles single-PV, unbalanced, full-strength searches;
+    // everything else keeps the default Lazy SMP path.
+    ybwcThisSearch = ybwcRootEnabled() && th.engine.size() > 1 && opts.multiPV == 1
+                     && opts.balanceMode == SearchOptions::BALANCE_NONE && !opts.pondering
+                     && !SkillMovePicker(opts.strengthLevel).enabled();
+    {
+        std::lock_guard<std::mutex> lock(ybwcWork.mutex);
+        ybwcWork.stop           = false;
+        ybwcWork.splitPhaseOver = false;
+    }
+#endif
+
     // Starts worker threads, then starts main thread
     ctx.printer.printSearchStarts(th, ctx.timectl);
     th.engine.runOnAllThreads([this](SearchThread &t) { search(t); }, true);
@@ -367,6 +395,12 @@ void ABSearcher::search(SearchThread &th)
     int            firstMateDepth = 0, firstSingularDepth = 0;
     SearchThread  *mainThread = (&th == th.engine.main() ? th.engine.main() : nullptr);
 
+#ifdef GB_YBWC_ROOT
+    // In hybrid mode workers only assist while the iteration depth is shallow;
+    // deeper iterations keep their own Lazy SMP loop like before.
+    bool splitPhaseEndSignalled = false;
+#endif
+
     // Init search depth range
     int maxDepth   = std::min(options.maxDepth, std::clamp(SearchCfg.maxSearchDepth, 2, MAX_DEPTH));
     int startDepth = std::clamp(options.startDepth, 1, maxDepth);
@@ -398,8 +432,42 @@ void ABSearcher::search(SearchThread &th)
             rm.previousPv    = rm.pv;
         }
 
+#ifdef GB_YBWC_ROOT
+        const bool splitDepth =
+            ybwcThisSearch && static_cast<int>(sd.rootDepth) <= ybwcSplitDepth();
+        if (!mainThread && splitDepth
+            && (ybwcHelperLimit() < 0 || static_cast<int>(th.id) <= ybwcHelperLimit())) {
+            // Worker in the shallow split phase: help with this depth's root
+            // moves instead of running a duplicated iteration.
+            assistRootSplitDepth(th, stackArray);
+            sd.completedDepth = sd.rootDepth;
+            continue;
+        }
+        if (mainThread && ybwcThisSearch && !splitDepth && !splitPhaseEndSignalled) {
+            // Deeper iterations fall back to Lazy SMP; release waiting workers.
+            splitPhaseEndSignalled = true;
+            notifyRootSplitPhaseOver();
+        }
+#endif
+
         // MultiPV loop. We perform a full root search for each PV line
-        for (sd.pvIdx = 0; sd.pvIdx < sd.multiPv && !th.engine.isTerminating(); ++sd.pvIdx) {
+#ifdef GB_YBWC_ROOT
+        if (mainThread && ybwcThisSearch && splitDepth) {
+            // Cooperative root split: one shared search of the whole root list
+            // replaces the sequential PVS loop.
+            cooperativeRootSearch(th, sd, Depth(sd.rootDepth));
+            th.selDepth = std::max(th.selDepth, sd.rootDepth);
+            th.rootMoves[0].selDepth = th.selDepth;
+            if (mainThread)
+                ctx.printer.printPvCompletes(*mainThread,
+                                             ctx.timectl,
+                                             sd.rootDepth,
+                                             0,
+                                             1);
+        }
+        else
+#endif
+            for (sd.pvIdx = 0; sd.pvIdx < sd.multiPv && !th.engine.isTerminating(); ++sd.pvIdx) {
             // Reset selDepth for each depth and each PV line
             th.selDepth = 0;
 
@@ -487,6 +555,12 @@ void ABSearcher::search(SearchThread &th)
             }
         }
     }
+
+#ifdef GB_YBWC_ROOT
+    // Release the helper threads that are blocked on the root-split queue.
+    if (mainThread && ybwcThisSearch)
+        stopRootSplitWorkers();
+#endif
 
     // Sync modifications in database client to database storage
     if (th.dbClient)
@@ -664,6 +738,333 @@ void aspirationSearch(Rule rule, Board &board, SearchStack *ss, Value prevValue,
         assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
     }
 }
+
+#ifdef GB_YBWC_ROOT
+/// Search exactly one root move at the given depth by temporarily shrinking the
+/// thread's root move list to that move. Used by the root-split prototype; the
+/// list is restored before returning so the caller's root set stays untouched.
+/// @param useAspiration Use the normal aspiration window around `prevValue`
+///     (first / previous PV move) instead of the explicit (alpha, beta) window.
+Value searchSingleRoot(Rule             rule,
+                       Board           &board,
+                       SearchStack     *ss,
+                       Pos              move,
+                       Value            alpha,
+                       Value            beta,
+                       Depth            depth,
+                       Value            prevValue,
+                       bool             useAspiration,
+                       std::vector<Pos> *outPv)
+{
+    SearchThread *thisThread = board.thisThread();
+    ABSearchData &searchData = *thisThread->searchDataAs<ABSearchData>();
+
+    RootMoves savedRootMoves;
+    savedRootMoves.swap(thisThread->rootMoves);
+    thisThread->rootMoves.clear();
+    thisThread->rootMoves.emplace_back(move);
+    thisThread->rootMoves[0].previousValue = prevValue;
+
+    uint32_t savedPvIdx   = searchData.pvIdx;
+    uint32_t savedMultiPv = searchData.multiPv;
+    bool     savedSingularRoot = searchData.singularRoot;
+    searchData.pvIdx           = 0;
+    searchData.multiPv         = 1;
+    searchData.singularRoot    = false;
+
+    Value value;
+    if (useAspiration) {
+        aspirationSearch(rule, board, ss, prevValue, depth);
+        value = thisThread->rootMoves[0].value;
+    }
+    else
+        value = ::search<Root>(rule, board, ss, alpha, beta, depth, false);
+
+    if (outPv)
+        *outPv = thisThread->rootMoves[0].pv;
+
+    searchData.pvIdx        = savedPvIdx;
+    searchData.multiPv      = savedMultiPv;
+    searchData.singularRoot = savedSingularRoot;
+    thisThread->rootMoves.clear();
+    thisThread->rootMoves.swap(savedRootMoves);
+    return value;
+}
+
+/// Prototype runtime switch: the root-split path is compiled in only when
+/// GB_YBWC_ROOT is defined and stays disabled unless RAPFI_YBWC=1 is exported.
+bool ybwcRootEnabled()
+{
+    static const bool enabled = []() {
+        const char *v = std::getenv("RAPFI_YBWC");
+        return v && (v[0] == '1' || v[0] == 'y' || v[0] == 'Y');
+    }();
+    return enabled;
+}
+
+/// Diagnostic switch: RAPFI_YBWC_GATE=0 releases the siblings immediately
+/// (plain root split) instead of waiting for the first/PV move (YBWC gate).
+bool ybwcGateEnabled()
+{
+    static const bool enabled = []() {
+        const char *v = std::getenv("RAPFI_YBWC_GATE");
+        return !(v && v[0] == '0');
+    }();
+    return enabled;
+}
+
+/// Hybrid split depth: cooperative root split is used only while the iteration
+/// depth is at most this value; deeper iterations fall back to Lazy SMP.
+/// RAPFI_YBWC_SPLITDEPTH unset means "always split" (pure YBWC prototype).
+int ybwcSplitDepth()
+{
+    static const int splitDepth = []() {
+        const char *v = std::getenv("RAPFI_YBWC_SPLITDEPTH");
+        return v ? std::atoi(v) : 999;
+    }();
+    return splitDepth;
+}
+
+/// Number of helper threads allowed to join the cooperative root split. The
+/// main thread always participates; helpers with a larger id keep running
+/// their own Lazy SMP iteration during the shallow phase. -1 means all helper
+/// threads may join (the default pure/hybrid behavior).
+int ybwcHelperLimit()
+{
+    static const int helperLimit = []() {
+        const char *v = std::getenv("RAPFI_YBWC_HELPERS");
+        return v ? std::atoi(v) : -1;
+    }();
+    return helperLimit;
+}
+
+}  // namespace
+
+void ABSearcher::stopRootSplitWorkers()
+{
+    {
+        std::lock_guard<std::mutex> lock(ybwcWork.mutex);
+        ybwcWork.stop = true;
+    }
+    ybwcWork.ticketCv.notify_all();
+    ybwcWork.doneCv.notify_all();
+}
+
+void ABSearcher::runRootSplitClaims(SearchThread &th,
+                                    StackArray   &stackArray,
+                                    Rule          rule,
+                                    uint32_t      ticket,
+                                    int           depth,
+                                    uint32_t      moveCount)
+{
+    while (ybwcWork.ticket.load(std::memory_order_acquire) == ticket) {
+        uint32_t idx = ybwcWork.nextMove.fetch_add(1, std::memory_order_relaxed);
+        if (idx >= moveCount)
+            break;
+
+        Value value = VALUE_NONE;
+        if (!th.engine.isTerminating()) {
+            Value alpha = Value(ybwcWork.bestValue.load(std::memory_order_relaxed));
+            if (alpha <= VALUE_NONE)
+                alpha = -VALUE_INFINITE;
+            Pos              move = ybwcWork.moves[idx];
+            std::vector<Pos> pv;
+
+            if (idx == 0) {
+                // No-gate mode: the previous PV move is claimed like any other
+                // sibling and searched with a full aspiration window.
+                value = searchSingleRoot(rule,
+                                         *th.board,
+                                         stackArray.rootStack(),
+                                         move,
+                                         -VALUE_INFINITE,
+                                         VALUE_INFINITE,
+                                         Depth(depth),
+                                         ybwcWork.prevValue,
+                                         true,
+                                         &pv);
+                alpha = -VALUE_INFINITE;
+            }
+            else {
+                // PVS at the root: null window on the shared alpha first, full
+                // re-search only when the move beats it.
+                value = searchSingleRoot(rule,
+                                         *th.board,
+                                         stackArray.rootStack(),
+                                         move,
+                                         alpha,
+                                         alpha == -VALUE_INFINITE ? VALUE_INFINITE : alpha + 1,
+                                         Depth(depth),
+                                         VALUE_NONE,
+                                         false,
+                                         &pv);
+                if (value > alpha && !th.engine.isTerminating())
+                    value = searchSingleRoot(rule,
+                                             *th.board,
+                                             stackArray.rootStack(),
+                                             move,
+                                             alpha,
+                                             VALUE_INFINITE,
+                                             Depth(depth),
+                                             VALUE_NONE,
+                                             false,
+                                             &pv);
+            }
+
+            if (value > alpha) {
+                int cur = ybwcWork.bestValue.load(std::memory_order_relaxed);
+                while (int(value) > cur
+                       && !ybwcWork.bestValue.compare_exchange_weak(cur, int(value),
+                                                                    std::memory_order_relaxed))
+                    ;
+            }
+
+            ybwcWork.values[idx] = value;
+            ybwcWork.pvs[idx]    = std::move(pv);
+        }
+
+        if (ybwcWork.remaining.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+            std::lock_guard<std::mutex> lock(ybwcWork.mutex);
+            ybwcWork.doneCv.notify_all();
+        }
+    }
+}
+
+void ABSearcher::notifyRootSplitPhaseOver()
+{
+    {
+        std::lock_guard<std::mutex> lock(ybwcWork.mutex);
+        ybwcWork.splitPhaseOver = true;
+    }
+    ybwcWork.ticketCv.notify_all();
+}
+
+void ABSearcher::assistRootSplitDepth(SearchThread &th, StackArray &stackArray)
+{
+    ABSearchData &sd = *th.searchDataAs<ABSearchData>();
+    uint32_t      localTicket = sd.ybwcTicket;
+    int           depth       = 0;
+    uint32_t      moveCount   = 0;
+
+    // Wait for the next depth dispatch (the ticket is bumped by the main
+    // thread after it published depth/moveCount/results buffers). When the
+    // shallow split phase is over there is nothing left to help with.
+    {
+        std::unique_lock<std::mutex> lock(ybwcWork.mutex);
+        ybwcWork.ticketCv.wait(lock, [&] {
+            return ybwcWork.stop || ybwcWork.splitPhaseOver
+                   || ybwcWork.ticket.load(std::memory_order_acquire) != localTicket;
+        });
+        if (ybwcWork.stop || ybwcWork.splitPhaseOver)
+            return;
+        localTicket = ybwcWork.ticket.load(std::memory_order_acquire);
+        sd.ybwcTicket = localTicket;
+        depth         = ybwcWork.depth;
+        moveCount     = ybwcWork.moveCount;
+    }
+
+    // Young brothers wait: the previous PV move is searched alone first;
+    // siblings are released only after it returns.
+    {
+        std::unique_lock<std::mutex> lock(ybwcWork.mutex);
+        ybwcWork.ticketCv.wait(lock, [&] {
+            return ybwcWork.stop || ybwcWork.splitPhaseOver
+                   || ybwcWork.siblingsOpen.load(std::memory_order_acquire)
+                   || ybwcWork.ticket.load(std::memory_order_acquire) != localTicket;
+        });
+        if (ybwcWork.stop || ybwcWork.splitPhaseOver)
+            return;
+        if (ybwcWork.ticket.load(std::memory_order_acquire) != localTicket)
+            return;
+    }
+
+    runRootSplitClaims(th, stackArray, th.options().rule, localTicket, depth, moveCount);
+}
+
+void ABSearcher::cooperativeRootSearch(SearchThread &th, ABSearchData &sd, Depth depth)
+{
+    RootMoves &rootMoves = th.rootMoves;
+    const uint32_t moveCount = static_cast<uint32_t>(rootMoves.size());
+    if (moveCount == 0)
+        return;
+
+    uint32_t ticket;
+    const bool gate = ybwcGateEnabled();
+    {
+        std::lock_guard<std::mutex> lock(ybwcWork.mutex);
+        ybwcWork.depth     = static_cast<int>(depth);
+        ybwcWork.moveCount = moveCount;
+        ybwcWork.prevValue = rootMoves[0].previousValue;
+        ybwcWork.moves.resize(moveCount);
+        ybwcWork.values.assign(moveCount, VALUE_NONE);
+        ybwcWork.pvs.assign(moveCount, {});
+        for (uint32_t i = 0; i < moveCount; i++)
+            ybwcWork.moves[i] = rootMoves[i].pv[0];
+        ybwcWork.nextMove.store(0, std::memory_order_relaxed);
+        ybwcWork.remaining.store(moveCount, std::memory_order_relaxed);
+        ybwcWork.siblingsOpen.store(!gate, std::memory_order_relaxed);
+        ybwcWork.bestValue.store(gate ? VALUE_NONE : ybwcWork.prevValue,
+                                 std::memory_order_relaxed);
+        ticket = ybwcWork.ticket.fetch_add(1, std::memory_order_release) + 1;
+    }
+    ybwcWork.ticketCv.notify_all();
+
+    StackArray stackArray(MAX_PLY, Evaluation::evaluate(*th.board, th.options().rule));
+    if (gate) {
+        // Phase 1: the previous PV move is searched alone (young brother gate).
+        std::vector<Pos> pv;
+        Value value = searchSingleRoot(th.options().rule,
+                                       *th.board,
+                                       stackArray.rootStack(),
+                                       rootMoves[0].pv[0],
+                                       -VALUE_INFINITE,
+                                       VALUE_INFINITE,
+                                       depth,
+                                       rootMoves[0].previousValue,
+                                       true,
+                                       &pv);
+        ybwcWork.values[0] = value;
+        ybwcWork.pvs[0]    = std::move(pv);
+        ybwcWork.bestValue.store(value, std::memory_order_relaxed);
+        ybwcWork.remaining.fetch_sub(1, std::memory_order_acq_rel);
+    }
+
+    if (!th.engine.isTerminating() && moveCount > (gate ? 1u : 0u)) {
+        if (gate) {
+            ybwcWork.nextMove.store(1, std::memory_order_relaxed);
+            ybwcWork.siblingsOpen.store(true, std::memory_order_release);
+            ybwcWork.ticketCv.notify_all();
+        }
+
+        // The main thread joins the siblings instead of idling.
+        runRootSplitClaims(th, stackArray, th.options().rule, ticket, static_cast<int>(depth),
+                           moveCount);
+
+        std::unique_lock<std::mutex> lock(ybwcWork.mutex);
+        ybwcWork.doneCv.wait(lock, [&] {
+            return ybwcWork.remaining.load(std::memory_order_acquire) == 0
+                   || th.engine.isTerminating();
+        });
+    }
+
+    if (th.engine.isTerminating())
+        return;
+
+    // Commit only after every claimed move returned, so an aborted iteration
+    // never mixes depths (rollback keeps the previous depth's values).
+    for (uint32_t i = 0; i < moveCount; i++) {
+        if (ybwcWork.values[i] != VALUE_NONE) {
+            rootMoves[i].value = ybwcWork.values[i];
+            rootMoves[i].pv    = ybwcWork.pvs[i];
+        }
+    }
+    sortRootMoves(rootMoves.begin(), rootMoves.end(), false);
+    th.selDepth = std::max(th.selDepth, static_cast<int>(depth));
+}
+
+namespace {
+
+#endif
 
 /// Dynamic dispatch templated search() with correct rule. It is also
 /// responsible for iterating the first move in balance2 mode.

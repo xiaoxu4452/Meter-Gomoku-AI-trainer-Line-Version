@@ -1,0 +1,173 @@
+{
+ "turn": 5000,
+ "reps": 1,
+ "threads": 4,
+ "hashKB": 1572864,
+ "detail": 2,
+ "variants": [
+  {
+   "name": "sse",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-sse.exe"
+  },
+  {
+   "name": "avx2",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx2.exe"
+  },
+  {
+   "name": "avxvnni",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avxvnni.exe"
+  },
+  {
+   "name": "avx512",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512.exe"
+  },
+  {
+   "name": "avx512vnni",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe"
+  }
+ ],
+ "samples": [
+  {
+   "variant": "sse",
+   "pos": 5,
+   "d": 23,
+   "sd": 39,
+   "nodes": 2870000,
+   "speed": 576000,
+   "ttime": 4977,
+   "ev": "-215",
+   "best": "7,8",
+   "wall": 5396,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "avx2",
+   "pos": 5,
+   "d": 22,
+   "sd": 36,
+   "nodes": 3640000,
+   "speed": 731000,
+   "ttime": 4974,
+   "ev": "-227",
+   "best": "7,8",
+   "wall": 5435,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "avxvnni",
+   "pos": 5,
+   "d": 0,
+   "sd": 0,
+   "nodes": 0,
+   "speed": 0,
+   "ttime": 0,
+   "ev": "",
+   "best": null,
+   "wall": 580,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "avx512",
+   "pos": 5,
+   "d": 24,
+   "sd": 48,
+   "nodes": 5020000,
+   "speed": 1008000,
+   "ttime": 4976,
+   "ev": "-204",
+   "best": "7,8",
+   "wall": 5398,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "avx512vnni",
+   "pos": 5,
+   "d": 25,
+   "sd": 43,
+   "nodes": 5325000,
+   "speed": 1070000,
+   "ttime": 4973,
+   "ev": "-219",
+   "best": "7,8",
+   "wall": 5412,
+   "pi": 0,
+   "rep": 0
+  }
+ ],
+ "summary": {
+  "sse": {
+   "n": 1,
+   "depth": 23,
+   "seldepth": 39,
+   "nps": 576000,
+   "nodes": 2870000,
+   "wall": 5396,
+   "best": {
+    "7,8": 1
+   },
+   "evals": [
+    "-215"
+   ]
+  },
+  "avx2": {
+   "n": 1,
+   "depth": 22,
+   "seldepth": 36,
+   "nps": 731000,
+   "nodes": 3640000,
+   "wall": 5435,
+   "best": {
+    "7,8": 1
+   },
+   "evals": [
+    "-227"
+   ]
+  },
+  "avxvnni": {
+   "n": 1,
+   "depth": 0,
+   "seldepth": 0,
+   "nps": 0,
+   "nodes": 0,
+   "wall": 580,
+   "best": {
+    "null": 1
+   },
+   "evals": [
+    ""
+   ]
+  },
+  "avx512": {
+   "n": 1,
+   "depth": 24,
+   "seldepth": 48,
+   "nps": 1008000,
+   "nodes": 5020000,
+   "wall": 5398,
+   "best": {
+    "7,8": 1
+   },
+   "evals": [
+    "-204"
+   ]
+  },
+  "avx512vnni": {
+   "n": 1,
+   "depth": 25,
+   "seldepth": 43,
+   "nps": 1070000,
+   "nodes": 5325000,
+   "wall": 5412,
+   "best": {
+    "7,8": 1
+   },
+   "evals": [
+    "-219"
+   ]
+  }
+ }
+}

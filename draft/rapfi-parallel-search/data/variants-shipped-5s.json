@@ -1,0 +1,201 @@
+{
+ "turn": 5000,
+ "reps": 2,
+ "threads": 4,
+ "hashKB": 1572864,
+ "detail": 2,
+ "variants": [
+  {
+   "name": "sse",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-sse.exe"
+  },
+  {
+   "name": "avx2",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx2.exe"
+  },
+  {
+   "name": "avx512",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512.exe"
+  },
+  {
+   "name": "avx512vnni",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe"
+  }
+ ],
+ "samples": [
+  {
+   "variant": "sse",
+   "pos": 5,
+   "d": 22,
+   "sd": 43,
+   "nodes": 2743000,
+   "speed": 551000,
+   "ttime": 4972,
+   "ev": "-207",
+   "best": "7,8",
+   "wall": 5389,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "avx2",
+   "pos": 5,
+   "d": 23,
+   "sd": 39,
+   "nodes": 4593000,
+   "speed": 923000,
+   "ttime": 4973,
+   "ev": "-244",
+   "best": "7,8",
+   "wall": 5387,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "avx512",
+   "pos": 5,
+   "d": 26,
+   "sd": 53,
+   "nodes": 4655000,
+   "speed": 1004000,
+   "ttime": 4633,
+   "ev": "-233",
+   "best": "7,8",
+   "wall": 5075,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "avx512vnni",
+   "pos": 5,
+   "d": 25,
+   "sd": 41,
+   "nodes": 5325000,
+   "speed": 1070000,
+   "ttime": 4973,
+   "ev": "-217",
+   "best": "7,8",
+   "wall": 5413,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "avx2",
+   "pos": 5,
+   "d": 24,
+   "sd": 47,
+   "nodes": 4714000,
+   "speed": 948000,
+   "ttime": 4970,
+   "ev": "-227",
+   "best": "7,8",
+   "wall": 5428,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "avx512",
+   "pos": 5,
+   "d": 25,
+   "sd": 52,
+   "nodes": 4737000,
+   "speed": 952000,
+   "ttime": 4972,
+   "ev": "-242",
+   "best": "7,8",
+   "wall": 5403,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "avx512vnni",
+   "pos": 5,
+   "d": 24,
+   "sd": 46,
+   "nodes": 4874000,
+   "speed": 980000,
+   "ttime": 4973,
+   "ev": "-207",
+   "best": "7,8",
+   "wall": 5408,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "sse",
+   "pos": 5,
+   "d": 22,
+   "sd": 42,
+   "nodes": 2981000,
+   "speed": 662000,
+   "ttime": 4499,
+   "ev": "-213",
+   "best": "7,8",
+   "wall": 4955,
+   "pi": 0,
+   "rep": 1
+  }
+ ],
+ "summary": {
+  "sse": {
+   "n": 2,
+   "depth": 22,
+   "seldepth": 42.5,
+   "nps": 606500,
+   "nodes": 2862000,
+   "wall": 5172,
+   "best": {
+    "7,8": 2
+   },
+   "evals": [
+    "-207",
+    "-213"
+   ]
+  },
+  "avx2": {
+   "n": 2,
+   "depth": 23.5,
+   "seldepth": 43,
+   "nps": 935500,
+   "nodes": 4653500,
+   "wall": 5407.5,
+   "best": {
+    "7,8": 2
+   },
+   "evals": [
+    "-244",
+    "-227"
+   ]
+  },
+  "avx512": {
+   "n": 2,
+   "depth": 25.5,
+   "seldepth": 52.5,
+   "nps": 978000,
+   "nodes": 4696000,
+   "wall": 5239,
+   "best": {
+    "7,8": 2
+   },
+   "evals": [
+    "-233",
+    "-242"
+   ]
+  },
+  "avx512vnni": {
+   "n": 2,
+   "depth": 24.5,
+   "seldepth": 43.5,
+   "nps": 1025000,
+   "nodes": 5099500,
+   "wall": 5410.5,
+   "best": {
+    "7,8": 2
+   },
+   "evals": [
+    "-217",
+    "-207"
+   ]
+  }
+ }
+}

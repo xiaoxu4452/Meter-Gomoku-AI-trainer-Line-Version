@@ -1,0 +1,60 @@
+{
+ "turn": 2000,
+ "reps": 2,
+ "threads": 1,
+ "hashKB": 1572864,
+ "detail": 2,
+ "variants": [
+  {
+   "name": "avxvnni-classical",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\_engine_bench\\vnni-classic\\engine.exe"
+  }
+ ],
+ "samples": [
+  {
+   "variant": "avxvnni-classical",
+   "pos": 5,
+   "d": 23,
+   "sd": 33,
+   "nodes": 2213000,
+   "speed": 1123000,
+   "ttime": 1971,
+   "ev": "-128",
+   "best": "7,8",
+   "wall": 2442,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "avxvnni-classical",
+   "pos": 5,
+   "d": 23,
+   "sd": 33,
+   "nodes": 2299000,
+   "speed": 1167000,
+   "ttime": 1970,
+   "ev": "-128",
+   "best": "7,8",
+   "wall": 2404,
+   "pi": 0,
+   "rep": 1
+  }
+ ],
+ "summary": {
+  "avxvnni-classical": {
+   "n": 2,
+   "depth": 23,
+   "seldepth": 33,
+   "nps": 1145000,
+   "nodes": 2256000,
+   "wall": 2423,
+   "best": {
+    "7,8": 2
+   },
+   "evals": [
+    "-128",
+    "-128"
+   ]
+  }
+ }
+}

@@ -1,0 +1,141 @@
+{
+ "turn": 120000,
+ "reps": 1,
+ "threads": 8,
+ "hashKB": 1572864,
+ "detail": 2,
+ "variants": [
+  {
+   "name": "baseline",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe"
+  },
+  {
+   "name": "tier2",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni-tier2.exe"
+  }
+ ],
+ "samples": [
+  {
+   "variant": "baseline",
+   "pos": 5,
+   "d": 14,
+   "sd": 24,
+   "nodes": 89000,
+   "speed": 1151000,
+   "ttime": 78,
+   "ev": "-190",
+   "best": "7,8",
+   "wall": 521,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "tier2",
+   "pos": 5,
+   "d": 14,
+   "sd": 22,
+   "nodes": 52000,
+   "speed": 1505000,
+   "ttime": 35,
+   "ev": "-192",
+   "best": "7,8",
+   "wall": 469,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "baseline",
+   "pos": 7,
+   "d": 14,
+   "sd": 24,
+   "nodes": 88000,
+   "speed": 1285000,
+   "ttime": 69,
+   "ev": "-170",
+   "best": "6,6",
+   "wall": 473,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "tier2",
+   "pos": 7,
+   "d": 14,
+   "sd": 19,
+   "nodes": 56000,
+   "speed": 1604000,
+   "ttime": 35,
+   "ev": "-157",
+   "best": "6,6",
+   "wall": 462,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "baseline",
+   "pos": 9,
+   "d": 14,
+   "sd": 24,
+   "nodes": 105000,
+   "speed": 1826000,
+   "ttime": 58,
+   "ev": "-18",
+   "best": "10,8",
+   "wall": 460,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "tier2",
+   "pos": 9,
+   "d": 14,
+   "sd": 22,
+   "nodes": 107000,
+   "speed": 2062000,
+   "ttime": 52,
+   "ev": "-22",
+   "best": "10,6",
+   "wall": 461,
+   "pi": 2,
+   "rep": 0
+  }
+ ],
+ "summary": {
+  "baseline": {
+   "n": 3,
+   "depth": 14,
+   "seldepth": 24,
+   "nps": 1285000,
+   "nodes": 89000,
+   "wall": 473,
+   "best": {
+    "7,8": 1,
+    "6,6": 1,
+    "10,8": 1
+   },
+   "evals": [
+    "-190",
+    "-170",
+    "-18"
+   ]
+  },
+  "tier2": {
+   "n": 3,
+   "depth": 14,
+   "seldepth": 22,
+   "nps": 1604000,
+   "nodes": 56000,
+   "wall": 462,
+   "best": {
+    "7,8": 1,
+    "6,6": 1,
+    "10,6": 1
+   },
+   "evals": [
+    "-192",
+    "-157",
+    "-22"
+   ]
+  }
+ }
+}

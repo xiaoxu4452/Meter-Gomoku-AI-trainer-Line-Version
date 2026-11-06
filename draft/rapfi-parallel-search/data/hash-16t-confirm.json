@@ -1,0 +1,237 @@
+{
+ "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni-ybwc.exe",
+ "turn": 10000,
+ "reps": 2,
+ "threads": 16,
+ "maxdepth": 0,
+ "topn": 1,
+ "samples": [
+  {
+   "hashKB": 512,
+   "d": 27,
+   "sd": 52,
+   "nodes": 17766568,
+   "speed": 2957000,
+   "ttime": 9972,
+   "ev": "-227",
+   "best": "7,8",
+   "largePage": false,
+   "wall": 10309,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "hashKB": 1024,
+   "d": 26,
+   "sd": 41,
+   "nodes": 20814223,
+   "speed": 2454000,
+   "ttime": 9975,
+   "ev": "-248",
+   "best": "7,8",
+   "largePage": false,
+   "wall": 10341,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "hashKB": 2048,
+   "d": 27,
+   "sd": 41,
+   "nodes": 22925998,
+   "speed": 2847000,
+   "ttime": 9972,
+   "ev": "-252",
+   "best": "7,8",
+   "largePage": false,
+   "wall": 10396,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "hashKB": 1024,
+   "d": 27,
+   "sd": 44,
+   "nodes": 22076297,
+   "speed": 2496000,
+   "ttime": 9976,
+   "ev": "-240",
+   "best": "7,8",
+   "largePage": false,
+   "wall": 10340,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "hashKB": 2048,
+   "d": 27,
+   "sd": 58,
+   "nodes": 29754507,
+   "speed": 3020000,
+   "ttime": 9851,
+   "ev": "-327",
+   "best": "7,8",
+   "largePage": false,
+   "wall": 10274,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "hashKB": 512,
+   "d": 28,
+   "sd": 53,
+   "nodes": 26099742,
+   "speed": 2787000,
+   "ttime": 9365,
+   "ev": "-219",
+   "best": "7,8",
+   "largePage": false,
+   "wall": 9723,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "hashKB": 512,
+   "d": 37,
+   "sd": 38,
+   "nodes": 47599521,
+   "speed": 5365000,
+   "ttime": 9974,
+   "ev": "-M40",
+   "best": "7,6",
+   "largePage": false,
+   "wall": 10311,
+   "pi": 3,
+   "rep": 0
+  },
+  {
+   "hashKB": 1024,
+   "d": 37,
+   "sd": 28,
+   "nodes": 45090438,
+   "speed": 5105000,
+   "ttime": 9973,
+   "ev": "-M32",
+   "best": "8,6",
+   "largePage": false,
+   "wall": 10339,
+   "pi": 3,
+   "rep": 0
+  },
+  {
+   "hashKB": 2048,
+   "d": 38,
+   "sd": 44,
+   "nodes": 52500038,
+   "speed": 5400000,
+   "ttime": 9722,
+   "ev": "-M48",
+   "best": "7,6",
+   "largePage": false,
+   "wall": 10091,
+   "pi": 3,
+   "rep": 0
+  },
+  {
+   "hashKB": 1024,
+   "d": 37,
+   "sd": 24,
+   "nodes": 48930759,
+   "speed": 5195000,
+   "ttime": 9419,
+   "ev": "-M28",
+   "best": "7,6",
+   "largePage": false,
+   "wall": 9793,
+   "pi": 3,
+   "rep": 1
+  },
+  {
+   "hashKB": 2048,
+   "d": 37,
+   "sd": 26,
+   "nodes": 49094762,
+   "speed": 5296000,
+   "ttime": 9269,
+   "ev": "-M30",
+   "best": "8,6",
+   "largePage": false,
+   "wall": 9656,
+   "pi": 3,
+   "rep": 1
+  },
+  {
+   "hashKB": 512,
+   "d": 38,
+   "sd": 26,
+   "nodes": 49518979,
+   "speed": 5508000,
+   "ttime": 8990,
+   "ev": "-M30",
+   "best": "8,6",
+   "largePage": false,
+   "wall": 9325,
+   "pi": 3,
+   "rep": 1
+  }
+ ],
+ "summary": {
+  "512": {
+   "n": 4,
+   "depth": 32.5,
+   "seldepth": 45,
+   "nps": 4161000,
+   "nodes": 36849631.5,
+   "best": {
+    "7,8": 2,
+    "7,6": 1,
+    "8,6": 1
+   },
+   "largePage": 0,
+   "evals": [
+    "-227",
+    "-219",
+    "-M40",
+    "-M30"
+   ]
+  },
+  "1024": {
+   "n": 4,
+   "depth": 32,
+   "seldepth": 34.5,
+   "nps": 3800500,
+   "nodes": 33583367.5,
+   "best": {
+    "7,8": 2,
+    "8,6": 1,
+    "7,6": 1
+   },
+   "largePage": 0,
+   "evals": [
+    "-248",
+    "-240",
+    "-M32",
+    "-M28"
+   ]
+  },
+  "2048": {
+   "n": 4,
+   "depth": 32,
+   "seldepth": 42.5,
+   "nps": 4158000,
+   "nodes": 39424634.5,
+   "best": {
+    "7,8": 2,
+    "7,6": 1,
+    "8,6": 1
+   },
+   "largePage": 0,
+   "evals": [
+    "-252",
+    "-327",
+    "-M48",
+    "-M30"
+   ]
+  }
+ }
+}

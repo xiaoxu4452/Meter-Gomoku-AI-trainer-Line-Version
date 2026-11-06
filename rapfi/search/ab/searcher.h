@@ -25,10 +25,44 @@
 #include "../searchthread.h"
 #include "../timecontrol.h"
 #include "history.h"
+#ifdef GB_YBWC_ROOT
+    #include "searchstack.h"
+#endif
 
 #include <atomic>
+#ifdef GB_YBWC_ROOT
+    #include <condition_variable>
+    #include <mutex>
+    #include <vector>
+#endif
 
 namespace Search::AB {
+
+#ifdef GB_YBWC_ROOT
+/// Shared descriptor for the experimental root-split search (YBWC prototype).
+/// The main thread owns one instance per searcher; worker threads wait for a
+/// depth ticket, claim root moves from the shared queue and publish results.
+/// This is a build-flagged experiment only; the default search path is Lazy SMP.
+struct RootSplitShared
+{
+    std::mutex              mutex;
+    std::condition_variable ticketCv;  ///< wakes workers on new depth / siblings open / stop
+    std::condition_variable doneCv;    ///< wakes main when every claimed move finished
+    std::atomic<uint32_t>   ticket {0};  ///< incremented once per dispatched depth
+    std::atomic<uint32_t>   nextMove {0};      ///< next root move index to claim
+    std::atomic<uint32_t>   remaining {0};     ///< claimed but unfinished moves
+    std::atomic<bool>       siblingsOpen {false};
+    std::atomic<int>        bestValue {VALUE_NONE};  ///< shared alpha across siblings
+    bool                    stop = false;            ///< guarded by mutex
+    bool                    splitPhaseOver = false;  ///< shallow split phase finished
+    int                     depth = 0;               ///< guarded by mutex
+    uint32_t                moveCount = 0;           ///< guarded by mutex
+    Value                   prevValue = VALUE_NONE;  ///< guarded by mutex (no-gate mode)
+    std::vector<Pos>        moves;                   ///< guarded by mutex at dispatch only
+    std::vector<Value>      values;
+    std::vector<std::vector<Pos>> pvs;
+};
+#endif
 
 struct ABSearchData : SearchData
 {
@@ -40,6 +74,9 @@ struct ABSearchData : SearchData
     bool             singularRoot;     /// Is there only a single response at root?
     std::atomic<int> completedDepth;   /// Previously completed depth
     std::atomic<int> bestMoveChanges;  /// How many time best move has changed in this search
+#ifdef GB_YBWC_ROOT
+    uint32_t ybwcTicket = 0;  /// Last root-split ticket served by this thread
+#endif
 
     MainHistory        mainHistory;         /// Heuristic history table
     CounterMoveHistory counterMoveHistory;  /// Counter move history table
@@ -96,6 +133,43 @@ private:
 
     /// Pick thread with the best result according to eval and completed depth.
     SearchThread *pickBestThread(SearchEngine &threads) const;
+
+#ifdef GB_YBWC_ROOT
+    /// Whether the current search session runs the cooperative root split.
+    /// Set once per search in searchMain() before workers are dispatched.
+    bool ybwcThisSearch = false;
+
+    /// Shared root-split work descriptor (guarded by its own mutex).
+    RootSplitShared ybwcWork;
+
+    /// Worker-side loop: wait for a depth ticket, claim root moves and search
+    /// them. Returns when the main thread stops the session.
+    void assistRootSplit(SearchThread &th);
+
+    /// Serve one shallow cooperative depth: wait for the current ticket, join
+    /// the sibling claims and return. Used only in the hybrid split phase.
+    void assistRootSplitDepth(SearchThread &th, StackArray &stackArray);
+
+    /// Signal that the shallow split phase ended; waiting workers must fall
+    /// back to their own Lazy SMP iteration.
+    void notifyRootSplitPhaseOver();
+
+    /// Claim and search root moves of one depth ticket. Used by both the main
+    /// thread (after opening the siblings) and the helpers.
+    void runRootSplitClaims(SearchThread &th,
+                            StackArray   &stackArray,
+                            Rule          rule,
+                            uint32_t      ticket,
+                            int           depth,
+                            uint32_t      moveCount);
+
+    /// Main-side depth body: search the previous PV move alone, then release
+    /// the remaining root moves to all threads and commit the sorted result.
+    void cooperativeRootSearch(SearchThread &th, ABSearchData &sd, Depth depth);
+
+    /// Wake up workers and let them leave the current task.
+    void stopRootSplitWorkers();
+#endif
 };
 
 }  // namespace Search::AB
