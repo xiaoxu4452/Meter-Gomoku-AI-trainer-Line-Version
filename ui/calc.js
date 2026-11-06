@@ -1138,7 +1138,10 @@ var S = {
 
   previewOn: true,
   customBase: 'light',
-  nbest: 3,
+  // Default 1 analysis point: a single-PV search reaches ~2 ply deeper than a 3-PV search
+  // at the same 10 s budget (measured 27 vs 25), so full-strength analysis is the default
+  // and multi-point routes stay opt-in through the Analysis-points setting.
+  nbest: 1,
 
   cards: null,
 
@@ -7878,7 +7881,7 @@ function applyLang() {
     if (els.sel_maxDepth) els.sel_maxDepth.title = d.phDepth || '';
     if (els.sel_maxNodes) els.sel_maxNodes.title = d.phNodes || '';
     if (els.sel_multiPv) {
-      var mpSel = Math.max(1, Math.min(8, Math.round(+S.nbest || 3)));
+      var mpSel = Math.max(1, Math.min(8, Math.round(+S.nbest || 1)));
       var mpHtml = [];
       for (var mi = 1; mi <= 8; mi++) {
         mpHtml.push('<option value="' + mi + '"' + (mi === mpSel ? ' selected' : '') + '>' + mi + (d.multiPvUnit || '') + '</option>');
@@ -8863,7 +8866,7 @@ function setPatchNow() {
     cores: +S.cores || 0, hashMB: +S.hashMB || 0,
     variant: S.variant || '', weights: S.weights || '',
     candRange: (S.candRange === undefined || S.candRange === null) ? null : +S.candRange,
-    nbest: +S.nbest || 3, maxDepth: +S.maxDepth || 0, maxNodes: +S.maxNodes || 0,
+    nbest: +S.nbest || 1, maxDepth: +S.maxDepth || 0, maxNodes: +S.maxNodes || 0,
     showNum: !!S.showNum, previewOn: S.previewOn !== false,
     uiFont: fontCfg()
   };
