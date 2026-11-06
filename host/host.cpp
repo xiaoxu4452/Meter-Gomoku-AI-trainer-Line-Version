@@ -3821,6 +3821,78 @@ long long TotalPhysKB() { return (long long)MemTotalMB() * 1024; }
 }  // namespace host
 }  // namespace eng
 
+static std::wstring StateDir() {
+  std::wstring d;
+  wchar_t b[MAX_PATH] = {0};
+  if (GetEnvironmentVariableW(L"LOCALAPPDATA", b, MAX_PATH) && b[0])
+    d = std::wstring(b) + L"\\MeterGomoku";
+  else
+    d = ExeDir();
+  CreateDirectoryW(d.c_str(), nullptr);
+  return d;
+}
+static std::wstring StateFile() { return Join(StateDir(), L"state.json"); }
+
+static std::string JsonObjAfter(const std::string& s, const char* key) {
+  size_t p = s.find(key);
+  if (p == std::string::npos) return "";
+  p = s.find('{', p);
+  if (p == std::string::npos) return "";
+  int depth = 0; bool inStr = false, esc = false;
+  for (size_t i = p; i < s.size(); ++i) {
+    char c = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c == '\\') esc = true;
+      else if (c == '"') inStr = false;
+      continue;
+    }
+    if (c == '"') { inStr = true; continue; }
+    if (c == '{') depth++;
+    else if (c == '}') { if (--depth == 0) return s.substr(p, i - p + 1); }
+  }
+  return "";
+}
+
+static bool WriteStateAtomic(const std::string& json) {
+  if (json.empty() || json.size() > (256u << 10)) return false;
+  std::wstring f = StateFile(), tmp = f + L".tmp";
+  HANDLE h = CreateFileW(tmp.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                         FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (!h) return false;
+  bool ok = true;
+  const char* p = json.data();
+  size_t left = json.size();
+  while (left) {
+    DWORD n = 0;
+    if (!WriteFile(h, p, (DWORD)left, &n, nullptr) || n == 0) { ok = false; break; }
+    p += n; left -= n;
+  }
+  FlushFileBuffers(h);
+  CloseHandle(h);
+  if (!ok) { DeleteFileW(tmp.c_str()); return false; }
+  if (!MoveFileExW(tmp.c_str(), f.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+    DeleteFileW(tmp.c_str());
+    return false;
+  }
+  return true;
+}
+
+static std::string ReadStateFile() {
+  HANDLE h = CreateFileW(StateFile().c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
+                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (!h) return "";
+  std::string o;
+  char buf[4096];
+  DWORD n = 0;
+  while (ReadFile(h, buf, sizeof(buf), &n, nullptr) && n) {
+    if (o.size() + n > (256u << 10)) { o.clear(); break; }
+    o.append(buf, n);
+  }
+  CloseHandle(h);
+  return o;
+}
+
 class MsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
  public:
   HRESULT STDMETHODCALLTYPE Invoke(ICoreWebView2*, ICoreWebView2WebMessageReceivedEventArgs* e) override {
@@ -3829,6 +3901,21 @@ class MsgHandler : public Cb<ICoreWebView2WebMessageReceivedEventHandler> {
      std::string s = WideToUtf8(raw);
      CoTaskMemFree(raw);
      LogMsg("[msg] " + s.substr(0, 200));
+
+    
+    
+    if (s.find("\"stateSave\"") != std::string::npos) {
+      std::string obj = JsonObjAfter(s, "\"data\":");
+      bool ok = WriteStateAtomic(obj);
+      if (!ok) LogMsg("[state] 写入失败（保留上一份完整文件）");
+      return S_OK;
+    }
+    if (s.find("\"stateLoad\"") != std::string::npos) {
+      std::string st = ReadStateFile();
+      PostToPageSoon(std::string("{\"type\":\"stateLoaded\",\"data\":") +
+                     (st.empty() ? "null" : st) + "}");
+      return S_OK;
+    }
 
     
     if (s.find("\"engine\"") != std::string::npos && s.find("\"op\":") != std::string::npos) {

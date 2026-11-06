@@ -1,4 +1,4 @@
-﻿﻿﻿﻿/* Meter Gomoku Trainer - overlay UI stylesheet (board, panels, controls; adapts to light/dark theme). */
+/* Meter Gomoku Trainer - overlay UI stylesheet (board, panels, controls; adapts to light/dark theme). */
 
 /* design tokens: colours, radii, spacing (light / dark themes) */
 :root{
@@ -810,6 +810,64 @@ button.sq2{flex:0 0 auto; padding:.22rem .52rem; font-size:.82rem; border-radius
 
 .anbtns .btn:disabled{opacity:.38; cursor:default; border-color:var(--border)}
 .anbtns .btn.on:disabled{opacity:.38}
+
+.anbtns .balseg{
+  display:inline-flex; align-items:stretch; width:100%; min-width:0; max-width:100%;
+  border:1px solid var(--border); border-radius:.4rem; overflow:hidden;
+  background:var(--card);
+}
+.anbtns .balseg .segbtn{
+  flex:1 1 0; min-width:0; padding:.34rem .1rem; font-size:.85rem; line-height:1.2;
+  border:0; border-radius:0; background:transparent; color:var(--ink); font-weight:500;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.anbtns .balseg .segbtn:hover{background:var(--chip)}
+.anbtns .balseg .segbtn.on{color:var(--accent); font-weight:700}
+.anbtns .balseg .seg-n{flex:0 0 2.9rem; background:var(--chip); font-weight:700}
+.anbtns .balseg .segbtn.on + .seg-n,
+.anbtns .balseg .seg-n.on{color:var(--accent)}
+.anbtns .balseg .seg-div{flex:0 0 1px; align-self:stretch; background:var(--border)}
+.anbtns .balseg .segbtn:disabled{opacity:.5; cursor:default}
+body.compactDock .anbtns .balseg .segbtn{font-size:.75rem; padding:.34rem .04rem}
+body.compactDock .anbtns .balseg .seg-n{flex:0 0 2.25rem}
+body.compactDock .anbtns> .btn{font-size:.78rem; padding:.34rem .08rem}
+
+html[lang="en"] #btn_an_bal{
+  white-space:pre-line; text-align:center;
+  font-size:.7rem; line-height:1.02; padding:.06rem .03rem; letter-spacing:0;
+}
+html[lang="en"] body.compactDock #btn_an_bal{font-size:.64rem; line-height:1; padding:.03rem .02rem}
+html[lang="en"] .anbtns .balseg .seg-n{font-size:.78rem; letter-spacing:0}
+
+.routes-box{margin:0 0 .42rem; border:1px solid var(--border); border-radius:8px;
+  background:var(--card); overflow:hidden}
+.rt-head{display:flex; align-items:center; flex-wrap:wrap; gap:.1rem .3rem; padding:.26rem .42rem;
+  border-bottom:1px solid var(--border); background:var(--chip)}
+.rt-ttl{font-size:.82rem; font-weight:700; color:var(--ink)}
+.rt-empty-msg{font-size:.78rem; line-height:1.55; color:var(--sub)}
+.rt-empty-lg{font-size:.68rem; line-height:1.5; color:var(--sub); opacity:.86;
+  white-space:normal; word-break:break-word; max-width:24rem}
+.rt-empty{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.4rem;
+  flex:1 1 auto; min-height:0; padding:.6rem 1rem; text-align:center; color:var(--sub)}
+.rt-list{display:flex; flex-direction:column; height:auto; min-height:13.5rem; max-height:27rem; overflow-y:auto; overflow-x:hidden;
+  padding:.26rem .34rem; display:flex; flex-direction:column; gap:.14rem;
+  scrollbar-width:thin; scrollbar-color:var(--border) transparent}
+.rt-list::-webkit-scrollbar{width:9px; height:9px}
+.rt-list::-webkit-scrollbar-button{display:none!important; width:0; height:0}
+.rt-list::-webkit-scrollbar-track{background:transparent}
+.rt-list::-webkit-scrollbar-thumb{background:var(--border); border-radius:99px;
+  border:2px solid transparent; background-clip:content-box}
+.rt-list::-webkit-scrollbar-thumb:hover{background:var(--sub); background-clip:content-box}
+.rt-row{flex:0 0 auto; padding:.14rem 0}
+.rt-row + .rt-row{border-top:1px dashed var(--border); margin-top:.12rem}
+.rt-h{display:flex; align-items:baseline; flex-wrap:wrap; gap:.06rem .42rem;
+  margin:0 0 .16rem .05rem; font-family:ui-monospace,Consolas,"Courier New",monospace}
+.rt-i{font-size:.72rem; font-weight:700; color:var(--sub); min-width:.9rem; white-space:nowrap}
+.rt-d{font-size:.7rem; color:var(--sub); white-space:nowrap}
+.rt-w{font-size:.74rem; font-weight:700; color:var(--sub); white-space:nowrap}
+.rt-s{font-size:.76rem; font-weight:700; color:var(--ink); white-space:nowrap}
+.rt-s.neg{color:#a8443f}
+.rt-line.pv-box{margin:0}
 .anlist{
   display:flex; flex-direction:column; gap:.12rem; margin-top:.24rem;
   max-height:9.5rem; overflow:auto; font-variant-numeric:tabular-nums;

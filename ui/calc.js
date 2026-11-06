@@ -64,7 +64,6 @@ var I18N = {
     phDepth: '4 ~ 128 的整数，留空 = 不限',
     phNodes: '0.1 ~ 4096（单位 M），留空 = 不限',
     coresHint: '本机 {n} 线程 · 上限 {m}',
-    coach: '指导视图', coachHint: '方形四色热力：AI 帮你算最佳落点，落子即消失',
     heatBest: '最佳', heatGood: '良好', heatFair: '一般', heatPoor: '劣势',
 
     sideAiB: 'AI 执黑', sideAiW: 'AI 执白',
@@ -106,7 +105,7 @@ var I18N = {
     fwdVctNone: '当前局面，{c}（所选进攻方）不存在VCT强制连续冲四杀棋',
     fwdClear: '清除计算',
 
-    markCleared: '已清除棋盘上的所有分析标记（分析计算 / 平衡点 / 扫描防守 / 前瞻 · VCF · VCT）',
+    markCleared: '已清除棋盘上的所有分析标记（分析计算 / 平衡点 / 扫描分析 / 前瞻 · VCF · VCT）',
     vcxPopTitle: '算杀结果',
     fwdAtkAuto: '进攻方：自动 —— 轮走方（算杀题面按惯例 = 子多的一方）。黑/白框只是**指示框，不可点**',
     fwdAtkB: '进攻方：黑棋（自动判定）',
@@ -132,7 +131,7 @@ var I18N = {
     aboutGuideList: [
       { t: '一、开始一盘棋', ps: [
         '顶部「对局设置」里选模式：对弈（AI 自动应答）/ 摆盘（自由摆子，AI 完全不参与）/ 残局（自己摆一个局面来研究）。',
-        '「思考时间」= AI 每手思考多少秒（内部按毫秒交给引擎）；时间越长棋力越强，热力与指导视图的色档也随它变化。',
+        '「思考时间」= AI 每手思考多少秒（内部按毫秒交给引擎）；时间越长棋力越强，热力的色档也随它变化。',
         '「AI 执子」是两个独立开关：只开「AI 执黑」→ 你执白；只开「AI 执白」→ 你执黑并开第一手；两个都开 → AI 与 AI 自打；两个都关 → 没有 AI，黑白双方都由你自己下。',
         '棋盘上直接点击落子。中间那颗 ▶ / ❚❚ 键：空闲时点它 = 让 AI 立刻替当前行棋方算一手并落下；AI 正在思考时点它 = 暂停。',
         '「重新开始」先把当前这局自动存进历史再清盘；「保存局面」手动把当前盘面存入历史。',
@@ -141,14 +140,15 @@ var I18N = {
         '棋盘下方三个键：「确定」/「顺序摆盘」/「任意摆盘」。顺序摆盘 = 黑白轮流落子；任意摆盘 = 点开右边的圆角小框，选「黑子」或「白子」后可连续摆这一色，数量与顺序都不限（比如 30 个黑子 + 10 个白子）。',
         '选中「黑子」键变浅紫、「白子」键变浅白蓝，一眼看得出正在摆哪一色。',
         '摆好后点最左边的「确定」→ 残局定下来，键变浅绿并显示「已确定」；此后「重新开始」会回到这个局面，存进历史时它也是首帧。再点一次「已确定」即解除，可重新摆。',
-        '残局模式下 AI 全程不参与（辅助一手、热力、指导视图都停摆），交换手类规则自动变灰 —— 摆盘研究不需要换先。',
+        '残局模式下 AI 全程不参与（辅助一手与热力都停摆），交换手类规则自动变灰 —— 摆盘研究不需要换先。',
       ]},
       { t: '三、计算评估', ps: [
         '「计算」= 单路深搜当前局面并把最佳点标在棋盘上（再点一次 = 停止计算）；「多点分析」按「分析点数」一次给出 2~8 个候选，圆圈里是名次与评估分。',
-        '「平衡点」= 官方平衡搜索（引擎原生 **YXBALANCETWO 成对**，**不是**对弈引擎的搜索）按你选的「点数」给出黑白双方都没有明显优势的候选点，并把引擎给的评估分一并报出来（|评估| ≤ 50 才是官方平衡窗口内的「平」；评估刻度 ScalingFactor=200 ⇒ 胜率 = sigmoid(评估/200)）；「点数」可在 1~6 之间切换（空盘固定 3 个：黑 1 固定天元，白 2 / 黑 3 由一次**成对**平衡搜索联合给出 —— 成对搜索才是官方口径的「平」，单点搜索在近乎空盘上评估会到 −350~−470，那是「一眼看出谁占优」的根源）；点数为奇数时**收尾那手也走成对搜索、只取这一对的第 1 手**，所以报出的评估分同样在 0 附近；「扫描防守」= 引擎原生 **YXSEARCHDEFEND**（Rapfi 整合包同一算法）：先补一手 PASS 把行棋方让给对手，再对全盘候选点持续深算 —— 每个点的 % 就是「对手下在这里」的胜率，越高越要防；棋盘按危险度分五档：1 档最大圆环 + 半透明填充，2~4 档圆环依次减小、透明度依次升高（最小圆环 = 1 档的一半），5 档（边角 / 低危点）只铺一个数字、外围一圈更细的小环（大小与 4 档一致），像扫盘一样铺开；整套配色为天蓝色系（高危深、低危偏白）；搜索越算越深、越算越准，点「停止扫描」后**最后一帧保留在棋盘上**，落子或「清除计算」才消失。',
-        '「AI 视图」= AI 思考期间在棋盘上铺它的候选点（圆形、格内是评估分），AI 一落子就撤掉；「指导视图」= 轮到你时用方形四色提示最佳落点，你一落子就消失。',
+        '「平衡点」= 官方平衡搜索（引擎原生 **YXBALANCETWO 成对**，**不是**对弈引擎的搜索）按你选的「点数」给出黑白双方都没有明显优势的候选点，并把引擎给的评估分一并报出来；棋盘上的平衡点是一个细实线圆环，黑方淡紫、白方天蓝半透明填充，环里写胜率 / 评分 / 序号（|评估| ≤ 50 才是官方平衡窗口内的「平」；评估刻度 ScalingFactor=200 ⇒ 胜率 = sigmoid(评估/200)）；「点数」可在 1~6 之间切换（空盘固定 3 个：黑 1 固定天元，白 2 / 黑 3 由一次**成对**平衡搜索联合给出 —— 成对搜索才是官方口径的「平」，单点搜索在近乎空盘上评估会到 −350~−470，那是「一眼看出谁占优」的根源）；点数为奇数时**收尾那手也走成对搜索、只取这一对的第 1 手**，所以报出的评估分同样在 0 附近；「扫描分析」= 引擎原生 **YXSEARCHDEFEND**（Rapfi 整合包同一算法，宿主**不再补 PASS**）：候选范围临时放全盘，对每一个空点持续深算 —— 每个点的 % 就是「**轮到的一方**落在这里」的胜率（轮到黑是黑子的胜率，轮到白是白子的胜率）；圆环大小**固定**，只按「相对本帧最高胜率」分四档上色：最高一段是原本的蓝，之后依次海蓝、浅天蓝、白蓝，透明度随档位下降，最低一档也只减 25%（仍保留 75%）；搜索越算越深、越算越准，点「停止分析」后**最后一帧保留在棋盘上**，落子或「清除计算」才消失。',
+        '「AI 视图」= AI 思考期间在棋盘上铺它的候选点（圆形、格内是评估分），AI 一落子就撤掉。',
         '「分析计算」= 棋盘下方的开关型功能键：开启后在**主车道**持续深算当前局面，铺出引擎当前榜单（最佳点+候选，最多 8 个）；随搜索加深自然微变并收敛，用户落子 / 悔棋自动重开会话，仪表盘用时跨轮累加；再点一次 = 停止。摆盘 / 残局 / 双人手动对弈同样可用。',
-        '「清除计算」与「计算」并排：一键擦掉**本卡里任意项目**留在棋盘上的标记 —— 计算 / 多点分析 / 平衡点的徽标与评估分、扫描防守的五档圆环与百分比，以及前瞻 · VCF · VCT 的序号、虚线与代码链；只清标记，不动局面本身。',
+        '「清除计算」与「计算」并排：一键擦掉**本卡里任意项目**留在棋盘上的标记 —— 计算 / 多点分析 / 平衡点的徽标与评估分、扫描分析的固定圆环与百分比，以及前瞻 · VCF · VCT 的序号、虚线与代码链；只清标记，不动局面本身。',
+        '「分析路线」= 「计算评估」卡片下方的高框：分析点数设成几就铺几条路线，每条是引擎回吐的整条 PV（名次 / 深度 / 胜率 / 评分 + 坐标链）；鼠标悬停某个坐标 = 预览这条线走到那一手，点一下 = 把这条线钉在棋盘上（搜索刷新也不会丢），再点一次取消；双击某个坐标 = 直接把这条路线走到那一手（gomocalc 的双击落线）。',
         '仪表盘同步给出深度、速度、节点、用时与评估分；下方评估曲线按黑 / 白两条记录整局走势（纵轴随分数自动进位）。',
       ]},
       { t: '四、前瞻 / VCF / VCT', ps: [
@@ -190,6 +190,18 @@ var I18N = {
     aboutVer: '版本', aboutFeat: '功能', aboutOss: '开源组件', aboutLic: '许可',
     aboutUpdates: '最近更新',
     aboutUpdateList: [
+      { v: '4.51', items: [
+        '「全盘分析」改名「扫描分析」，候选范围不再强行铺满全盘，回到参考包 Rapfi-YixinBoard 的做法：只扫选点范围覆盖到的那一片（形状跟着棋子走，不是固定几何形状）',
+        '平衡点环改成细实线，环内填半透明紫（黑）/ 天蓝（白），里面的胜率、评分与序号清晰可见',
+        '「分析路线」框高一倍，滚动条去掉上下箭头统一成细标准样式，也不再显示「悬停预览」的提示文字',
+        '移除「指导视图」；「关于」里的「主页」按钮移到标题行',
+      ]},
+        { v: '4.50', items: [
+        '「扫描防守」改名「扫描分析」，算法回到参考包 Rapfi-YixinBoard 的原样：不再补 PASS，候选范围放到全盘，每个点是「轮到的一方落在这里」的胜率（轮到黑是黑子，轮到白是白子）',
+        '扫描分析的圆环大小固定，只按「相对本帧最高胜率」分四档上色：蓝 → 海蓝 → 浅天蓝 → 白蓝，透明度随档位下降、最低一档只减 25%',
+        '平衡点只保留 1 点 / 2 点两档；圆环改成自研网页版的版式：上半是胜率、下半是评分，序号做成左上角的小徽标，环是虚线',
+        '「计算评估」下面新增「分析路线」框：分析点数有几条候选就铺几条路线，每条上面一行是这局的「题目」（名次 / 深度 / 胜率 / 分数），下面是与引擎日志同款的代码框；坐标悬停 = 预览到这一手，点一下 = 把这条线钉在棋盘上',
+      ]},
       { v: '4.48', items: [
         '棋子新增「玉石」材质（层状浅杂色 + 玻璃光泽），仿真棋子也有落盘微阴影；棋盘改为 2 倍超采样，棋子、序号、网格线全部变清',
         '「对局」新增「动态时间」开关：简单局面少算、难局多算（最多 +15%），见杀局面只用 40%，省下的时间存进时间池供后续调用；关闭后严格按设定秒数思考',
@@ -208,14 +220,13 @@ var I18N = {
         '识别参数真正生效：5 项阈值（灰度 / 黑白偏移、黑 / 白百分比）任意一项偏离默认值就切换到严格判定 —— 结果按你设的参数出，底层的「松阈值重判 / 自制读子 / 局部对比」整条兜底链不再静默改写；只有全部保持默认时才启用兜底',
         '后台思考重做：改用引擎原生 pondering（与官方整合包同一套节奏）—— 开着时对手思考期间引擎就在算我方应对，你一落子它已就绪；关着时引擎落子后立刻停，不再空转（CPU 常年高占用的一大来源）',
         '对局设置新增「style（谨慎度）」六档：0 最激进（5×5 候选）… 5 最谨慎（全盘），默认 3（官方推荐档），带方向说明；同一板块新增「多主变」行（1~8，默认 3）',
-        '「分析点数」与「多主变」共用同一份值、两端双向同步，并接通多点分析、前瞻深算（下限放到 1~2）与扫描防守的候选上限',
+        '「分析点数」与「多主变」共用同一份值、两端双向同步，并接通多点分析、前瞻深算（下限放到 1~2）与扫描分析的候选上限',
         '引擎变体自动基准修正：auto-bench 之前会把 avx2 误判成最快，现在按实测 nps 选出真实最快的变体',
         '候选点去重下沉到引擎回执层：同一个点只出现一次，不再出现重复名次',
         '对局设置卡片分组：只有「引擎」板块（选点范围 / 分析点数 / 线程 / 哈希）用虚线框，其余板块不加框',
         '英文界面补齐全部占位符（{n} / {p} 等不再原样露出）；修复日志并发写偶发丢行',
       ]},
       { v: '4.43', items: [
-        '扫描防守改用引擎原生 YXSEARCHDEFEND：先补一手 PASS 把行棋方让给对手，每个点的 % 就是对手下在那里的胜率；按危险度分五档画环（1 档最大圆环 + 半透明填充，2~4 档依次缩小变淡，5 档边角点只铺数字 + 细环）扫盘，偏白天蓝色系；按钮变「停止扫描」，停止后最后一帧留在棋盘上，「清除标记」改名「清除计算」',
         '识图图片适应性大升级：深色 / 浅色主题、旋转截图、拍屏照片、低对比与模糊图都能读 —— 新增「局部对比读子」第三套判别器、找盘阶梯（3×3 高斯 → CLAHE 均衡 → 1.5× 放大），以及网格对不上时的几何校验兜底',
         '识图「识别参数」面板：打开即自动收起棋盘代码框，提示行改成固定高度的虚线文本框 —— 拖滑动条时整列不再上下抖',
         '界面资源合并为单一 ui.pak（不再是一堆 .enc 文件）：避免被杀毒软件当成「加密文档」误删导致窗口白屏；真缺文件时会显示一张诊断页（告诉你加白名单后重装），而不是一片空白',
@@ -225,7 +236,7 @@ var I18N = {
     aboutFeatList: [
       '三种模式：对弈（AI 执黑 / AI 执白可自由开关，两个都开即 AI 自打）/ 自由摆盘 / 残局（自摆局面 + 「确定」定盘，重新开始回到该局面）',
       '前瞻推演：一路走到盘面真的五子连珠；VCF / VCT 本地算杀（多线程并行 + 迭代加深）',
-      '计算评估：计算 / 清除计算 / 多点分析 / 平衡点 / 点数 / 扫描防守，另配 AI 视图与指导视图',
+      '计算评估：计算 / 清除计算 / 多点分析 / 平衡点（1 或 2 点）/ 扫描分析，另配 AI 视图与面板下方的「分析路线」框',
       '评估曲线：纵轴随分数动态进位，最大可到 ±1200；仪表盘给出深度 / 速度 / 节点 / 用时',
       '三种规则：无禁手 / 无禁手 · 长连不赢 / 连珠（有禁手）',
       '识图：截图或上传自动贴盘识别，VC 算杀题模式，人工修改（换色 / 删子 / 补子 / 裁剪）与图片抽屉',
@@ -242,12 +253,9 @@ var I18N = {
     calcOn: '计算中', calcIdle: '空闲',
 
     tagAiMove: 'AI 落子', tagAssist: '辅助建议', tagHeat: '热力图', tagCoach: '教练',
-tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
+tagDefend: '扫描分析', tagCalc: '计算评估', tagNbest: '多点分析',
     tagLiveAna: '分析计算', tagBg: '后台思考', liveAna: '分析计算', liveAnaStop: '停止分析',
     liveAnaBan: 'AI 自打：黑白双方都由 AI 走，没有用户执子方可分析，功能键停用',
-
-    liveAnaEvalBusy: '「评估」正在运行 —— 先点「停止评估」，再开「分析计算」',
-    placeEvalAnaBusy: '「分析计算」正在运行 —— 先点「停止分析」，再开「评估」',
     liveAnaRun: '分析计算 · 持续深算中 · 当前深度 {d}',
     anCalcRun: '计算评估 · 持续深算中 · 当前深度 {d}',
     anNbestRun: '多点分析 · 持续深算中 · 当前深度 {d}',
@@ -277,10 +285,8 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     fontSampleLog: '引擎：Rapfi · 深度 24 · 节点 4.5M · 用时 1.92s',
     fontSampleNum: '1 2 3 4 5 6 7 8 9 10',
     fontDefault: '系统默认',
-    placeEval: '评估', placeEvalStop: '停止评估',
-    placeEvalTip: '点击后持续评估当前局面，胜率与曲线实时更新到引擎仪表盘',
     setDescEngine: '深度、速度、节点、局面代码',
-    setDescAnalysis: '分析计算、平衡点、扫描防守',
+    setDescAnalysis: '分析计算、平衡点、扫描分析',
     setDescSetup: '模式、思考时间、规则、引擎参数',
     aiSideB: 'AI 执黑', aiSideW: 'AI 执白', aiTurnLbl: '思考时间',
     tagBal1: '一手平衡', tagBal2: '二手平衡', tagFwd: '前瞻推演', tagTen: '十打选点',
@@ -377,13 +383,22 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
 
     analysis: '计算评估',
 
-    anCalc: '分析计算', anStop: '停止计算', anDefend: '扫描防守', anStopScan: '停止扫描',
-    anNbest: '多点分析', anBal: '平衡点', anBaln: '点数',
+    anCalc: '分析计算', anStop: '停止计算', anDefend: '扫描分析', anStopScan: '停止分析',
+    anNbest: '多点分析', anBal: '平衡点', anBaln: '点数', anBalBtn: '平衡点',
     anDefendDone: '扫 {c} 点：%越高越要防，W=距赢 L=距输',
     anDefendRefine: '持续加深…第 {r} 轮 · 每轮 {t}s',
     anDefendStable: '已收敛，结论稳定',
-    anScanRun: '扫描防守 · 引擎全点深算中… 深度 {d} · 已扫 {c} 点（%越高越要防）',
-    anScanFrozen: '已停止扫描：保留最后一帧（{c} 点）——落子 / 清除计算后消失',
+    anScanRun: '扫描分析 · 引擎扫描中… 深度 {d} · 已扫 {c} 点（% = 轮到的一方落在此处的胜率）',
+    anScanFrozen: '已停止分析：保留最后一帧（{c} 点）——落子 / 清除计算后消失',
+    rtTitle: '分析路线',
+    rtLegend: '评分 = 引擎评估值（正 = 该行首手方占优）· 深度 = 已完成整轮（d 值）· 胜率 = 该行首手一方视角',
+    rtEmpty: '点「多点分析 / 分析计算 / 平衡点」后，这里按点数列出每一条相关路线',
+    rtWin: '胜率',
+    rtScoreTip: '评分：引擎给的评估值（不是胜率；正 = 该行首手方占优，|评分| ≤ 50 为官方平衡窗口）',
+    rtDepthTip: '深度：已完成整轮搜索的深度（d25 = 25 轮全部跑完）',
+    rtWinTip: '胜率：按该行首手一方的视角换算（引擎 WINRATE，或由评分换算）',
+    balPtBtn: '{n} 点',
+    balPtHint: '平衡点数：点击循环 1 点 ⇄ 2 点（空盘固定 3 手）',
 
     shell: '搜索',
 
@@ -514,12 +529,13 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     anBalNoEngine: '平衡子不可用（原生平衡引擎没应答）—— 已按「绝不用对弈引擎顶替平衡点」的口径空手返回，请稍后重试',
     anBalFail: '平衡搜索失败：',
     anBalnSet: '平衡点数已设为 {n}（空盘固定 3）',
-    anBalnHint: '平衡点数（1~6，空盘固定 3）',
-    balStart: '平衡搜索开始：标记随计算微调；再点「平衡点」停止并自动落子',
+    anBalnHint: '平衡点数（1 或 2；空盘固定 3）',
+    balStart: '平衡搜索开始：标记与相关路线随计算微调；再点「平衡点」停止',
     balRunStat: '平衡计算中 · 深度 {d} · 已用 {t}s',
-    balStopShow: '停止并落子',
-    balRunTip: '再点一次：停止并落子',
-    balTip: '持续平衡搜索；再点一次自动落子',
+    balStopShow: '停止',
+    balRunTip: '停止平衡搜索：标记与相关路线保留在棋盘上',
+    balTip: '持续平衡搜索；再点一次停止（结果保留）',
+    balKept: '（已停止：平衡点标记与相关路线保留；落子 / 切换分析 / 清除计算时清除）',
     balOpenDone: '空盘：官方平衡开局 3 手已就绪，再点「平衡点」自动落子',
     balShown: '已自动落子 {n} 手 · 深度 {d}',
     balNoPlay: '（当前是开局 / 交换流程：标记已保留在棋盘上，未自动落子）',
@@ -586,7 +602,6 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     phDepth: 'Integer 4 ~ 128, empty = no limit',
     phNodes: '0.1 ~ 4096 (in M), empty = no limit',
     coresHint: '{n} threads on this PC · max {m}',
-    coach: 'Coach view', coachHint: 'Square 4-colour heat: AI computes your best spots; clears on move',
     heatBest: 'Best', heatGood: 'Good', heatFair: 'Fair', heatPoor: 'Poor',
 
     sideAiB: 'AI plays Black', sideAiW: 'AI plays White',
@@ -625,7 +640,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     fwdVctHit: 'VCT win found: {n} moves; attacker: {c} (odd numbers = attacker, even = defender)',
     fwdVcfNone: 'No VCF (forcing fours) win exists for {c} (the chosen attacker) in this position',
     fwdVctNone: 'No VCT (continuous threats) win exists for {c} (the chosen attacker) in this position',
-    fwdClear: 'Clear calc',
+    fwdClear: 'Clear',
     markCleared: 'Cleared every analysis mark on the board (Live analysis / Balance picks / Scan def / Lookahead \u00b7 VCF \u00b7 VCT)',
     vcxPopTitle: 'Solver result',
     fwdAtkAuto: 'Attacker: auto - the side to move (mate puzzles: the majority side, as usual). The black/white frames are indicators only, not clickable',
@@ -651,7 +666,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     aboutGuideList: [
       { t: '1. Start a game', ps: [
         'Pick a mode in Game Setup: AI (the engine replies) / Free setup (you place stones, no AI at all) / Endgame (set up a position and study it).',
-        'Thinking time = how many seconds the AI gets per move (sent to the engine in milliseconds). Longer time means a stronger move; the heat and coach views also widen with it.',
+        'Thinking time = how many seconds the AI gets per move (sent to the engine in milliseconds). Longer time means a stronger move; the heat bands also widen with it.',
         'Two independent switches choose the AI sides: only "AI plays Black" -> you play White; only "AI plays White" -> you play Black and open the game; both on -> AI vs AI; both off -> no AI at all, you play both colours yourself.',
         'Click the board to place a stone. The centre button: when idle it asks the AI to play one move for whoever is on turn; while the AI is thinking it pauses.',
         '"Restart" auto-saves the current game into History first, then clears the board; "Save" stores the position into History by hand.',
@@ -660,13 +675,14 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
         'Three keys appear under the board: Confirm / Sequential / Free colour. Sequential = black and white alternate; Free colour = open the rounded box, pick Black or White and keep placing that colour - any count, any order (e.g. 30 black + 10 white).',
         'The picked colour key lights up: Black turns light purple, White turns light blue-white.',
         'Press Confirm (leftmost) to lock the position in: the key turns light green and reads "Confirmed"; from then on Restart returns to this position, and it is the first frame when saved to History. Press it again to release and re-place.',
-        'The AI never joins endgame mode (assist, heat and coach views are all off), and swap-style rules are greyed out - a set-up position needs no swap.',
+        'The AI never joins endgame mode (assist and heat are both off), and swap-style rules are greyed out - a set-up position needs no swap.',
       ]},
       { t: '3. Evaluation', ps: [
         '"Compute" deep-searches the position and marks the best point (press again to stop); "Multi-point" returns 2-8 candidates with rank and score in each badge.',
-        '"Balanced 1" picks the candidate whose evaluation is closest to zero; "Balanced 2" plays each candidate out and reads the reply before choosing; "Defense scan" runs the engine-native YXSEARCHDEFEND (the same algorithm as the Rapfi bundle): a pass is inserted so the opponent is to move, then every candidate point is searched continuously - each point\'s % is the opponent\'s win rate there, so higher = more urgent. Points are drawn in five tiers: tier 1 is the largest ring with a translucent fill, tiers 2-4 shrink and fade (the smallest ring is half the largest), and tier 5 (edges / low risk) shows just a number inside a thinner ring of the same size as tier 4, sweeping the board; the whole palette is sky blue (deeper = more urgent, paler = low risk). The search keeps deepening; "Stop scan" keeps the last frame on the board until you play or press "Clear calc".',
-        '"AI view" shows the AI candidates (circles with scores) only while it thinks, and clears the moment it moves; "Coach view" hints your best move in four colours and disappears as soon as you play.',
-        '"Clear calc" sits next to "Compute": one press wipes whatever any card item left on the board - badges and scores from Compute / Multi-point / Balanced 1 / Balanced 2, the five-tier rings and percentages of Defense scan, and the numbers, dashed lines and code chain of Look-ahead / VCF / VCT. It clears marks only, never the position.',
+        '"Balanced 1" picks the candidate whose evaluation is closest to zero; "Balanced 2" plays each candidate out and reads the reply before choosing; "Scan analysis" runs the engine-native YXSEARCHDEFEND exactly as the Rapfi bundle does - no extra pass, the candidate range is widened to the whole board, and every empty point is searched continuously. Each percentage is the win rate of the side to move if it plays there (Black when Black is to move, White when White is). All rings share one fixed size; only the colour changes, in four steps measured against the best value of the frame: the original blue for the top band, then sea blue, light sky blue and white-blue, with opacity falling by band but never dropping below 75%. The search keeps deepening; "Stop analysis" keeps the last frame on the board until you play or press "Clear calc".',
+        '"AI view" shows the AI candidates (circles with scores) only while it thinks, and clears the moment it moves.',
+        '"Clear calc" sits next to "Compute": one press wipes whatever any card item left on the board - badges and scores from Compute / Multi-point / Balanced 1 / Balanced 2, the fixed rings and percentages of Scan analysis, and the numbers, dashed lines and code chain of Look-ahead / VCF / VCT. It clears marks only, never the position.',
+        'The "Routes" panel sits under the analysis card: set the analysis points to N and N routes are laid out, each with the full engine PV (rank / depth / win rate / score plus the coordinate chain); hover a coordinate to preview up to that move, click to pin the line on the board (it survives search refreshes), click again to release it, and double-click a coordinate to play that route onto the board (gomocalc behaves the same way).',
         'The dashboard shows depth, speed, nodes, time and evaluation; the curve below tracks the whole game for both colours (the axis rescales itself).',
       ]},
       { t: '4. Look-ahead / VCF / VCT', ps: [
@@ -708,6 +724,18 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     aboutVer: 'Version', aboutFeat: 'Features', aboutOss: 'Open-source components', aboutLic: 'Licence',
     aboutUpdates: 'Recent updates',
     aboutUpdateList: [
+      { v: '4.51', items: [
+        '"Full board" is now "Scan analysis": the candidate range is no longer forced open, it follows the reference bundle - only the area covered by your candidate range is scanned, so the shape follows the stones instead of being a fixed geometry',
+        'Balance rings are thin solid lines filled with translucent violet (Black) or sky blue (White), with the win rate, score and pick number clearly readable inside',
+        'The Routes panel is twice as tall, its scrollbar loses the arrow buttons and uses the plain thin style, and the "hover to preview" hint is gone',
+        'Coach view removed; the Homepage button in About now sits on the title row',
+      ]},
+        { v: '4.50', items: [
+        '"Defend scan" is now "Scan analysis" and follows the reference bundle exactly: no extra pass, the candidate range is the whole board, and each point reads the win rate of the side to move playing there (Black when Black is to move, White when White is)',
+        'Full-board rings keep one fixed size and are coloured in four steps against the best value of the frame (blue, sea blue, light sky blue, white-blue), with opacity never dropping more than 25%',
+        'Balance picks are limited to 1 or 2; the ring now matches the web calculator - win rate on top, score below, the pick number as a small badge on the upper-left rim, dashed ring',
+        'New "Routes" panel under the analysis card: one line per analysed point, each showing the engine\'s full PV; hover a coordinate to preview up to that move, click to pin the line on the board',
+      ]},
       { v: '4.48', items: [
         'New "Jade" stone material (layered pale tints with a glass-like sheen); realistic stones also cast a soft contact shadow. The board renders at 2x supersampling, so stones, move counters and grid lines are visibly sharper',
         'New "Dynamic time" switch under Game: trivial positions get less time, hard ones up to +15%, forced wins only 40% - the saved seconds go into a time bank for later moves. Turn it off to think exactly the configured number of seconds',
@@ -733,7 +761,6 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
         'All placeholders filled in for the English UI ({n} / {p} no longer leak); fixed occasional lost lines in concurrent logging',
       ]},
       { v: '4.43', items: [
-        'Defense scan now uses the engine-native YXSEARCHDEFEND: a PASS hands the move to the opponent, so each percentage is the opponent win rate at that point; danger is drawn in five tiers (tier 1 is the largest ring with a translucent fill, tiers 2-4 shrink and fade, tier 5 edge points show only a number in a thin ring), in a pale sky-blue ramp; the key becomes "Stop scan" and the last frame stays on the board; "Clear marks" is renamed "Clear calc"',
         'Vision adapts far better to real pictures: dark and light board themes, rotated screenshots, photos of a screen, low-contrast and blurry images all read now - a third "local contrast" reader judges each intersection against its own background, board search climbs a ladder (3x3 blur, CLAHE equalisation, 1.5x upscale), and a geometry check takes over when the grid does not line up',
         'Vision "Recognition params": opening the panel hides the position-code box automatically, and the hint line is a fixed-height dashed box - dragging the sliders no longer makes the column jump',
         'UI assets are now one ui.pak instead of many .enc files - antivirus products no longer mistake the encrypted documents for ransomware and delete them (which used to leave a blank window); if the file really is missing, a diagnostic page explains how to whitelist and reinstall',
@@ -743,7 +770,7 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
     aboutFeatList: [
       'Three modes: play the AI / free placement / endgame (set up a position and Confirm it; Restart returns to it)',
       'Look-ahead that runs to a real five-in-a-row; local VCF / VCT mate solver (multi-worker, iterative deepening)',
-      'Evaluation: Compute / Clear calc / Multi-point / Balanced 1 / Balanced 2 / Defense scan, plus AI view and Coach view',
+      'Evaluation: Compute / Clear calc / Multi-point / Balanced 1 or 2 / Scan analysis, plus AI view and the Routes panel',
       'Eval curve with a self-rescaling axis up to +/-1200; dashboard with depth / speed / nodes / time',
       'Three rules: freestyle / overline-loses / Renju (forbidden moves)',
       'Vision: screenshot or upload with auto board snapping, VC mate-puzzle mode, manual editing (swap / remove / fill / crop) and a picture drawer',
@@ -762,8 +789,6 @@ tagDefend: '扫描防守', tagCalc: '计算评估', tagNbest: '多点分析',
 tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     tagLiveAna: 'Live analysis', tagBg: 'Background thinking', liveAna: 'Analyze', liveAnaStop: 'Stop analysis',
     liveAnaBan: 'AI self-play: both sides are played by AI - no user side to analyze',
-    liveAnaEvalBusy: 'Evaluation is running - stop it first, then start analysis',
-    placeEvalAnaBusy: 'Analysis is running - stop it first, then start evaluation',
     liveAnaRun: 'Live analysis · deep search · depth {d}',
     anCalcRun: 'Eval · continuous deep search · depth {d}',
     anNbestRun: 'Multi-PV · continuous deep search · depth {d}',
@@ -793,8 +818,6 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     fontSampleLog: 'Engine: Rapfi · depth 24 · nodes 4.5M · 1.92s',
     fontSampleNum: '1 2 3 4 5 6 7 8 9 10',
     fontDefault: 'System default',
-    placeEval: 'Evaluate', placeEvalStop: 'Stop evaluation',
-    placeEvalTip: 'Continuously evaluate this position; win rate and curve update in the engine dashboard',
     setDescEngine: 'Depth, speed, nodes, position code',
     setDescAnalysis: 'Live analysis, balance, scan defence',
     setDescSetup: 'Mode, think time, rules, engine knobs',
@@ -884,13 +907,22 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     cards: 'Cards', cardsHint: 'Pick the panels shown right of the board',
     cardSideL: 'L', cardSideR: 'R',
     analysis: 'Analysis',
-    anCalc: 'Analyze', anStop: 'Stop', anDefend: 'Defend scan', anStopScan: 'Stop scan',
-    anNbest: 'Multi-point', anBal: 'Balance picks', anBaln: 'Points',
+    anCalc: 'Analyze', anStop: 'Stop', anDefend: 'Scan', anStopScan: 'Stop',
+    anNbest: 'Multi-point', anBal: 'Balance picks', anBaln: 'Points', anBalBtn: 'Balance\nPoint',
     anDefendDone: 'Scanned {c} points: higher % = more urgent (W = to win, L = to lose)',
     anDefendRefine: 'Deepening… round {r} · {t}s each',
     anDefendStable: 'Converged: result stable',
-    anScanRun: 'Defend scan · all-point engine search… depth {d} · {c} points (% = urgency)',
-    anScanFrozen: 'Scan stopped: last frame kept ({c} points) — cleared by a move / Clear calc',
+    anScanRun: 'Scan analysis · scanning… depth {d} · {c} points (% = win rate if the side to move plays there)',
+    anScanFrozen: 'Analysis stopped: last frame kept ({c} points) — cleared by a move / Clear calc',
+    rtTitle: 'Routes',
+    rtLegend: 'Score = engine eval (positive = that row’s first side is ahead) · Depth = completed full iteration (d value) · Win rate = view of the side playing that row’s first move',
+    rtEmpty: 'Run Multi-point / Analyze / Balance and every point gets its own related route here',
+    rtWin: 'win',
+    rtScoreTip: 'Score: the engine eval value (not a win rate; positive = the row’s first side is ahead; |score| ≤ 50 is the official balance window)',
+    rtDepthTip: 'Depth: how deep the completed full iterations went (d25 = 25 iterations finished)',
+    rtWinTip: 'Win rate: converted for the side playing that row’s first move (engine WINRATE or derived from the score)',
+    balPtBtn: '{n} pt',
+    balPtHint: 'Balance point count: click to cycle 1 ⇄ 2 points (3 fixed on an empty board)',
 
     shell: 'Search',
     shell: 'Search',
@@ -1017,12 +1049,13 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     anBalNoEngine: 'Balance sub-engine unavailable (native balance search did not answer) — returned empty rather than substituting the playing engine for balance points; retry shortly',
     anBalFail: 'Balance search failed: ',
     anBalnSet: 'Balance point count set to {n} (3 fixed on empty board)',
-    anBalnHint: 'Balance point count (1-6, 3 fixed on empty board)',
-    balStart: 'Balance search started: the marks refine as it runs; press Balance again to stop and play them',
+    anBalnHint: 'Balance point count (1 or 2; 3 fixed on an empty board)',
+    balStart: 'Balance search started: marks and routes refine as it runs; press Balance again to stop',
     balRunStat: 'Balancing · depth {d} · {t}s',
-    balStopShow: 'Stop & play',
-    balRunTip: 'Press again: play the stones',
-    balTip: 'Continuous balance search; press again to play',
+    balStopShow: 'Stop',
+    balRunTip: 'Stop the balance search; marks and routes stay on the board',
+    balTip: 'Continuous balance search; press again to stop (results kept)',
+    balKept: ' (stopped: balance marks and routes kept; cleared by a move, another analysis, or Clear)',
     balOpenDone: 'Empty board: the official 3-move balanced opening is ready; press Balance again to play it',
     balShown: 'Played {n} stones · depth {d}',
     balNoPlay: ' (opening / swap flow active: marks kept on the board, nothing played automatically)',
@@ -1287,10 +1320,11 @@ function grab() {
    'cpThemesView','cpCustomView','cp_custom','cp_custom_back','t_cpCustom',
    't_cpTarget','t_cpHex','t_cpPreset',
    'btn_set','btn_settings','setPop','btn_aiside','aiSidePop','btn_ai_close',
-   'ai_side_b','ai_side_w','t_aiTurn','num_turn2','btn_live','btn_place_eval',
+   'ai_side_b','ai_side_w','t_aiTurn','num_turn2','btn_live',
    't_analysis','btn_an_calc','btn_an_bal','btn_an_baln','btn_an_defend',
+   'routesBox','rtList',
    'num_nbest','t_nbest','t_nbestHint',
-   't_history','t_saved','t_drTip'].forEach(function (id) {
+   't_history','t_saved','t_drTip','ab_home'].forEach(function (id) {
     els[id] = document.getElementById(id);
   });
 }
@@ -1370,7 +1404,7 @@ function layoutFootRows(force) {
     if (h0 > 0) _footBaseH = h0;
   }
   var sig = foot.clientWidth + '|' + foot.className + '|' +
-            ['btn_place_eval', 'btn_live', 'btn_aiside'].map(function (id) {
+            ['btn_live', 'btn_aiside'].map(function (id) {
               var e = document.getElementById(id);
               return e ? (footIsHidden(e) ? 0 : 1) : 0;
             }).join('');
@@ -1879,13 +1913,6 @@ function paint() {
   }
 
   var r = gap * 0.47;
-  for (var y = 0; y < N; y++) for (var x = 0; x < N; x++) {
-    var c = G.board[y][x];
-    if (!c) continue;
-    var px = pad + x * gap, py = pad + y * gap;
-    stoneDraw(ctx, px, py, r, c, Math.max(0.68, gap * 0.0195),
-              css('--blk'), css('--blk-edge'), css('--wht'), css('--blk'));
-  }
 
   if (typeof VIS !== 'undefined' && VIS.edit) {
     (VIS.ghosts || []).forEach(function (gp) {
@@ -1937,23 +1964,6 @@ function paint() {
 
   drawForbiddenMarks(ctx, g);
 
-  if (numShown() && G.moves.length) {
-    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-
-    var numPx = Math.max(8, gap * NUM_SCALE);
-    G.moves.forEach(function (m, i) {
-
-      if (i === G.moves.length - 1) return;
-      var sx = pad + m.x * gap, sy = pad + m.y * gap;
-      var txt = String(i + 1);
-      fitStoneNum(ctx, txt, numPx, r, NUM_WEIGHT);
-      var numDy = numGlyphDy(ctx, txt);
-
-      ctx.fillStyle = (m.c === 1) ? '#ffffff' : '#1a1a1a';
-      ctx.fillText(txt, sx, sy + numDy);
-    });
-  }
-
   if ((G.heat.length || G.coach.length) && S.mode !== 'place' && S.mode !== 'endgame' && aiDecorOn()) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
@@ -1986,23 +1996,209 @@ function paint() {
     ctx.globalAlpha = 1;
   }
 
-  if (G.moves.length) {
-    var lm = G.moves[G.moves.length - 1];
-    var lx = pad + lm.x * gap, ly = pad + lm.y * gap;
-    if (numShown()) {
-      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  if (openActive() && aiDecorOn() && OPEN.kind === 'tar' && OPEN.tar && OPEN.tar.called.length) {
+    ctx.strokeStyle = '#00bfa5';
+    ctx.lineWidth = Math.max(1.6, gap * 0.06);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '600 ' + Math.max(8, gap * 0.3) + 'px "Segoe UI",system-ui,sans-serif';
+    OPEN.tar.called.forEach(function (p, i) {
+      var px = pad + p[0] * gap, py = pad + p[1] * gap;
+      ctx.beginPath(); ctx.arc(px, py, r * 0.62, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#00bfa5';
+      ctx.fillText(String(i + 1), px, py);
+    });
+  }
 
-      var lmTxt = String(G.moves.length);
-      fitStoneNum(ctx, lmTxt, Math.max(10, gap * NUM_SCALE), r, Math.max(700, NUM_WEIGHT));
-      var lmDy = numGlyphDy(ctx, lmTxt);
-      ctx.fillStyle = css('--winline');
-      ctx.fillText(lmTxt, lx, ly + lmDy);
-    } else {
-      ctx.fillStyle = css('--winline');
-      ctx.beginPath();
-      ctx.arc(lx, ly, Math.max(2.2, r * 0.22), 0, Math.PI * 2);
-      ctx.fill();
+  G.missRings.forEach(function (p) {
+    ctx.strokeStyle = css('--miss');
+    ctx.lineWidth = Math.max(2, gap * 0.09);
+    ctx.beginPath();
+    ctx.arc(pad + p.x * gap, pad + p.y * gap, r * 1.25, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+
+  if (openActive() && aiDecorOn()) drawOpenGuide(ctx, g, r);
+
+  var balHide = false;
+  if (G.ana.kind === 'bal' && G.ana.marks.length) {
+    // Hide only after the user has played as many stones as there are marks
+    // SINCE they were computed. The old rule compared the ABSOLUTE move count
+    // against the mark count, so every pick on a board that already had stones
+    // (e.g. 5 stones + 2 picks) was erased the moment it was drawn.
+    var balBaseM = (G.ana.balBase != null) ? G.ana.balBase : 0;
+    if (G.moves.length >= balBaseM + G.ana.marks.length) balHide = true;
+  } else if (G.ana.kind === 'bal1' && G.ana.marks.length) {
+    var isStage2 = G.ana.marks.some(function (mk) { return String(mk.badge) === '4'; });
+    if (G.moves.length >= (isStage2 ? 5 : 3)) balHide = true;
+  }
+  if (aiDecorOn() && G.ana.defCells && G.ana.defCells.length)
+    drawDefendMarks(ctx, G.ana.defCells, pad, gap);
+  if (aiDecorOn()) {
+    var lm = G.ana.marks.filter(function (m) { return m && m.live; });
+    if (lm.length) drawLiveMarks(ctx, lm, pad, gap);
+  }
+  if (G.ana.marks.length && (aiDecorOn() || G.ana.kind === 'bal' || G.ana.kind === 'bal1') && !balHide) {
+
+    var mrBase = Math.max(6, gap * 0.40);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    var taken = [];
+    // A balance pick that has already been played is covered by its stone, so
+    // drop exactly those marks while the rest keep counting down.
+    var balDraw = G.ana.marks.filter(function (m) { return !m.live; });
+    if (G.ana.kind === 'bal')
+      balDraw = balDraw.filter(function (m) { return !G.board[m.y][m.x]; });
+    function hits(a, b) {
+      return !(a.x2 < b.x1 || b.x2 < a.x1 || a.y2 < b.y1 || b.y2 < a.y1);
     }
+    balDraw.forEach(function (mk) {
+      if (mk.plain) return;
+      if (typeof mk.tier !== 'number') mk.tier = 0;
+      /* balance picks get a slightly larger ring so three lines fit inside */
+      var mr = (mk.tier < 0) ? gap * 0.47 : mrBase;
+      var px = pad + mk.x * gap, py = pad + mk.y * gap;
+
+      var pal = (mk.tier < 0) ? ANA_BAL : ANA_PAL[Math.max(0, Math.min(ANA_PAL.length - 1, mk.tier))];
+      if (mk.col) pal = { badge: mk.col, ring: 'rgba(255,255,255,.94)' };
+
+      var mt = mk.inline ? anaInlineMetrics(ctx, mk, mr) : null;
+      var multi = mt ? mt.multi : (String(mk.badge).length > 1);
+      var pw = mt ? mt.pw : mr * 2, ph = mt ? mt.ph : mr * 2;
+      if (!mt && multi) {
+
+        ctx.font = '700 ' + Math.max(8, mr * 0.9) + 'px "Segoe UI",system-ui,sans-serif';
+        pw = ctx.measureText(mk.badge).width + mr * 0.9;
+        ph = mr * 1.6;
+      }
+      ctx.beginPath();
+      if (multi) {
+        if (ctx.roundRect) ctx.roundRect(px - pw / 2, py - ph / 2, pw, ph, ph / 2);
+        else ctx.rect(px - pw / 2, py - ph / 2, pw, ph);
+      } else {
+        ctx.arc(px, py, mr, 0, Math.PI * 2);
+      }
+      if (mk.tier < 0 && mk.inline) {
+        var isW = !!mk.col;
+        ctx.fillStyle = isW ? 'rgba(86,182,240,.28)' : 'rgba(148,118,246,.28)';
+        ctx.fill();
+        ctx.lineWidth = Math.max(1.2, gap * 0.030);
+        ctx.strokeStyle = isW ? 'rgba(44,158,224,.95)' : 'rgba(126,92,246,.95)';
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = pal.badge; ctx.fill();
+        ctx.lineWidth = Math.max(1.6, gap * 0.07);
+        ctx.strokeStyle = pal.ring; ctx.stroke();
+      }
+      taken.push({ x1: px - pw / 2 - 1, y1: py - ph / 2 - 1, x2: px + pw / 2 + 1, y2: py + ph / 2 + 1 });
+    });
+    balDraw.forEach(function (mk) {
+      var px = pad + mk.x * gap, py = pad + mk.y * gap;
+      var mr = (mk.tier < 0) ? gap * 0.47 : mrBase;
+      if (mk.plain) {
+
+        var pf = Math.max(7, gap * 0.24);
+        ctx.font = '600 ' + pf + 'px "Segoe UI",system-ui,sans-serif';
+        var palP = (mk.tier < 0) ? ANA_BAL : ANA_PAL[Math.max(0, Math.min(ANA_PAL.length - 1, mk.tier))];
+        if (mk.col) palP = { badge: mk.col };
+        ctx.lineWidth = Math.max(2, gap * 0.09);
+        ctx.strokeStyle = 'rgba(255,255,255,.9)';
+        ctx.strokeText(mk.label, px, py);
+        ctx.fillStyle = palP.badge;
+        ctx.fillText(mk.label, px, py);
+        return;
+      }
+
+      if (mk.inline) {
+        var mt = anaInlineMetrics(ctx, mk, mr);
+        if (mk.label || mk.sub) {
+          var palT = { badge: mk.col || ANA_BAL.badge };
+          var FS_FAM = '"Segoe UI",system-ui,sans-serif';
+          var wOf = function (fs, txt) {
+            if (!txt) return 0;
+            ctx.font = '700 ' + fs + 'px ' + FS_FAM;
+            return ctx.measureText(String(txt)).width;
+          };
+
+          var capW = mr * 1.50;
+          var gapV = mr * 0.10;
+          var fsTop = Math.max(9, mr * 0.82);
+          var fsBot = Math.max(8, mr * 0.62);
+          while (fsTop > 8 && (wOf(fsTop, mk.label) > capW ||
+                (fsTop + gapV + fsBot) > mr * 1.70)) {
+            fsTop -= 0.4;
+            fsBot = Math.max(8, fsTop * 0.72);
+          }
+          while (fsBot > 6 && wOf(fsBot, mk.sub) > capW) fsBot -= 0.3;
+          ctx.strokeStyle = 'rgba(255,255,255,.82)';
+          ctx.fillStyle = '#1d2430';
+          if (mk.label) {
+            ctx.font = '700 ' + fsTop + 'px ' + FS_FAM;
+            ctx.lineWidth = Math.max(1.4, fsTop * 0.20);
+            var yTop = py - mr * 0.28;
+            ctx.strokeText(mk.label, px, yTop); ctx.fillText(mk.label, px, yTop);
+          }
+          if (mk.sub) {
+            ctx.font = '700 ' + fsBot + 'px ' + FS_FAM;
+            ctx.lineWidth = Math.max(1.3, fsBot * 0.20);
+            var yBot = py + mr * 0.37;
+            ctx.strokeText(mk.sub, px, yBot); ctx.fillText(mk.sub, px, yBot);
+          }
+          if (mk.badge != null && mk.badge !== '') {
+            var br = Math.max(8, mr * 0.36);
+            var bd = (mr + br * 0.75) * 0.7071;
+            var bx = px - bd, by = py - bd;
+            ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2);
+            ctx.fillStyle = palT.badge; ctx.fill();
+            ctx.lineWidth = Math.max(1.2, br * 0.2);
+            ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.stroke();
+            ctx.fillStyle = '#fff';
+            ctx.font = '700 ' + Math.max(7, br * 1.05) + 'px "Segoe UI",system-ui,sans-serif';
+            ctx.fillText(String(mk.badge), bx, by + 0.5);
+          }
+          return;
+        }
+        ctx.fillStyle = css('--ink');
+        if (mk.label) {
+          ctx.font = '700 ' + mt.rf + 'px "Segoe UI",system-ui,sans-serif';
+          ctx.fillText(mk.badge, px, py - mt.ph * 0.19);
+          ctx.font = '600 ' + mt.ef + 'px "Segoe UI",system-ui,sans-serif';
+          ctx.fillText(mk.label, px, py + mt.ph * 0.24);
+        } else {
+          ctx.font = '700 ' + Math.max(9, mr * 0.9) + 'px "Segoe UI",system-ui,sans-serif';
+          ctx.fillText(mk.badge, px, py + 0.5);
+        }
+        return;
+      }
+
+      ctx.font = '700 ' + Math.max(8, mr * 0.9) + 'px "Segoe UI",system-ui,sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(mk.badge, px, py + 0.5);
+      if (!mk.label) return;
+
+      var fs = Math.max(8, gap * 0.28);
+      ctx.font = '600 ' + fs + 'px "Segoe UI",system-ui,sans-serif';
+      var tw = ctx.measureText(mk.label).width, th = fs * 1.1;
+      var off = Math.max(3, gap * 0.07);
+      var cands = [
+        { x: px, y: py + mr + off + th * 0.5 },
+        { x: px, y: py - mr - off - th * 0.5 },
+        { x: px + mr + off + tw / 2, y: py },
+        { x: px - mr - off - tw / 2, y: py },
+      ];
+      var pick = null;
+      for (var i = 0; i < cands.length && !pick; i++) {
+        var c = cands[i];
+        var box = { x1: c.x - tw / 2 - 1, y1: c.y - th * 0.62, x2: c.x + tw / 2 + 1, y2: c.y + th * 0.62 };
+        var clash = false;
+        for (var j = 0; j < taken.length; j++) if (hits(box, taken[j])) { clash = true; break; }
+        if (!clash) { pick = c; taken.push(box); }
+      }
+      if (!pick) pick = cands[0];
+      ctx.lineWidth = Math.max(2.6, gap * 0.11);
+      ctx.strokeStyle = 'rgba(255,255,255,.92)';
+      ctx.strokeText(mk.label, pick.x, pick.y);
+      ctx.fillStyle = '#241f1a';
+      ctx.fillText(mk.label, pick.x, pick.y);
+    });
   }
 
   var gpv = null, psd = curColor();
@@ -2061,29 +2257,6 @@ function paint() {
     }
     ctx.restore();
   }
-
-  if (openActive() && aiDecorOn() && OPEN.kind === 'tar' && OPEN.tar && OPEN.tar.called.length) {
-    ctx.strokeStyle = '#00bfa5';
-    ctx.lineWidth = Math.max(1.6, gap * 0.06);
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = '600 ' + Math.max(8, gap * 0.3) + 'px "Segoe UI",system-ui,sans-serif';
-    OPEN.tar.called.forEach(function (p, i) {
-      var px = pad + p[0] * gap, py = pad + p[1] * gap;
-      ctx.beginPath(); ctx.arc(px, py, r * 0.62, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = '#00bfa5';
-      ctx.fillText(String(i + 1), px, py);
-    });
-  }
-
-  G.missRings.forEach(function (p) {
-    ctx.strokeStyle = css('--miss');
-    ctx.lineWidth = Math.max(2, gap * 0.09);
-    ctx.beginPath();
-    ctx.arc(pad + p.x * gap, pad + p.y * gap, r * 1.25, 0, Math.PI * 2);
-    ctx.stroke();
-  });
-
-  if (openActive() && aiDecorOn()) drawOpenGuide(ctx, g, r);
 
   if (G.fwd && G.fwd.on && G.fwd.line.length && aiDecorOn()) {
     var show = fwdShowIdx();
@@ -2169,126 +2342,43 @@ function paint() {
     }
   }
 
-  var balHide = false;
-  if (G.ana.kind === 'bal' && G.ana.marks.length) {
-    // Hide only after the user has played as many stones as there are marks
-    // SINCE they were computed. The old rule compared the ABSOLUTE move count
-    // against the mark count, so every pick on a board that already had stones
-    // (e.g. 5 stones + 2 picks) was erased the moment it was drawn.
-    var balBaseM = (G.ana.balBase != null) ? G.ana.balBase : 0;
-    if (G.moves.length >= balBaseM + G.ana.marks.length) balHide = true;
-  } else if (G.ana.kind === 'bal1' && G.ana.marks.length) {
-    var isStage2 = G.ana.marks.some(function (mk) { return String(mk.badge) === '4'; });
-    if (G.moves.length >= (isStage2 ? 5 : 3)) balHide = true;
+  for (var sy = 0; sy < N; sy++) for (var sx = 0; sx < N; sx++) {
+    var sc = G.board[sy][sx];
+    if (!sc) continue;
+    stoneDraw(ctx, pad + sx * gap, pad + sy * gap, r, sc, Math.max(0.68, gap * 0.0195),
+              css('--blk'), css('--blk-edge'), css('--wht'), css('--blk'));
   }
-  if (aiDecorOn()) {
-    var lm = G.ana.marks.filter(function (m) { return m && m.live; });
-    if (lm.length) drawLiveMarks(ctx, lm, pad, gap);
+
+  if (numShown() && G.moves.length) {
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    var numPx = Math.max(8, gap * NUM_SCALE);
+    G.moves.forEach(function (m, i) {
+      if (i === G.moves.length - 1) return;
+      var sx2 = pad + m.x * gap, sy2 = pad + m.y * gap;
+      var txt = String(i + 1);
+      fitStoneNum(ctx, txt, numPx, r, NUM_WEIGHT);
+      var numDy = numGlyphDy(ctx, txt);
+      ctx.fillStyle = (m.c === 1) ? '#ffffff' : '#1a1a1a';
+      ctx.fillText(txt, sx2, sy2 + numDy);
+    });
   }
-  if (aiDecorOn() && G.ana.defCells && G.ana.defCells.length)
-    drawDefendMarks(ctx, G.ana.defCells, pad, gap);
-  if (G.ana.marks.length && (aiDecorOn() || G.ana.kind === 'bal' || G.ana.kind === 'bal1') && !balHide) {
 
-    var mr = Math.max(6, gap * 0.40);
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
-    var taken = [];
-    // A balance pick that has already been played is covered by its stone, so
-    // drop exactly those marks while the rest keep counting down.
-    var balDraw = G.ana.marks.filter(function (m) { return !m.live; });
-    if (G.ana.kind === 'bal')
-      balDraw = balDraw.filter(function (m) { return !G.board[m.y][m.x]; });
-    function hits(a, b) {
-      return !(a.x2 < b.x1 || b.x2 < a.x1 || a.y2 < b.y1 || b.y2 < a.y1);
-    }
-    balDraw.forEach(function (mk) {
-      if (mk.plain) return;
-      var px = pad + mk.x * gap, py = pad + mk.y * gap;
-
-      var pal = (mk.tier < 0) ? ANA_BAL : ANA_PAL[Math.max(0, Math.min(ANA_PAL.length - 1, mk.tier))];
-      if (mk.col) pal = { badge: mk.col, ring: 'rgba(255,255,255,.94)' };
-
-      var mt = mk.inline ? anaInlineMetrics(ctx, mk, mr) : null;
-      var multi = mt ? mt.multi : (String(mk.badge).length > 1);
-      var pw = mt ? mt.pw : mr * 2, ph = mt ? mt.ph : mr * 2;
-      if (!mt && multi) {
-
-        ctx.font = '700 ' + Math.max(8, mr * 0.9) + 'px "Segoe UI",system-ui,sans-serif';
-        pw = ctx.measureText(mk.badge).width + mr * 0.9;
-        ph = mr * 1.6;
-      }
+  if (G.moves.length) {
+    var lmS = G.moves[G.moves.length - 1];
+    var lxS = pad + lmS.x * gap, lyS = pad + lmS.y * gap;
+    if (numShown()) {
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      var lmTxtS = String(G.moves.length);
+      fitStoneNum(ctx, lmTxtS, Math.max(10, gap * NUM_SCALE), r, Math.max(700, NUM_WEIGHT));
+      var lmDyS = numGlyphDy(ctx, lmTxtS);
+      ctx.fillStyle = css('--winline');
+      ctx.fillText(lmTxtS, lxS, lyS + lmDyS);
+    } else {
+      ctx.fillStyle = css('--winline');
       ctx.beginPath();
-      if (multi) {
-        if (ctx.roundRect) ctx.roundRect(px - pw / 2, py - ph / 2, pw, ph, ph / 2);
-        else ctx.rect(px - pw / 2, py - ph / 2, pw, ph);
-      } else {
-        ctx.arc(px, py, mr, 0, Math.PI * 2);
-      }
-      ctx.fillStyle = pal.badge; ctx.fill();
-      ctx.lineWidth = Math.max(1.6, gap * 0.07);
-      ctx.strokeStyle = pal.ring; ctx.stroke();
-      taken.push({ x1: px - pw / 2 - 1, y1: py - ph / 2 - 1, x2: px + pw / 2 + 1, y2: py + ph / 2 + 1 });
-    });
-    balDraw.forEach(function (mk) {
-      var px = pad + mk.x * gap, py = pad + mk.y * gap;
-      if (mk.plain) {
-
-        var pf = Math.max(7, gap * 0.24);
-        ctx.font = '600 ' + pf + 'px "Segoe UI",system-ui,sans-serif';
-        var palP = (mk.tier < 0) ? ANA_BAL : ANA_PAL[Math.max(0, Math.min(ANA_PAL.length - 1, mk.tier))];
-        if (mk.col) palP = { badge: mk.col };
-        ctx.lineWidth = Math.max(2, gap * 0.09);
-        ctx.strokeStyle = 'rgba(255,255,255,.9)';
-        ctx.strokeText(mk.label, px, py);
-        ctx.fillStyle = palP.badge;
-        ctx.fillText(mk.label, px, py);
-        return;
-      }
-
-      if (mk.inline) {
-        var mt = anaInlineMetrics(ctx, mk, mr);
-        ctx.fillStyle = '#ffffff';
-        if (mk.label) {
-          ctx.font = '700 ' + mt.rf + 'px "Segoe UI",system-ui,sans-serif';
-          ctx.fillText(mk.badge, px, py - mt.ph * 0.19);
-          ctx.font = '600 ' + mt.ef + 'px "Segoe UI",system-ui,sans-serif';
-          ctx.fillText(mk.label, px, py + mt.ph * 0.24);
-        } else {
-          ctx.font = '700 ' + Math.max(9, mr * 0.9) + 'px "Segoe UI",system-ui,sans-serif';
-          ctx.fillText(mk.badge, px, py + 0.5);
-        }
-        return;
-      }
-
-      ctx.font = '700 ' + Math.max(8, mr * 0.9) + 'px "Segoe UI",system-ui,sans-serif';
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(mk.badge, px, py + 0.5);
-      if (!mk.label) return;
-
-      var fs = Math.max(8, gap * 0.28);
-      ctx.font = '600 ' + fs + 'px "Segoe UI",system-ui,sans-serif';
-      var tw = ctx.measureText(mk.label).width, th = fs * 1.1;
-      var off = Math.max(3, gap * 0.07);
-      var cands = [
-        { x: px, y: py + mr + off + th * 0.5 },
-        { x: px, y: py - mr - off - th * 0.5 },
-        { x: px + mr + off + tw / 2, y: py },
-        { x: px - mr - off - tw / 2, y: py },
-      ];
-      var pick = null;
-      for (var i = 0; i < cands.length && !pick; i++) {
-        var c = cands[i];
-        var box = { x1: c.x - tw / 2 - 1, y1: c.y - th * 0.62, x2: c.x + tw / 2 + 1, y2: c.y + th * 0.62 };
-        var clash = false;
-        for (var j = 0; j < taken.length; j++) if (hits(box, taken[j])) { clash = true; break; }
-        if (!clash) { pick = c; taken.push(box); }
-      }
-      if (!pick) pick = cands[0];
-      ctx.lineWidth = Math.max(2.6, gap * 0.11);
-      ctx.strokeStyle = 'rgba(255,255,255,.92)';
-      ctx.strokeText(mk.label, pick.x, pick.y);
-      ctx.fillStyle = '#241f1a';
-      ctx.fillText(mk.label, pick.x, pick.y);
-    });
+      ctx.arc(lxS, lyS, Math.max(2.2, r * 0.22), 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
 }
@@ -2636,16 +2726,16 @@ var LocalAI = (function () {
   function mapRes(r) {
     r = r || {};
     var cands = (r.candidates || []).map(function (c) {
-      var wr = (typeof c.winrateBp === 'number' && c.winrateBp >= 0 && c.winrateBp <= 10000)
-                 ? c.winrateBp / 10000 : 0.5;
-      return { x: c.x, y: c.y, winrate: wr, eval: c.eval || '', depth: c.depth || 0,
+      var wrKnown = (typeof c.winrateBp === 'number' && c.winrateBp >= 0 && c.winrateBp <= 10000);
+      var wr = wrKnown ? c.winrateBp / 10000 : 0.5;
+      return { x: c.x, y: c.y, winrate: wr, wrKnown: wrKnown, eval: c.eval || '', depth: c.depth || 0,
                speed: r.speed || 0, nodes: r.nodes || 0,
                line: (c.pv || []).map(function (p) { return [p[0], p[1]]; }) };
     });
     var best = (r.bestX >= 0 && r.bestY >= 0) ? [r.bestX, r.bestY]
                                               : (cands.length ? [cands[0].x, cands[0].y] : null);
     return { candidates: cands, best: best, timeout: !r.finished && !r.bestEval,
-             elapsed: r.timeMs || 0, nodeCount: r.nodes || 0,
+             elapsed: r.timeMs || 0, nodeCount: r.nodes || 0, nodes: r.nodes || 0,
              depth: r.depth || 0, superseded: !!r.superseded, error: r.err || '' };
   }
   function liveOf(job, r) {
@@ -2719,7 +2809,9 @@ var LocalAI = (function () {
     if (job.id != null && pend[job.id]) { delete pend[job.id]; clearTimeout(job.timer); running = true; }
     slotClear(job);
 
-    if (running) { try { post({ engine: 1, op: 'stop', id: ++seq, q: { lane: isEv ? 'eval' : 'main' } }); } catch (e) {} }
+    
+    
+    if (running) { try { post({ engine: 1, op: 'stop', id: ++seq, q: { lane: isEv ? 'eval' : 'main', live: 1 } }); } catch (e) {} }
     endJob(job, { stopped: true });
     pump();
   }
@@ -2774,7 +2866,12 @@ var LocalAI = (function () {
     if (job.op === 'live') {
 
       
-      if (G.busy) { if (wait && wait.op === 'live') endJob(wait, { busy: true, stopped: true }); wait = job; return; }
+      if (G.busy) {
+
+        
+        if (wait) endJob(wait, wait.op === 'live' ? { busy: true, stopped: true } : emptyRes(true));
+        wait = job; return;
+      }
       if (cur) { endJob(job, { busy: true, stopped: true }); return; }
       startJob(job);
       return;
@@ -2966,6 +3063,8 @@ var LocalAI = (function () {
   };
 })();
 
+try { setInterval(function () { LocalAI.kick(); }, 600); } catch (e) {}
+
 function apiBalance(body, ms) {
   if (window.__GB_TEST__) return Promise.reject(new Error('stub: no engine in test'));
   return LocalAI.balance(body, ms);
@@ -3030,6 +3129,15 @@ function fmtEval(ev) {
   if (n > RAPFI_EVAL_MAX) n = RAPFI_EVAL_MAX;
   else if (n < -RAPFI_EVAL_MAX) n = -RAPFI_EVAL_MAX;
   return (n > 0 ? '+' : '') + Math.round(n);
+}
+function flipEvalText(ev) {
+  var s = String(ev == null ? '' : ev).trim();
+  if (!s) return '';
+  var m = /^([+-]?)M(\d+|\*)$/i.exec(s);
+  if (m) return fmtEval((m[1] === '-') ? ('M' + m[2]) : ('-M' + m[2]));
+  var n = parseFloat(s.replace('+', ''));
+  if (isNaN(n)) return s;
+  return fmtEval(-n);
 }
 // ---- evaluation curve: black / white lines, self-rescaling axis ----
 function pushCurve(ply, vFromMover, moverIsBlack) {
@@ -3314,6 +3422,7 @@ async function aiAssistOnce() {
 function place(x, y, fromRedo, byAI) {
   if (x < 0 || y < 0 || x >= N || y >= N) return false;
   if (G.board[y][x]) return false;
+  var wasScan = !byAI && !fromRedo && G.ana.busy && G.ana.kind === 'defend';
 
   if (!fromRedo) G.redo = [];
 
@@ -3348,9 +3457,11 @@ function place(x, y, fromRedo, byAI) {
   bgThinkKick(140);
   paint();
 
-  if (PLACE_EVAL && PLACE_EVAL.on) placeEvalKick();
-
   if (G.fwd && G.fwd.on && !G.fwd.hold) fwdQueue();
+  if (wasScan && !G.over) setTimeout(function () {
+    if (S.mode === 'place' || S.mode === 'endgame') return;
+    try { anaDefend(true); } catch (e) {}
+  }, 0);
   return true;
 }
 
@@ -3410,7 +3521,6 @@ function settleMove() {
   var last = G.moves[G.moves.length - 1];
   if (last && winCheck(G.board, last.x, last.y, last.c)) {
     G.over = true;
-    if (PLACE_EVAL && PLACE_EVAL.on) { PLACE_EVAL.on = false; placeEvalHaltJob(); }
     G.think = [];
     clearHeat();
     setStat(G.lastStat, T('over') + ' · ' + winTextFor(last.c));
@@ -3460,31 +3570,102 @@ function afterMove() {
   if (isAiColor(curColor())) aiMove();
 }
 
+var GAME_TS = 0;
+var __stateTmr = null, __stateLast = 0, __statePending = null;
+
+function gameStateObj() {
+  return {
+    v: 2, ts: Date.now(),
+    moves: G.moves.map(function (m) { return [m.x, m.y, m.c]; }),
+    rule: S.rule, side: S.side, aiB: !!S.aiB, aiW: !!S.aiW, mode: S.mode,
+    sett: { nbest: anaIp(), turnMs: S.turnMs, matchMs: S.matchMs, dyn: !!S.dyn }
+  };
+}
+
+function stateSaveSoon(o) {
+  __statePending = o;
+  if (!HOST) return;
+  var now = Date.now(), wait = 150 - (now - __stateLast);
+  if (wait <= 0) { stateFlush(); return; }
+  if (!__stateTmr) __stateTmr = setTimeout(stateFlush, wait);
+}
+function stateFlush() {
+  if (__stateTmr) { clearTimeout(__stateTmr); __stateTmr = null; }
+  if (!__statePending) return;
+  var o = __statePending; __statePending = null; __stateLast = Date.now();
+  try { tellHost({ type: 'stateSave', data: o }); } catch (e) {}
+}
+function stateValid(o) {
+  if (!o || typeof o !== 'object') return false;
+  if (o.v !== undefined && (typeof o.v !== 'number' || o.v > 2)) return false;
+  if (!Array.isArray(o.moves) || o.moves.length > 225) return false;
+  for (var i = 0; i < o.moves.length; i++) {
+    var a = o.moves[i];
+    if (!Array.isArray(a) || a.length < 2) return false;
+    var x = +a[0], y = +a[1];
+    if (!(x >= 0 && x < N && y >= 0 && y < N) || Math.floor(x) !== x || Math.floor(y) !== y) return false;
+  }
+  return true;
+}
+function applyGameState(o) {
+  if (!stateValid(o)) return false;
+  G.board = newBoard(); G.moves = []; G.curve = []; G.heat = []; G.nums = []; G.coach = [];
+  o.moves.forEach(function (a) {
+    var c = a[2] || ((G.moves.length % 2 === 0) ? 1 : 2);
+    var x = +a[0], y = +a[1];
+    if (G.board[y][x]) return;
+    G.board[y][x] = c;
+    G.moves.push({ x: x, y: y, c: c });
+  });
+  
+  if (o.rule === 0 || o.rule === 1 || o.rule === 2 || o.rule === 5) S.rule = o.rule;
+  if (o.side === 1 || o.side === 2) S.side = o.side;
+  if (typeof o.aiB === 'boolean') S.aiB = o.aiB;
+  if (typeof o.aiW === 'boolean') S.aiW = o.aiW;
+  if (!LINK_MODE && typeof o.mode === 'string' &&
+      (o.mode === 'play' || o.mode === 'place' || o.mode === 'endgame')) S.mode = o.mode;
+  var st = o.sett || {};
+  var nb = Math.round(+st.nbest || 0);
+  if (nb >= 1 && nb <= 8) S.nbest = nb;
+  var tm = +st.turnMs || 0;
+  if (tm >= 200 && tm <= 300000) S.turnMs = tm;
+  GAME_TS = +o.ts || 0;
+  try { if (els.sel_rule) els.sel_rule.value = String(S.rule); } catch (e) {}
+  try { if (els.num_nbest) els.num_nbest.value = String(anaIp()); } catch (e) {}
+  try { if (els.num_turn) els.num_turn.value = turnSecs(); } catch (e) {}
+  try { syncSideUI(); } catch (e) {}
+  recomputeOver();
+  paint();
+  refreshCoach();
+  return !!G.moves.length;
+}
+
 function persistGame() {
-  try {
-    var mv = G.moves.map(function (m) { return [m.x, m.y, m.c]; });
-    localStorage.setItem('gbcalc.game.v1', JSON.stringify({ moves: mv, rule: S.rule,
-      side: S.side, aiB: S.aiB, aiW: S.aiW, mode: S.mode, ts: Date.now() }));
-  } catch (e) {}
+  var o = gameStateObj();
+  GAME_TS = o.ts;
+  try { localStorage.setItem('gbcalc.game.v1', JSON.stringify(o)); } catch (e) {}
+  try { stateSaveSoon(o); } catch (e) {}
 }
 
 function restoreGame() {
   var o = null;
   try { o = JSON.parse(localStorage.getItem('gbcalc.game.v1') || 'null'); } catch (e) { o = null; }
-  if (!o || !Array.isArray(o.moves) || !o.moves.length) return false;
-  G.board = newBoard(); G.moves = []; G.curve = []; G.heat = []; G.nums = []; G.coach = [];
-  o.moves.forEach(function (a) {
-    var c = a[2] || ((G.moves.length % 2 === 0) ? 1 : 2);
-    if (a[0] < 0 || a[1] < 0 || a[0] >= N || a[1] >= N) return;
-    if (G.board[a[1]][a[0]]) return;
-    G.board[a[1]][a[0]] = c;
-    G.moves.push({ x: a[0], y: a[1], c: c });
-  });
-  recomputeOver();
-  paint();
-  refreshCoach();
-  return true;
+  if (!o || !o.moves || !o.moves.length) return false;
+  return applyGameState(o);
 }
+window.__gbApplyState = function (o) {
+  if (!stateValid(o)) return false;
+  if ((+o.ts || 0) < GAME_TS) return false;   
+  return applyGameState(o);
+};
+
+try {
+  window.addEventListener('pagehide', function () { if (__statePending) stateFlush(); });
+  window.addEventListener('beforeunload', function () { if (__statePending) stateFlush(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden' && __statePending) stateFlush();
+  });
+} catch (e) {}
 
 function recomputeOver() {
   var over = false;
@@ -4219,7 +4400,6 @@ function refreshUI() {
   els.btn_pause.disabled = (S.mode === 'place' || S.mode === 'endgame');
 
   if (els.btn_live) liveAnaUI();
-  placeEvalUI();
 
   if (els.sideHint) {
     els.sideHint.textContent = aiVsAi()
@@ -5050,7 +5230,7 @@ function toast(msg) {
   setStat(null, msg);
 }
 
-var APP_VERSION = '4.48';
+var APP_VERSION = '4.51';
 
 var UPDATE_URL = 'https://wwbbj.lanzout.com/b016l49aqj';
 var UPDATE_PWD = '15';
@@ -5072,6 +5252,14 @@ function openUpdatePage() {
   window.open(UPDATE_URL, '_blank');
   toast(T('updateOpened').replace('{p}', UPDATE_PWD));
 }
+
+/* the About dialog links back to the project home page (GitHub Pages) */
+var HOME_URL = 'https://xiaoxu4452.github.io/Meter-Gomoku/';
+function openHome() {
+  if (HOST) { tellHost({ type: 'openUrl', url: HOME_URL }); return; }
+  window.open(HOME_URL, '_blank');
+}
+try { window.gbOpenHome = openHome; } catch (e) {}
 
 function escHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -5119,6 +5307,10 @@ function renderAbout() {
   });
   var keep = AB_BUILT ? els.ab_body.scrollTop : 0;
   els.ab_body.innerHTML = h;
+  if (els.ab_home) {
+    els.ab_home.textContent = (S.lang === 'en' ? 'Homepage' : '主页');
+    els.ab_home.onclick = openHome;
+  }
   AB_BUILT = true;
   if (keep) els.ab_body.scrollTop = keep;
 }
@@ -7167,7 +7359,6 @@ function undoOne() {
   anaReset();
   liveAnaBoardChanged();
   paint(); refreshUI();
-  if (PLACE_EVAL && PLACE_EVAL.on) placeEvalKick();
   refreshCoach();
 }
 function stepBack() {
@@ -7195,7 +7386,6 @@ function stepBack() {
   anaReset();
   liveAnaBoardChanged();
   paint(); refreshUI();
-  if (PLACE_EVAL && PLACE_EVAL.on) placeEvalKick();
   refreshCoach();
 }
 function stepForward() {
@@ -7586,6 +7776,7 @@ function applyLang() {
     if (el) el.textContent = d[k];
   });
   try { dashEvalRefresh(); } catch (eEV) {}
+  try { rtRender(); } catch (eRT) {}
   try { if (els.t_bgThinkHint) els.t_bgThinkHint.removeAttribute('data-base'); } catch (eBH1) {}
   try { bgThinkHintSync(); } catch (eBH2) {}
   els.btn_reset.textContent = d.reset;
@@ -7655,15 +7846,14 @@ function applyLang() {
       pinKeySync(pk, cd ? cd.getAttribute('data-id') : '');
     });
     if (els.btn_live) liveAnaUI();
-    placeEvalUI();
     els.t_analysis.textContent = d.analysis;
     if (els.t_curveTtl) els.t_curveTtl.textContent = d.curve;
     [].forEach.call(document.querySelectorAll('.ci-score'), function (el) { el.textContent = d.score; });
     [].forEach.call(document.querySelectorAll('.ci-win'), function (el) { el.textContent = d.winRate; });
     drawCurveInfo();
     els.btn_an_defend.textContent = (G.ana.busy && G.ana.kind === 'defend') ? d.anStopScan : d.anDefend;
-    els.btn_an_bal.textContent = d.anBal;
-    if (els.btn_an_baln) { els.btn_an_baln.value = String(balPN()); els.btn_an_baln.title = d.anBalnHint; }
+    balUI();               
+    balPNLabel();
 
     if (els.btn_fwd) els.btn_fwd.textContent = d.fwd;
     if (els.btn_fwd_ok) els.btn_fwd_ok.textContent = d.fwdOk;
@@ -9704,7 +9894,7 @@ function pvText(line) {
 }
 
 function anaMark(btn) {
-  [els.btn_an_bal, els.btn_an_baln, els.btn_an_defend].forEach(function (b) {
+  [els.btn_an_bal, els.btn_an_defend].forEach(function (b) {
     if (b) b.classList.toggle('on', !!btn && b === btn);
   });
   anaCalcUI();
@@ -9716,10 +9906,8 @@ function anaCalcUI() {
   if (!els.btn_an_calc) return;
   var liveOn = !!(typeof LIVE_AN !== 'undefined' && LIVE_AN && LIVE_AN.on);
   var ban = aiVsAi();
-  
-  var evOn = !!(typeof PLACE_EVAL !== 'undefined' && PLACE_EVAL && PLACE_EVAL.on);
-  els.btn_an_calc.disabled = ban || evOn;
-  els.btn_an_calc.title = ban ? T('liveAnaBan') : (evOn ? T('liveAnaEvalBusy') : '');
+  els.btn_an_calc.disabled = ban;
+  els.btn_an_calc.title = ban ? T('liveAnaBan') : '';
   els.btn_an_calc.classList.toggle('on', liveOn);
   els.btn_an_calc.textContent = liveOn ? T('liveAnaStop') : T('anCalc');
   if (els.btn_an_defend) {
@@ -9784,6 +9972,7 @@ function anaReset() {
   G.ana.busy = false; G.ana.kind = '';
   G.ana.marks = []; G.ana.rows = [];
   G.ana.autoDefend = false;
+  rtClear();
   anaMark(null);
   renderAna(T('anIdle'), true);
 }
@@ -9797,11 +9986,13 @@ function anaLiveRun(kind, topN, tagKey) {
   var gen = G.ana.gen, mvN = G.moves.length;
   var side = curColor(), t0 = Date.now(), lastUi = 0, lastPaint = 0;
   var ended = false;
+  var lastSeen = Date.now(), wdRetries = 0, wd = null;
   var h = LocalAI.live({
     board: G.board, moveList: [], matchMs: 600000, turnMs: 3600000, timeUsedMs: 0,
     topN: topN, rule: engineRule(), cid: 'calc-' + kind + '-' + mvN, lane: 'main', side: side,
     liveId: LocalAI.nextLiveId(), tag: T(tagKey),
   }, function (res) {
+    lastSeen = Date.now();
     if (gen !== G.ana.gen || G.moves.length !== mvN) return;
     var cs = ((res && res.candidates) || []).filter(function (c) {
       return c && c.x >= 0 && c.y >= 0 && !(G.board[c.y] && G.board[c.y][c.x]);
@@ -9817,6 +10008,7 @@ function anaLiveRun(kind, topN, tagKey) {
       G.ana.rows = [{ i: 0, badge: '1', coord: coordName(c0.x, c0.y),
                       eval: fmtEval(c0.eval), pv: pvText(c0.line) }];
       setPvLine(c0.line || [], side);
+      rtSet([c0], side);
     } else {
       G.ana.marks = []; G.ana.rows = [];
       cs.slice(0, topN).forEach(function (c, i) {
@@ -9826,6 +10018,7 @@ function anaLiveRun(kind, topN, tagKey) {
                           eval: fmtEval(c.eval), pv: pvText(c.line) });
       });
       setPvLine((cs[0] && cs[0].line) || [], side);
+      rtSet(cs.slice(0, topN), side);
     }
     var now = Date.now();
     if (now - lastUi >= 600) {
@@ -9840,6 +10033,7 @@ function anaLiveRun(kind, topN, tagKey) {
     if (now - lastPaint >= 260) { lastPaint = now; paint(); }
   }, function (ev) {
     ended = true;
+    clearInterval(wd);
     if (gen !== G.ana.gen) return;
     ANA_LIVE.handle = null;
     if (ev && ev.busy) {
@@ -9854,6 +10048,29 @@ function anaLiveRun(kind, topN, tagKey) {
     paint();
   });
   if (!ended && gen === G.ana.gen) ANA_LIVE.handle = h;
+
+  
+  
+  wd = setInterval(function () {
+    if (ended || gen !== G.ana.gen || G.moves.length !== mvN) { clearInterval(wd); return; }
+    if (Date.now() - lastSeen <= 6000) return;
+    lastSeen = Date.now();
+    if (wdRetries >= 2) {
+      clearInterval(wd);
+      try { h.stop(); } catch (e) {}
+      ended = true;
+      if (gen === G.ana.gen) { G.ana.busy = false; anaMark(null); renderAna(T('offline')); paint(); }
+      return;
+    }
+    wdRetries++;
+    try { h.stop(); } catch (e) {}
+    if (gen === G.ana.gen && G.moves.length === mvN) {
+      G.ana.busy = true;          
+      setTimeout(function () {
+        if (gen === G.ana.gen && G.moves.length === mvN && G.ana.busy) anaLiveRun(kind, topN, tagKey);
+      }, 600);
+    }
+  }, 1000);
 }
 
 function anaDeferClear() {
@@ -9863,6 +10080,7 @@ function anaDeferClear() {
     G.ana.deferTmr = null;
     if (G.ana.busy || gen !== G.ana.gen) return;
     G.ana.marks = []; G.ana.rows = [];
+    rtClear();
     if (!G.ana.kind) anaMark(null);
     if (!G.ana.busy) renderAna(T('anIdle'), true);
     paint();
@@ -9896,18 +10114,21 @@ function defLiveStop() {
   DEF_LIVE.gen++;
   if (DEF_LIVE.handle) { try { DEF_LIVE.handle.stop(); } catch (e) {} DEF_LIVE.handle = null; }
 }
-var DEF_TIERS = [
-  { rf: 1.00, ff: 1.00, ring: 0.98, fill: 0.30, lw: 1.00 },
-  { rf: 0.84, ff: 0.93, ring: 0.82, fill: 0.23, lw: 0.82 },
-  { rf: 0.68, ff: 0.86, ring: 0.64, fill: 0.17, lw: 0.68 },
-  { rf: 0.50, ff: 0.78, ring: 0.46, fill: 0.11, lw: 0.56 }
+var DEF_RAMP = [
+  { at: 0.92, h: 214, s: 72, l: 52, a: 1.00, fill: 0.34, txt: '#ffffff' },  
+  { at: 0.78, h: 202, s: 84, l: 45, a: 0.92, fill: 0.25, txt: '#ffffff' },  
+  { at: 0.58, h: 199, s: 82, l: 60, a: 0.84, fill: 0.15, txt: '#17476f' },  
+  { at: 0.00, h: 205, s: 88, l: 78, a: 0.75, fill: 0.09, txt: '#1f5b8f' }   
 ];
-function defendTierOf(pct) {
-  if (pct >= 95) return 1;
-  if (pct >= 90) return 2;
-  if (pct >= 85) return 3;
-  if (pct >= 70) return 4;
-  return 5;
+function defendStyle(pct, maxPct) {
+  var m = (typeof maxPct === 'number' && maxPct > 0) ? maxPct : 100;
+  var r = Math.max(0, Math.min(1, (pct || 0) / m));
+  for (var i = 0; i < DEF_RAMP.length; i++) if (r >= DEF_RAMP[i].at) return DEF_RAMP[i];
+  return DEF_RAMP[DEF_RAMP.length - 1];
+}
+function defendColor(pct, maxPct) {
+  var st = defendStyle(pct, maxPct);
+  return 'hsl(' + st.h + ',' + st.s + '%,' + st.l + '%)';
 }
 function anaDefendStop() {
   if (G.ana.kind !== 'defend') return;
@@ -9921,6 +10142,7 @@ function anaDefendStop() {
 }
 function anaDefend(renew) {
   if (!anaGuard(1)) return;
+  anaSolo('scan');
   aiStandDown();
   defLiveStop();
   var gen = ++G.ana.gen;
@@ -9952,14 +10174,22 @@ function anaDefend(renew) {
       var k = c.x + ',' + c.y;
       if (seen[k] != null) {
         var old = cells[seen[k]];
-        if (pct > old.pct) { old.pct = pct; old.evalTxt = c.eval || old.evalTxt; }
+        if (pct > old.pct) { old.pct = pct; old.wr = c.winrate; old.evalTxt = c.eval || old.evalTxt; }
         return;
       }
       seen[k] = cells.length;
-      cells.push({ x: c.x, y: c.y, pct: pct, evalTxt: c.eval || '', depth: c.depth || 0 });
+      cells.push({ x: c.x, y: c.y, pct: pct,
+                   wr: (typeof c.winrate === 'number') ? c.winrate : null,
+                   evalTxt: c.eval || '', depth: c.depth || 0,
+                   line: (c.line && c.line.length) ? c.line : [[c.x, c.y]] });
     });
-    cells.sort(function (a, b) { return b.pct - a.pct; });
-    cells.forEach(function (c, i) { c.rank = i + 1; c.tier = defendTierOf(c.pct); });
+    cells.sort(function (a, b) {
+      var d = (b.wr == null ? b.pct / 100 : b.wr) - (a.wr == null ? a.pct / 100 : a.wr);
+      if (Math.abs(d) > 1e-9) return d;
+      return evalNum(b.evalTxt) - evalNum(a.evalTxt);
+    });
+    cells = cells.slice(0, SCAN_MAX);
+    cells.forEach(function (c, i) { c.rank = i + 1; });
     renderDefendMarks(cells);
 
     var depth = (res && res.depth) || (cells[0] && cells[0].depth) || 0;
@@ -9970,8 +10200,7 @@ function anaDefend(renew) {
       els.st_speed.textContent = fmtSpeed(res.speed || 0);
       els.st_nodes.textContent = fmtNodes(res.nodes || 0);
       els.st_time.textContent = ((now - t0) / 1000).toFixed(1) + ' s';
-      var scSide = 3 - curColor();
-      if (cells[0] && cells[0].evalTxt) dashEvalSet(cells[0].evalTxt, scSide);
+      if (cells[0] && cells[0].evalTxt) dashEvalSet(cells[0].evalTxt, curColor());
       els.st_best.textContent = cells[0] ? coordName(cells[0].x, cells[0].y) : '-';
     }
     if (now - lastAna >= 1000) {
@@ -10002,66 +10231,103 @@ function anaDefend(renew) {
   if (!ended && gen === G.ana.gen) DEF_LIVE.handle = h;
 }
 
-function defendColor(pct) {
-  var B = [[90, 'hsl(214,72%,52%)'], [80, 'hsl(211,72%,54%)'], [70, 'hsl(208,71%,56%)'],
-           [60, 'hsl(205,70%,58%)'], [50, 'hsl(202,68%,60%)'], [40, 'hsl(199,66%,62%)'],
-           [30, 'hsl(196,64%,64%)'], [20, 'hsl(198,70%,68%)'], [10, 'hsl(201,76%,72%)'],
-           [5, 'hsl(203,82%,76%)'], [0, 'hsl(205,88%,80%)']];
-  for (var i = 0; i < B.length; i++) if (pct >= B[i][0]) return B[i][1];
-  return B[B.length - 1][1];
-}
-
 function renderDefendMarks(cells) {
   G.ana.defCells = cells;
   G.ana.marks = [];
-  G.ana.rows = cells.slice(0, 8).map(function (c, i) {
+  var maxPct = cells.length ? cells[0].pct : 0;   
+  G.ana.rows = cells.map(function (c, i) {
     return { i: i, badge: String(i + 1),
-             coord: coordName(c.x, c.y), eval: c.pct + '%',
-             pv: c.evalTxt ? ('评分 ' + c.evalTxt) : '',
-             col: defendColor(c.pct || 0) };
+             coord: coordName(c.x, c.y), eval: (c.evalTxt || '–'),
+             pct: c.pct, wr: c.wr,
+             line: c.line, side: curColor() };
   });
+  rtSetScan(cells, curColor());
+}
+
+var SCAN_TILE_SIDE = 0.92 * 0.8;   
+var SCAN_MAX = 48;
+function scanTileP(c) {
+  if (c && typeof c.wr === 'number') return Math.max(0, Math.min(1, c.wr));
+  if (c && typeof c.pct === 'number') return Math.max(0, Math.min(1, c.pct / 100));
+  return 0.5;
+}
+function scanTileColor(p, dark) {
+  if (p <= 0.5) {
+    var t = Math.max(0, Math.min(1, p / 0.5));   
+    return {
+      h: (345 + 95 * t) % 360,                   
+      s: 46 + 42 * t,                            
+      l: (dark ? 58 : 72) - 14 * t,              
+      a: 0.40 + 0.46 * t                         
+    };
+  }
+  var dev = Math.min(1, Math.abs(p - 0.5) * 2);
+  return {
+    h: p <= 0.68 ? 80 + ((p - 0.5) / 0.18) * 60 : 140,   
+    s: 36 + 52 * dev,
+    l: dark ? 44 : 58,
+    a: 0.86
+  };
+}
+function tileFontFit(ctx, txt, maxW, want, min) {
+  var fs = want;
+  ctx.font = '700 ' + fs + 'px "Segoe UI",system-ui,sans-serif';
+  while (fs > min && ctx.measureText(txt).width > maxW) {
+    fs -= 0.5;
+    ctx.font = '700 ' + fs + 'px "Segoe UI",system-ui,sans-serif';
+  }
+  return fs;
 }
 
 function defendAlpha(col, a) {
   return String(col).replace(/^hsl\((.*)\)$/, 'hsla($1,' + a.toFixed(2) + ')');
 }
 function drawDefendMarks(ctx, cells, pad, gap) {
-  var r0 = Math.max(8, gap * 0.43);
-  var r3 = Math.max(8, r0 * DEF_TIERS[2].rf);
-  var fs5 = Math.max(9, r3 * 0.56 * (DEF_TIERS[2].ff / DEF_TIERS[2].rf));
-  var by = [[], [], [], [], []];
-  cells.forEach(function (c) { by[Math.max(0, Math.min(4, (c.tier || 5) - 1))].push(c); });
-  for (var t = 4; t >= 0; t--) {
-    by[t].forEach(function (c) {
-      var px = pad + c.x * gap, py = pad + c.y * gap;
-      var pct = Math.max(0, Math.min(100, Math.round(c.pct || 0)));
-      var col = defendColor(pct);
-      if (t >= 3) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(px, py, r0 * DEF_TIERS[3].rf, 0, Math.PI * 2);
-        ctx.lineWidth = (t === 3 ? Math.max(1.0, gap * 0.030) : Math.max(0.9, gap * 0.020));
-        ctx.strokeStyle = defendAlpha(col, t === 3 ? 0.88 : 0.72);
-        ctx.stroke();
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
-        ctx.font = '700 ' + fs5 + 'px "Segoe UI",system-ui,sans-serif';
-        ctx.lineWidth = Math.max(1.4, fs5 * 0.28);
-        ctx.strokeStyle = 'rgba(0,0,0,.58)';
-        ctx.strokeText(String(pct), px, py);
-        ctx.fillStyle = '#fff';
-        ctx.fillText(String(pct), px, py);
-        ctx.restore();
-        return;
-      }
-      var ti = DEF_TIERS[t];
-      var r = Math.max(8, r0 * ti.rf);
-      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
-      ctx.fillStyle = defendAlpha(col, ti.fill); ctx.fill();
-      ctx.lineWidth = (t === 0 ? Math.max(1.6, gap * 0.044) : Math.max(1, gap * 0.038 * ti.lw));
-      ctx.strokeStyle = defendAlpha(col, ti.ring); ctx.stroke();
-      drawRingLabels(ctx, px, py, r, pct + '%', '', ti.ff / ti.rf, 2.0 + t * 0.1);
-    });
-  }
+  var side = Math.max(10, gap * SCAN_TILE_SIDE);
+  var half = side / 2;
+  var dark = document.body.getAttribute('data-theme') === 'dark';
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  cells.forEach(function (c, idx) {
+    var px = pad + c.x * gap, py = pad + c.y * gap;
+    var p = scanTileP(c);
+    var best = (idx === 0);
+    var col = scanTileColor(p, dark);
+    var hue = best ? 168 : col.h;
+    var sat = best ? 74 : col.s;
+    var l = best ? (dark ? 44 : 58) : col.l;
+    var alpha = best ? 0.96 : col.a;
+    var fill = 'hsla(' + hue.toFixed(1) + ',' + sat.toFixed(1) + '%,' + l.toFixed(1) + '%,' + alpha.toFixed(2) + ')';
+    var stroke = 'hsl(' + hue.toFixed(1) + ',' + Math.max(sat, 45).toFixed(1) + '%,' + (dark ? 30 : 36) + '%)';
+    ctx.beginPath(); ctx.rect(px - half, py - half, side, side);
+    ctx.fillStyle = fill; ctx.fill();
+    ctx.lineWidth = Math.max(1, gap * 0.028);
+    ctx.strokeStyle = stroke; ctx.stroke();
+
+    var inkWhite = dark || l < 52;
+    var ink = inkWhite ? '#f5fbff' : '#0b1a14';
+    var halo = inkWhite ? 'rgba(10,20,32,.62)' : 'rgba(255,255,255,.82)';
+    var top = (Math.round(p * 1000) / 10).toFixed(1) + '%';
+    var bot = (c.evalTxt && c.evalTxt !== '') ? String(c.evalTxt) : '–';
+    var topY = py - side * 0.2;
+    var botY = py + side * 0.3;
+    var topFs = tileFontFit(ctx, top, side * 0.94, side * 0.374, Math.max(5, side * 0.15));
+    ctx.font = '700 ' + topFs + 'px "Segoe UI",system-ui,sans-serif';
+    ctx.lineWidth = Math.max(1, topFs * 0.12);
+    ctx.strokeStyle = halo;
+    ctx.strokeText(top, px, topY);
+    ctx.fillStyle = ink;
+    ctx.fillText(top, px, topY);
+
+    var botFs = tileFontFit(ctx, bot, side * 0.94, side * 0.286, Math.max(5, side * 0.13));
+    ctx.font = '700 ' + botFs + 'px "Segoe UI",system-ui,sans-serif';
+    ctx.lineWidth = Math.max(1, botFs * 0.12);
+    ctx.strokeStyle = halo;
+    ctx.strokeText(bot, px, botY);
+    ctx.fillStyle = ink;
+    ctx.fillText(bot, px, botY);
+  });
+  ctx.restore();
 }
 
 var LIVE_AN = {
@@ -10106,23 +10372,45 @@ function liveAnaClear() {
 }
 function liveAnaUI() {
   if (aiVsAi() && LIVE_AN.on) { LIVE_AN.on = false; liveAnaClear(); }
-
-  var evOn = !!(typeof PLACE_EVAL !== 'undefined' && PLACE_EVAL && PLACE_EVAL.on);
   if (els.btn_live) {
-    els.btn_live.disabled = aiVsAi() || evOn;
-    els.btn_live.title = aiVsAi() ? T('liveAnaBan') : (evOn ? T('liveAnaEvalBusy') : '');
+    els.btn_live.disabled = aiVsAi();
+    els.btn_live.title = aiVsAi() ? T('liveAnaBan') : '';
     els.btn_live.classList.toggle('on', LIVE_AN.on);
     els.btn_live.textContent = LIVE_AN.on ? T('liveAnaStop') : T('liveAna');
   }
-  
-  if (els.btn_place_eval && !els.btn_place_eval.hidden)
-    els.btn_place_eval.disabled = !!LIVE_AN.on;
   anaCalcUI();
 }
+function anaSolo(keep) {
+  if (keep !== 'live' && LIVE_AN.on) {
+    LIVE_AN.on = false;
+    liveAnaClear();
+    liveAnaUI();
+  }
+  if (keep !== 'scan' && G.ana.kind === 'defend') {
+    try { defLiveStop(); } catch (eAS1) {}
+    G.ana.autoDefend = false;
+    G.ana.defCells = null;
+  }
+  if (keep !== 'bal' && typeof BAL !== 'undefined' && BAL && BAL.on) {
+    try { balAbort(); } catch (eAS2) {}
+  }
+  if (keep !== 'fwd' && G.fwd && G.fwd.on) {
+    try { fwdOff(); } catch (eAS3) {}
+  }
+  G.ana.gen++;
+  G.ana.busy = false;
+  if (G.ana.kind !== 'defend' || keep !== 'scan') G.ana.kind = '';
+  G.ana.marks = []; G.ana.rows = [];
+  if (keep !== 'scan') G.ana.defCells = null;
+  PV_HOVER = null; PV_PREVIEW = null; PV_RENDER = null;
+  rtClear();
+  anaMark(null);
+  renderAna(T('anIdle'), true);
+  paint();
+}
+
 function liveAnaToggle() {
   if (aiVsAi()) { liveAnaUI(); return; }
-  
-  if (!LIVE_AN.on && PLACE_EVAL.on) { liveAnaUI(); return; }
   if (linkSessionOn()) {
     setStat(null, '连线会话中不使用「分析计算」—— 评估只针对 AI 执色方进行');
     return;
@@ -10130,7 +10418,9 @@ function liveAnaToggle() {
   LIVE_AN.on = !LIVE_AN.on;
   liveAnaUI();
   if (LIVE_AN.on) {
-    if (PLACE_EVAL.on) { PLACE_EVAL.on = false; placeEvalHaltJob(); placeEvalUI(); }
+    anaSolo('live');        
+    LIVE_AN.on = true;      
+    liveAnaUI();
     aiStandDown();
     bgThinkStop();
     anaLiveStop();
@@ -10145,30 +10435,42 @@ function liveAnaToggle() {
   }
 }
 
-var LIVE_PICK_LIM = [0.08, 0.05, 0.03, 0.05, 0.07, 0.09, 0.11];
-
-function liveAnaPick(cs, n) {
-  if (!cs || !cs.length) return [];
+function liveAnaPick(cs, n, prev) {
   var cap = Math.max(1, Math.min(8, Math.round(n || anaIp())));
-  var out = [cs[0]], bw = cs[0].wr;
-  for (var i = 1; i < cs.length && out.length < cap; i++) {
-    var k = Math.min(out.length - 1, LIVE_PICK_LIM.length - 1);
-    if (bw - cs[i].wr > LIVE_PICK_LIM[k] + 1e-9) break;
-    out.push(cs[i]);
+  var seen = {}, out = [];
+  function add(c) {
+    if (!c || out.length >= cap) return;
+    var k = c.x + ',' + c.y;
+    if (seen[k]) return;
+    if (G.board[c.y] && G.board[c.y][c.x]) return;
+    seen[k] = 1;
+    out.push(c);
   }
+  (cs || []).forEach(add);
+  (prev || []).forEach(add);
   return out;
 }
+function liveAnaStrength(c) {
+  var v = evalNum(c && c.raw);
+  if (!isNaN(v)) return v;
+  if (c && typeof c.wr === 'number') return c.wr * 1000;
+  return -1e9;
+}
 function liveAnaApply(res) {
+  if (!LIVE_AN.on || G.ana.kind === 'defend') return;
   var cs = ((res && res.candidates) || []).filter(function (c) {
     return c && c.x >= 0 && c.y >= 0 && !(G.board[c.y] && G.board[c.y][c.x]);
   }).map(function (c, i) {
     return { x: c.x, y: c.y, ev: fmtEval(c.eval), raw: c.eval,
              wr: (typeof c.winrate === 'number') ? c.winrate : 0.5,
+             wrKnown: !!c.wrKnown,
              depth: c.depth || 0, rank: i, line: c.line || [] };
   });
+  cs.sort(function (a, b) { return liveAnaStrength(b) - liveAnaStrength(a); });
   LIVE_AN.items = cs;
-  LIVE_AN.picked = liveAnaPick(cs, anaIp());
-  setPvLine((cs[0] && cs[0].line) || [], liveAnaSide());
+  LIVE_AN.picked = liveAnaPick(cs, anaIp(), LIVE_AN.picked);
+  setPvLine((LIVE_AN.picked[0] && LIVE_AN.picked[0].line) || [], liveAnaSide());
+  rtSet(LIVE_AN.picked, liveAnaSide());
 
   if (cs[0] && els.st_best) els.st_best.textContent = coordName(cs[0].x, cs[0].y);
   if (cs[0]) dashEvalSet(cs[0].raw, liveAnaSide());
@@ -10195,9 +10497,398 @@ function liveAnaRows() {
   renderAna(T('liveAnaRun').replace('{d}', String(LIVE_AN.depth || 0)), true);
 }
 
+var RT_DATA = { rows: [], pin: null, key: "" };
+function rtKeyOf(rows) {
+  return rows.map(function (r) {
+    /* structure only (point + whole line): depth / score changes go through
+       rtPatchText so the DOM is never rebuilt mid-hover */
+    return r.coord[0] + "," + r.coord[1] + "/" +
+      r.line.map(function (q) { return q[0] + "," + q[1]; }).join(" ");
+  }).join("|");
+}
+function rtClear() {
+  RT_DATA.rows = []; RT_DATA.pin = null; RT_DATA.key = ""; RT_DATA.mode = "";
+  if (typeof PV_PREVIEW !== "undefined" && PV_PREVIEW) PV_PREVIEW = null;
+  rtRender();
+}
+function rtSet(cands, side) {
+  var cap = Math.max(1, Math.min(8, anaIp()));
+  var rows = (cands || []).slice(0, cap).map(function (c) {
+    var line = (c.line && c.line.length) ? c.line : [[c.x, c.y]];
+    return {
+      coord: [c.x, c.y], depth: c.depth || 0,
+      wr: (typeof c.winrate === "number") ? c.winrate : (typeof c.wr === "number" ? c.wr : null),
+      ev: (c.eval != null) ? c.eval : (c.ev || ""),
+      line: line.map(function (q) { return [q[0] | 0, q[1] | 0]; }),
+      side: side || curColor(),
+    };
+  });
+  var key = rtKeyOf(rows);
+  var same = (key === RT_DATA.key) && els.rtList && els.rtList.querySelector('.rt-row');
+  RT_DATA.rows = rows; RT_DATA.key = key; RT_DATA.mode = 'live';
+  if (RT_DATA.pin && RT_DATA.pin.r >= rows.length) RT_DATA.pin = null;
+  if (same) { rtPatchText(); rtSelPaint(); }
+  else rtRender();
+}
+function rtWinTxt(r) {
+  if (r.wr == null || isNaN(+r.wr)) return '';
+  var pct = Math.round((+r.wr) * 1000) / 10;
+  return T('rtWin') + ' ' + pct.toFixed(1) + '%';
+}
+function escA(s) {
+  return escHtml(s == null ? '' : s).replace(/"/g, '&quot;');
+}
+/* 评分统一带符号：正数补 +（扫描分析回吐的裸数字如 573 → +573），杀棋保留 +M53 / -M53 */
+function rtEvTxt(ev) {
+  var s = (ev == null) ? '' : String(ev).trim();
+  if (!s) return '–';
+  if (/^[+\-]/.test(s) || /^M/i.test(s) || /^dM/i.test(s)) return s;
+  if (/^\d/.test(s)) return '+' + s;
+  return s;
+}
+function rtHdrHtml(ri, r) {
+  var ev = String(r.ev == null ? '' : r.ev);
+  var wt = rtWinTxt(r);
+  return '<div class="rt-h">' +
+    '<b class="rt-i">#' + (ri + 1) + '</b>' +
+    '<span class="rt-s' + (/^-/.test(ev) ? ' neg' : '') + '" title="' + escA(T('rtScoreTip')) + '">' +
+      escHtml(ev) + '</span>' +
+    '<span class="rt-d" title="' + escA(T('rtDepthTip')) + '">d' + (r.depth || 0) + '</span>' +
+    (wt ? '<span class="rt-w" title="' + escA(T('rtWinTip')) + '">' + escHtml(wt) + '</span>' : '') +
+    '</div>';
+}
+function rtPatchText() {
+  var box = els.rtList;
+  if (!box) return;
+  var rowsEls = box.querySelectorAll('.rt-row');
+  for (var i = 0; i < rowsEls.length && i < RT_DATA.rows.length; i++) {
+    var r = RT_DATA.rows[i], el = rowsEls[i];
+    var d = el.querySelector('.rt-d'), w = el.querySelector('.rt-w'), e = el.querySelector('.rt-s');
+    if (d) d.textContent = 'd' + (r.depth || 0);
+    if (w) w.textContent = rtWinTxt(r);
+    if (e) {
+      var ev = String(r.ev == null ? '' : r.ev);
+      e.textContent = ev;
+      e.classList.toggle('neg', /^-/.test(ev));
+    }
+  }
+}
+/* 空态：占位提示 + 口径说明（评分/深度/胜率）都居中放在路线框内部；一旦出现任何路线
+   （计算分析 / 扫描 / 平衡点）就整块移除，路线从框顶排列，框外不再留说明文字。 */
+function rtEmptyHtml() {
+  return '<div class="rt-empty"><div class="rt-empty-msg">' + escHtml(T('rtEmpty')) +
+    '</div><div class="rt-empty-lg">' + escHtml(T('rtLegend')) + '</div></div>';
+}
+/* 扫描路线：条数 = 当前扫描候选数（最多 SCAN_MAX），与棋盘方块一一对应。
+   扫描每帧候选会重排，但 DOM 按坐标复用 + 原地改文字，不整屏重建、不丢滚动位置。 */
+function rtScanLineKey(r) {
+  return r.line.map(function (q) { return q[0] + ',' + q[1]; }).join(' ');
+}
+function rtMakeScanRow(r, ri) {
+  var el = document.createElement('div');
+  el.className = 'rt-row';
+  el.setAttribute('data-k', r.coord[0] + ',' + r.coord[1]);
+  el.innerHTML = '<div class="rt-h">' +
+    '<b class="rt-i"></b><span class="rt-s" title="' + escA(T('rtScoreTip')) + '"></span>' +
+    '<span class="rt-d" title="' + escA(T('rtDepthTip')) + '"></span>' +
+    '<span class="rt-w" title="' + escA(T('rtWinTip')) + '"></span>' +
+    '</div><div class="rt-line pv-box"></div>';
+  rtFillScanRow(el, r, ri, true);
+  return el;
+}
+function rtFillScanRow(el, r, ri, forceLine) {
+  el.setAttribute('data-r', String(ri));
+  var iEl = el.querySelector('.rt-i');
+  if (iEl) iEl.textContent = '#' + (ri + 1);
+  var sEl = el.querySelector('.rt-s');
+  if (sEl) {
+    var ev = String(r.ev == null ? '–' : r.ev);
+    sEl.textContent = ev;
+    sEl.classList.toggle('neg', /^-/.test(ev));
+  }
+  var dEl = el.querySelector('.rt-d');
+  if (dEl) dEl.textContent = 'd' + (r.depth || 0);
+  var wEl = el.querySelector('.rt-w');
+  if (wEl) wEl.textContent = rtWinTxt(r);
+  var lineEl = el.querySelector('.rt-line');
+  if (lineEl) {
+    var lk = rtScanLineKey(r);
+    if (forceLine || lineEl.getAttribute('data-lk') !== lk) {
+      lineEl.setAttribute('data-lk', lk);
+      lineEl.innerHTML = r.line.map(function (q, i) {
+        return '<b class="pv-mv rt-mv' + (i === 0 ? ' best' : '') + '" data-r="' + ri +
+               '" data-i="' + i + '">' + escHtml(coordName(q[0], q[1])) + '</b>';
+      }).join('');
+    } else {
+      [].forEach.call(lineEl.querySelectorAll('.rt-mv'), function (ch) {
+        ch.setAttribute('data-r', String(ri));
+      });
+    }
+  }
+}
+function rtSetScan(cells, side) {
+  var pinKey = null, pinI = 0;
+  if (RT_DATA.pin && RT_DATA.rows[RT_DATA.pin.r]) {
+    var pr = RT_DATA.rows[RT_DATA.pin.r];
+    pinKey = pr.coord[0] + ',' + pr.coord[1];
+    pinI = RT_DATA.pin.i || 0;
+  }
+  var rows = (cells || []).slice(0, SCAN_MAX).map(function (c) {
+    var line = (c.line && c.line.length) ? c.line : [[c.x, c.y]];
+    return {
+      coord: [c.x, c.y], depth: c.depth || 0,
+      wr: (typeof c.wr === 'number') ? c.wr : ((typeof c.pct === 'number') ? c.pct / 100 : 0.5),
+      ev: rtEvTxt((c.evalTxt && c.evalTxt !== '') ? c.evalTxt : null),
+      line: line.map(function (q) { return [q[0] | 0, q[1] | 0]; }),
+      side: side || curColor(),
+    };
+  });
+  RT_DATA.rows = rows; RT_DATA.key = 'scan'; RT_DATA.mode = 'scan';
+  RT_DATA.pin = null;
+  if (pinKey) {
+    for (var ri = 0; ri < rows.length; ri++) {
+      if (rows[ri].coord[0] + ',' + rows[ri].coord[1] === pinKey) {
+        RT_DATA.pin = { r: ri, i: Math.min(pinI, Math.max(0, rows[ri].line.length - 1)) };
+        break;
+      }
+    }
+  }
+  var box = els.rtList;
+  if (!box) return;
+  if (!rows.length) {
+    box.innerHTML = rtEmptyHtml();
+    return;
+  }
+  rtBind(box);
+  var oldTop = box.scrollTop;
+  var ph = box.querySelector('.rt-empty');
+  if (ph) box.removeChild(ph);
+  var existing = {};
+  [].forEach.call(box.querySelectorAll('.rt-row'), function (el) {
+    var k = el.getAttribute('data-k');
+    if (k) existing[k] = el;
+  });
+  var live = {};
+  rows.forEach(function (r, ri) {
+    var k = r.coord[0] + ',' + r.coord[1];
+    var el = existing[k] || rtMakeScanRow(r, ri);
+    rtFillScanRow(el, r, ri, !existing[k]);
+    box.appendChild(el);          /* 按引擎名次顺序重排（复用节点） */
+    live[k] = 1;
+  });
+  [].forEach.call(box.querySelectorAll('.rt-row'), function (el) {
+    var k = el.getAttribute('data-k');
+    if (k && !live[k]) box.removeChild(el);
+  });
+  box.scrollTop = oldTop;
+  if (RT_DATA.pin) rtApplyPin();
+  rtSelPaint();
+}
+
+/* ★ 2026-11-05（用户）：平衡点也铺相关路线 —— 两点平衡 → 2 条，1 点 → 1 条，
+   行格式与其它路线完全一致（#1 评分 d 胜率 坐标链），并与棋盘上的平衡点标记一一对应。
+   停止平衡搜索后保留；切换其它分析 / 落子 / 清除计算时随 rtClear 一起擦掉。 */
+function rtSetBal(rows) {
+  rows = rows || [];
+  if (!rows.length) { if (RT_DATA.mode === 'bal') rtClear(); return; }
+  var key = 'bal|' + rows.map(function (r) {
+    return r.coord[0] + ',' + r.coord[1] + '/' +
+      r.line.map(function (q) { return q[0] + ',' + q[1]; }).join(' ');
+  }).join('|');
+  var same = (key === RT_DATA.key) && els.rtList && els.rtList.querySelector('.rt-row');
+  RT_DATA.rows = rows; RT_DATA.key = key; RT_DATA.mode = 'bal';
+  if (RT_DATA.pin && RT_DATA.pin.r >= rows.length) RT_DATA.pin = null;
+  if (same) { rtPatchText(); rtSelPaint(); } else rtRender();
+}
+function rtRender() {
+  var box = els.rtList;
+  if (!box) return;
+  if (!RT_DATA.rows.length) {
+    box.innerHTML = rtEmptyHtml();
+    return;
+  }
+  var html = "";
+  RT_DATA.rows.forEach(function (r, ri) {
+    /* 每行 = 「题目」（序号 / 评分 / 深度 / 胜率）+ 一条和引擎日志同款的路线代码框。
+       统一格式：#1  +389  d25  胜率 53.9%  H8 I9 G7 …
+       名次始终等于数组下标，旧点退出时整行随 rtKeyOf 变化重建，不会出现重号/空行。 */
+    html += '<div class="rt-row" data-r="' + ri + '">' +
+      rtHdrHtml(ri, r) +
+      '<div class="rt-line pv-box">' + r.line.map(function (q, i) {
+        return '<b class="pv-mv rt-mv' + (i === 0 ? " best" : "") + '" data-r="' + ri +
+               '" data-i="' + i + '">' + escHtml(coordName(q[0], q[1])) + "</b>";
+      }).join("") + "</div></div>";
+  });
+  box.innerHTML = html;
+  rtBind(box);
+  rtSelPaint();
+}
+function rtSelPaint() {
+  var box = els.rtList;
+  if (!box) return;
+  var pin = RT_DATA.pin;
+  var kids = box.querySelectorAll(".rt-mv");
+  for (var i = 0; i < kids.length; i++) {
+    var on = !!pin && +kids[i].getAttribute("data-r") === pin.r && +kids[i].getAttribute("data-i") === pin.i;
+    kids[i].classList.toggle("sel", on);
+  }
+}
+function rtHover(ri, i) {
+  var r = RT_DATA.rows[ri];
+  if (!r || i < 0 || i >= r.line.length) return;
+  PV_RENDER = r.line.map(function (q) { return [q[0], q[1]]; });
+  PV_SIDE = r.side;
+  PV_HOVER = { i: i, x: r.line[i][0], y: r.line[i][1], seq: i + 1 };
+  PV_PREVIEW = null;
+  paint();
+}
+function rtApplyPin() {
+  var pin = RT_DATA.pin;
+  if (!pin) return;
+  var r = RT_DATA.rows[pin.r];
+  if (!r) { RT_DATA.pin = null; return; }
+  PV_HOVER = null;
+  PV_PREVIEW = {
+    moves: r.line.slice(0, pin.i + 1).map(function (q) { return [q[0], q[1]]; }),
+    side: r.side,
+  };
+}
+/* 双击某条路线的某一手 = 把这条线走到那一手（gomocalc 的双击行为）：
+   先停掉正在跑的分析/扫描，再逐手实落到棋盘，复盘 / 分析路线随之刷新。 */
+function rtCommit(ri, i) {
+  var r = RT_DATA.rows[ri];
+  if (!r || !r.line || i < 0 || i >= r.line.length) return;
+  if (G.ana.busy) {
+    try { if (G.ana.kind === 'defend') anaDefendStop(); else if (LIVE_AN.on) liveAnaToggle(); } catch (eRC) {}
+  }
+  RT_DATA.pin = null; PV_HOVER = null; PV_PREVIEW = null;
+  var n = 0;
+  for (var k = 0; k <= i; k++) {
+    var q = r.line[k];
+    if (!q || !place(q[0], q[1])) break;
+    n++;
+  }
+  if (!n) { paint(); return; }
+  afterMove();
+  paint();
+}
+
+function rtBind(box) {
+  if (box.__rtBound) return;
+  box.__rtBound = 1;
+  box.addEventListener("mouseover", function (e) {
+    var t = e.target && e.target.closest ? e.target.closest(".rt-mv") : null;
+    if (!t) return;
+    rtHover(+t.getAttribute("data-r"), +t.getAttribute("data-i"));
+  });
+  box.addEventListener("mouseout", function (e) {
+    var t = e.target && e.target.closest ? e.target.closest(".rt-mv") : null;
+    if (!t) return;
+    if (RT_DATA.pin) { rtApplyPin(); paint(); return; }
+    if (!PV_HOVER && !PV_PREVIEW) return;
+    PV_HOVER = null; PV_PREVIEW = null;
+    paint();
+  });
+  box.addEventListener("click", function (e) {
+    var t = e.target && e.target.closest ? e.target.closest(".rt-mv") : null;
+    if (!t) return;
+    var ri = +t.getAttribute("data-r"), i = +t.getAttribute("data-i");
+    var same = RT_DATA.pin && RT_DATA.pin.r === ri && RT_DATA.pin.i === i;
+    RT_DATA.pin = same ? null : { r: ri, i: i };
+    if (RT_DATA.pin) rtApplyPin();
+    else { PV_HOVER = null; PV_PREVIEW = null; }
+    rtSelPaint();
+    paint();
+  });
+  /* 双击：把这条路线落到第 i 手（gomocalc 的「双击路线把局面设过去」） */
+  box.addEventListener("dblclick", function (e) {
+    var t = e.target && e.target.closest ? e.target.closest(".rt-mv") : null;
+    if (!t) return;
+    e.preventDefault();
+    rtCommit(+t.getAttribute("data-r"), +t.getAttribute("data-i"));
+  });
+}
+/* ==== 分析路线框的滚动隔离 ====
+   鼠标停在「分析路线」框内时，滚轮只滚框内；即使到上/下边界，外层卡片也不动。
+   只有继续朝同一方向累计满 5 个滚轮档位（触控板按等价滚动量换算）时，才把这一手的
+   滚动交给外层可滚动容器，并清零计数；反向同理。框内内容不足滚动时不拦截外层。
+   手势判定 320ms：惯性滚动（触控板）会连续投递 wheel，交接后继续平滑滚外层。 */
+function rtWheelUnits(e) {
+  var dy = e.deltaY || 0;
+  if (e.deltaMode === 1) return dy / 3;      /* 行：一个档位 ≈ 3 行 */
+  if (e.deltaMode === 2) return dy;          /* 页：一页 ≈ 一个档位 */
+  return dy / 100;                           /* Chromium 鼠标一格 = 100px */
+}
+function rtWheelDeltaPx(e, units) {
+  if (e.deltaMode === 0) return e.deltaY || 0;
+  return units * 100;
+}
+function rtOuterScroller(el) {
+  var p = el && el.parentElement;
+  while (p && p !== document.body && p !== document.documentElement) {
+    var cs = getComputedStyle(p);
+    var oy = cs.overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight + 1) return p;
+    p = p.parentElement;
+  }
+  return null;
+}
+function rtWheelIsolate() {
+  var box = els.routesBox;
+  if (!box || box.__rtWheel) return;
+  box.__rtWheel = 1;
+  var ctx = { dir: 0, acc: 0, hand: false, t: 0 };
+  box.addEventListener('wheel', function (e) {
+    var list = els.rtList;
+    if (!list) return;
+    var units = rtWheelUnits(e);
+    if (!units) return;
+    var dir = units > 0 ? 1 : -1;
+    var maxTop = list.scrollHeight - list.clientHeight;
+    /* 内容不足以滚动：完全不拦截，交给外层（符合「不拦截外层」的口径） */
+    if (maxTop <= 1) { ctx.dir = 0; ctx.acc = 0; ctx.hand = false; return; }
+    var now = Date.now();
+    var atBottom = list.scrollTop >= maxTop - 1;
+    var atTop = list.scrollTop <= 1;
+    var boundary = (dir > 0 && atBottom) || (dir < 0 && atTop);
+    var px = rtWheelDeltaPx(e, units);
+    if (!boundary) {
+      /* 框内可滚：拦下原生滚动链，只动框内，避免同一事件把余量传给外层 */
+      e.preventDefault();
+      list.scrollTop += px;
+      ctx.dir = 0; ctx.acc = 0; ctx.hand = false; ctx.t = now;
+      return;
+    }
+    /* 到边界：方向变了就重来；同一手势内的惯性续滚（<320ms）直接放行 */
+    if (dir !== ctx.dir) { ctx.dir = dir; ctx.acc = 0; ctx.hand = false; }
+    if (ctx.hand && now - ctx.t < 320) {
+      e.preventDefault();
+      var outer = rtOuterScroller(box);
+      if (outer) outer.scrollTop += px;
+      ctx.t = now;
+      return;
+    }
+    if (ctx.hand && now - ctx.t >= 320) { ctx.hand = false; ctx.acc = 0; }
+    ctx.t = now;
+    var add = Math.abs(units);
+    if (ctx.acc + add < 5) {
+      /* 未满 5 档：只记录，外层绝不动 */
+      ctx.acc += add;
+      e.preventDefault();
+      return;
+    }
+    /* 累计满 5 档：交接给外层，计数清零 */
+    ctx.acc = 0;
+    ctx.hand = true;
+    e.preventDefault();
+    var outer2 = rtOuterScroller(box);
+    if (outer2) outer2.scrollTop += px;
+  }, { passive: false });
+}
 function liveAnaStart() {
   if (!LIVE_AN.on) return;
-
+  // ★ 2026-10-31：AI 思考（G.busy）期间引擎归那一手 ask 独占，分析延后再起；
+  //   否则两边互抢，AI 的搜索会被反复打断，越算越浅。
   if (G.busy) { liveAnaScheduleRetry(220); return; }
   if (!liveAnaWanted()) return;
   var gen = ++LIVE_AN.gen;
@@ -10223,8 +10914,9 @@ function liveAnaStart() {
   }, function (res) {
     ended = true;
     if (gen !== LIVE_AN.gen) return;
-
-    
+    // ★ 2026-10-31（用户：「评估后落子，评估又失败了」）：宿主现在让 live 走无限时间的
+    //   分析模式，正常情况下只在 stop / 落子抢占时结束；但万一引擎仍自己收官
+    //   （旧权重 / 异常回执），把这一帧终局结果也画出来，别让仪表盘一直空白。
     try {
       if (res && res.candidates && res.candidates.length &&
           G.moves.length === mvN && LIVE_AN.key === liveAnaKeyNow()) liveAnaApply(res);
@@ -10278,172 +10970,14 @@ function liveAnaTouch(restartMs) {
 }
 
 function liveAnaBoardChanged() {
-
+  // ★ 2026-10-31：局面变了 = 上一手的实时统计 / 评估分全部作废。旧实现只重启 job、不删 lane，
+  //   新 job 的第一帧 tick 到来之前（深搜某一层可能静默十几秒）界面一直停在上一手的数字。
   if (LIVE_AN.on || LIVE_AN.frozen) {
     LIVE_AN.t0 = 0; LIVE_AN.key = '';
     LIVE_AN.cid = liveAnaCidNow();
     liveDashReset();
   }
   liveAnaTouch(120);
-}
-
-var PLACE_EVAL = { on: false, gen: 0, handle: null, timer: 0, key: '', mvN: 0, side: 0, t0: 0,
-                   lastUi: 0, pending: null, uiTimer: 0, clearPending: false };
-
-function placeEvalWanted() {
-  if (SET_MODE || RV_MODE || G.review || G.over || linkSessionOn()) return false;
-  return PLACE_EVAL.on && S.mode === 'place';
-}
-function placeEvalHaltJob() {
-  PLACE_EVAL.gen++;
-  if (PLACE_EVAL.handle) { try { PLACE_EVAL.handle.stop(); } catch (ePE0) {} PLACE_EVAL.handle = null; }
-  if (PLACE_EVAL.timer) { clearTimeout(PLACE_EVAL.timer); PLACE_EVAL.timer = 0; }
-  if (PLACE_EVAL.uiTimer) { clearTimeout(PLACE_EVAL.uiTimer); PLACE_EVAL.uiTimer = 0; }
-  G.ana.busy = false;
-}
-function placeEvalUI() {
-  if (!els.btn_place_eval) return;
-  var show = !SET_MODE && !RV_MODE && !G.review && !linkSessionOn() && S.mode === 'place';
-  els.btn_place_eval.hidden = !show;
-  if (!show) {
-    if (PLACE_EVAL.on) { PLACE_EVAL.on = false; placeEvalHaltJob(); }
-    
-    if (els.btn_live) liveAnaUI();
-    return;
-  }
-  
-  els.btn_place_eval.disabled = !!LIVE_AN.on;
-  els.btn_place_eval.classList.toggle('on', !!PLACE_EVAL.on);
-  els.btn_place_eval.textContent = PLACE_EVAL.on ? T('placeEvalStop') : T('placeEval');
-  els.btn_place_eval.title = LIVE_AN.on ? T('placeEvalAnaBusy') : T('placeEvalTip');
-  els.btn_place_eval.setAttribute('aria-pressed', PLACE_EVAL.on ? 'true' : 'false');
-  
-  if (els.btn_live) liveAnaUI();
-}
-
-var PLACE_EVAL_UI_MS = 620;
-function placeEvalFlush() {
-  var p = PLACE_EVAL.pending;
-  if (!p) return;
-  PLACE_EVAL.pending = null;
-  if (PLACE_EVAL.uiTimer) { clearTimeout(PLACE_EVAL.uiTimer); PLACE_EVAL.uiTimer = 0; }
-  PLACE_EVAL.lastUi = Date.now();
-  placeEvalPaint(p.res, p.mvN, p.side);
-}
-function placeEvalPaint(res, mvN, side) {
-  var c0 = ((res && res.candidates) || []).filter(function (c) {
-    return c && typeof c.x === 'number' && typeof c.y === 'number' &&
-           !(G.board[c.y] && G.board[c.y][c.x]);
-  })[0];
-  if (!c0) return;
-  var depth = (res && res.depth) || c0.depth || 0;
-  var st = {
-    x: c0.x, y: c0.y, depth: depth, eval: c0.eval, side: side,
-    speed: (res && res.speed) || c0.speed || 0,
-    nodes: (res && res.nodes) || c0.nodes || 0,
-
-    timeMs: (res && res.timeMs) || (PLACE_EVAL.t0 ? (Date.now() - PLACE_EVAL.t0) : 0),
-    line: c0.line || [],
-  };
-  G.lastStat = st;
-
-  if (!LIVE_AN.on) setStat(st);
-  var ev = evalNum(c0.eval);
-  if (isFinite(ev)) {
-    pushCurve(mvN, ev, side === 1);
-    drawCurve();
-  }
-}
-function placeEvalApply(res, mvN, side) {
-  PLACE_EVAL.pending = { res: res, mvN: mvN, side: side };
-  var wait = PLACE_EVAL_UI_MS - (Date.now() - PLACE_EVAL.lastUi);
-  if (wait > 0) {
-    if (!PLACE_EVAL.uiTimer) {
-      PLACE_EVAL.uiTimer = setTimeout(function () { PLACE_EVAL.uiTimer = 0; placeEvalFlush(); }, wait);
-    }
-    return;
-  }
-  placeEvalFlush();
-}
-function placeEvalStart() {
-  if (!placeEvalWanted()) return;
-  placeEvalHaltJob();                 // bump gen + stop any previous live job
-  PLACE_EVAL.pending = null;          // never paint a frame from the previous job
-  var gen = ++PLACE_EVAL.gen;
-  var mvN = G.moves.length, side = curColor();
-  PLACE_EVAL.mvN = mvN; PLACE_EVAL.side = side;
-  PLACE_EVAL.key = boardFp();
-  if (!PLACE_EVAL.t0) PLACE_EVAL.t0 = Date.now();
-
-  
-  var clearNow = !!PLACE_EVAL.clearPending;
-  PLACE_EVAL.clearPending = false;
-  var ended = false;
-  var h = LocalAI.live({
-    board: G.board, moveList: [], matchMs: 600000, turnMs: 3600000, timeUsedMs: 0,
-    topN: 1, rule: engineRule(), cid: 'calc-eval-' + mvN, lane: 'eval', side: side,
-    liveId: LocalAI.nextLiveId(), tag: T('placeEval'), clearHash: clearNow,
-  }, function (res) {
-    if (gen !== PLACE_EVAL.gen) return;
-    if (G.moves.length !== mvN || PLACE_EVAL.key !== boardFp()) {
-      if (PLACE_EVAL.on) {
-        PLACE_EVAL.timer = setTimeout(function () { PLACE_EVAL.timer = 0; placeEvalStart(); }, 120);
-      }
-      return;
-    }
-    placeEvalApply(res, mvN, side);
-  }, function (res) {
-    ended = true;
-    if (gen !== PLACE_EVAL.gen) return;
-    PLACE_EVAL.handle = null;
-
-    try {
-      if (PLACE_EVAL.on && res && res.candidates && res.candidates.length &&
-          G.moves.length === mvN && PLACE_EVAL.key === boardFp()) placeEvalApply(res, mvN, side);
-    } catch (ePE2) {}
-    placeEvalFlush();
-    if (PLACE_EVAL.on && placeEvalWanted())
-      PLACE_EVAL.timer = setTimeout(function () { PLACE_EVAL.timer = 0; placeEvalStart(); }, 320);
-  });
-  if (!ended && gen === PLACE_EVAL.gen) PLACE_EVAL.handle = h;
-}
-// a stone was just dropped / taken back: analyse the new position at once
-function placeEvalKick() {
-  if (!PLACE_EVAL.on || S.mode !== 'place') return;
-  if (!placeEvalWanted()) return;
-
-  
-  if (PLACE_EVAL.timer) { clearTimeout(PLACE_EVAL.timer); PLACE_EVAL.timer = 0; }
-  placeEvalStart();
-}
-function placeEvalStop() {
-  PLACE_EVAL.on = false;
-  placeEvalHaltJob();
-  // keep whatever the engine produced last, even if the throttle had not painted it yet
-  try { placeEvalFlush(); } catch (ePS0) {}
-  if (PLACE_EVAL.pending) PLACE_EVAL.pending = null;
-  try { drawCurveInfo(true); } catch (ePS1) {}
-  placeEvalUI();
-}
-function placeEvalToggle() {
-  if (SET_MODE || linkSessionOn()) return;
-  // stopping must always work - even if some other window already changed the mode,
-  
-  if (PLACE_EVAL.on) { placeEvalStop(); return; }
-  
-  if (LIVE_AN.on) { placeEvalUI(); return; }
-  if (S.mode !== 'place') { placeEvalUI(); return; }
-  PLACE_EVAL.on = true;
-  PLACE_EVAL.clearPending = true;     
-  aiStandDown(); bgThinkStop(); anaLiveStop();
-  if (LIVE_AN.on || LIVE_AN.frozen) { LIVE_AN.on = false; liveAnaClear(); liveAnaUI(); }
-  PLACE_EVAL.t0 = 0; PLACE_EVAL.lastUi = 0;
-  try {
-    var cv = cardVis();
-    if (!cv.engine) { cv.engine = 1; save(); applyCardVis(); syncDocks(); layoutBoard(); }
-  } catch (ePE1) {}
-  placeEvalStart();
-  placeEvalUI();
 }
 
 var BG_AN = { gen: 0, handle: null, key: '', timer: 0 };
@@ -10464,9 +10998,10 @@ function bgThinkYield() {
 function bgThinkHintSync() {
   var h = els.t_bgThinkHint;
   if (!h) return;
-
-  
-  
+  // ★ 2026-10-31（截图：提示变成「有计算在跑，已自动暂停 · 有计算在跑，已自动暂停」）：
+  //   旧逻辑把 DOM 里的当前文本当成 base —— 如果第一次同步时 hint 已经被写成 tag，
+  //   之后 applyLang() 再 removeAttribute('data-base')，下一拍就会把 tag 当 base，
+  //   于是 tag 被拼接两遍。base 只认 i18n 原文，永远不从 DOM 反推。
   var base = T('bgThinkHint') || '';
   if (h.getAttribute('data-base') !== base) h.setAttribute('data-base', base);
   var why = bgThinkBusyBy();
@@ -11361,6 +11896,7 @@ function fwdToggle() {
   if (G.over) { toast(T('over')); return; }
   if (RV_MODE || G.review) return;
 
+  anaSolo('fwd');
   G.fwd.wantVcx = false; G.fwd.want = ''; G.fwd.want2 = '';
   G.fwd.on = true;
   if (els.btn_fwd) els.btn_fwd.classList.add('on');
@@ -11927,19 +12463,41 @@ function balOpenHintTxt() {
 // tick - the picks drift exactly like the official bundle, and nothing ever restarts. Pressing the
 // key a second time stops the search and plays the last picks as real moves.
 var BAL = { on: false, job: null, acc: [], cur: [], need: 2, depth: 0, t0: 0,
-            logT: 0, logD: -1, fails: 0, stageT: 0, lastPaint: 0, watch: 0 };
+            logT: 0, logD: -1, fails: 0, stageT: 0, lastPaint: 0, watch: 0,
+            lastEv: null, lastWr: null, lastEvRaw: '', curLine: null };
 
+/* ★ 2026-11-05（用户）：点数不再是独立大按钮/下拉框，而是与「平衡点」同一分段控件的右半：
+   点击循环 1 点 → 2 点 → 1 点，标签显示当前值（1 点 / 2 点），平衡搜索进行中禁用。
+   口径与旧版一致：空盘仍固定 3 手官方平衡开局，与实际点数无关。 */
+var BAL_POINT_N = (function () {
+  try { var v = parseInt(localStorage.getItem('gb_bal_point_n') || '2', 10); return (v === 1) ? 1 : 2; }
+  catch (e) { return 2; }
+})();
+function balPN() { return BAL_POINT_N; }
+function balPNLabel() {
+  if (!els.btn_an_baln) return;
+  els.btn_an_baln.textContent = T('balPtBtn').replace('{n}', String(BAL_POINT_N));
+  els.btn_an_baln.title = T('balPtHint');
+  els.btn_an_baln.classList.toggle('on', !!(BAL && BAL.on));
+}
+function balPNSet(n) {
+  BAL_POINT_N = (n === 1) ? 1 : 2;
+  try { localStorage.setItem('gb_bal_point_n', String(BAL_POINT_N)); } catch (e) {}
+  balPNLabel();
+}
 function balUI() {
   if (!els.btn_an_bal) return;
   var on = !!(typeof BAL !== 'undefined' && BAL && BAL.on);
   els.btn_an_bal.classList.toggle('on', on);
-  els.btn_an_bal.textContent = on ? T('balStopShow') : T('anBal');
+  els.btn_an_bal.textContent = on ? T('balStopShow') : T('anBalBtn');
   els.btn_an_bal.title = on ? T('balRunTip') : T('balTip');
+  if (els.btn_an_baln) els.btn_an_baln.disabled = on;
+  balPNLabel();
 }
 
 function balAbort() {
   if (typeof BAL === 'undefined' || !BAL || !BAL.on) return;
-  BAL.on = false; BAL.acc = []; BAL.cur = [];
+  BAL.on = false; BAL.acc = []; BAL.cur = []; BAL.curLine = null;
   balLiveStop();
   if (els.btn_an_baln) els.btn_an_baln.disabled = false;
   balUI();
@@ -12018,6 +12576,23 @@ function balOnTick(res, gen, bv) {
   if (G.moves.length !== bv) { balLiveStop(); return; }
   var d = (res && res.depth) || 0;
   if (d > BAL.depth) { BAL.depth = d; BAL.stageT = Date.now(); }
+  /* 平衡点的分数就是「走完这一/两步之后的估值」（越接近 0 越平衡，见 gomocalc 的说明），
+     所以整组标记共用同一个实时分数；环里显示它 + 由它换算的胜率。 */
+  var c0b = (res && res.candidates && res.candidates[0]) || null;
+  if (c0b) {
+    /* ★ 2026-11-05（用户）：mapRes 把 eval 统一成**字符串**（"+18" / "-M3"），
+       旧代码这里只认 typeof === 'number'，于是一辈子不赋值 → 环里只剩一个 50%。
+       现在：数值由 evalNum 解析（和路线/仪表盘同口径），原文留给杀棋 M 格式。 */
+    if (typeof c0b.eval === 'string' && c0b.eval) BAL.lastEvRaw = c0b.eval;
+    var evn = evalNum(c0b.eval);
+    if (!isNaN(evn)) BAL.lastEv = evn;
+    // 只有引擎真的给了 WINRATE 才覆盖；mapRes 的 0.5 兜底不能当真实胜率
+    if (c0b.wrKnown && typeof c0b.winrate === 'number') BAL.lastWr = c0b.winrate;
+  }
+  /* 路线用引擎回吐的整条 BESTLINE（首手 + 对手平衡回应 + 后续 PV）；
+     平衡点路线与棋盘标记同源，见 balSetMarks → rtSetBal。 */
+  if (c0b && c0b.line && c0b.line.length)
+    BAL.curLine = c0b.line.map(function (q) { return [q[0] | 0, q[1] | 0]; });
   var pr = balPairOf(res);
   var now = Date.now();
   if (pr) {
@@ -12126,6 +12701,8 @@ function balFinish() {
   BAL.on = false;
   balUI();
   if (els.btn_an_baln) els.btn_an_baln.disabled = false;
+  balPNLabel();
+  /* 停止后路线保留（用户要求）：只有切换其它分析 / 落子 / 清除计算才走 rtClear。 */
   G.ana.busy = false; G.ana.kind = '';
   anaMark(null);
 }
@@ -12144,6 +12721,7 @@ function balPlayOut(r) {
   }
   G.ana.kind = ''; G.ana.busy = false;
   G.ana.marks = []; G.ana.rows = []; G.ana.balLeft = 0;
+  if (n) rtClear();              /* 落子后平衡点路线随标记一起撤掉，不留旧局面的残影 */
   anaMark(null);
   paint(); refreshUI();
   return n;
@@ -12182,27 +12760,23 @@ function balToggle() {
       paint();
       return;
     }
-    if (openActive()) {                // opening / swap flow: never auto-play into it
-      balSetMarks(picks);
-      paint();
-      renderAna(balDoneMsg(picks.length, picks.map(function (m) { return coordName(m.x, m.y); }), null) +
-        T('anBalColor') + T('balNoPlay'));
-      return;
-    }
-    var n = balPlayOut({ marks: picks });
-    if (n) {
-      renderAna(balDoneMsg(picks.length, picks.map(function (m) { return coordName(m.x, m.y); }), null) +
-        T('anBalColor') + (BAL.depth ? '\n' + T('balShown').replace('{n}', String(n)).replace('{d}', String(BAL.depth)) : ''));
-    } else {
-      renderAna(T('anBalNoEngine'));
-    }
+    /* ★ 2026-11-05（用户）：平衡点键 = 纯开关 —— 再点一次只停止计算，
+       标记与相关路线**保留**在棋盘上；切换其它分析 / 落子 / 清除计算时才擦掉。
+       （旧版这里会自动落子，现按新要求取消自动落子。） */
+    balSetMarks(picks);
+    paint();
+    renderAna(balDoneMsg(picks.length, picks.map(function (m) { return coordName(m.x, m.y); }), null) +
+      T('anBalColor') + T('balKept'));
     return;
   }
   if (!anaGuard(0)) return;
+  anaSolo('bal');
   aiStandDown();
-  BAL.on = true; BAL.acc = []; BAL.cur = []; BAL.depth = 0;
+  BAL.on = true; BAL.acc = []; BAL.cur = []; BAL.depth = 0; BAL.curLine = null;
+  BAL.lastEv = null; BAL.lastWr = null; BAL.lastEvRaw = '';
   BAL.t0 = Date.now(); BAL.logT = 0; BAL.logD = -1; BAL.fails = 0; BAL.lastPaint = 0;
-  BAL.need = !G.moves.length ? 3 : Math.max(1, Math.min(6, balPN()));
+  // 2026-11-04（用户）：平衡点只做 1 点 / 2 点（空盘仍给官方开局的 3 手）
+  BAL.need = !G.moves.length ? 3 : Math.max(1, Math.min(2, balPN()));
   var gen = ++G.ana.gen;
   if (els.btn_an_baln) els.btn_an_baln.disabled = true;
   G.ana.busy = true; G.ana.kind = 'bal';
@@ -12219,31 +12793,56 @@ function balSetMarks(arr) {
   var WHITE_DISC = 'rgba(70,190,255,.95)';
   G.ana.balLeft = arr.length;
   G.ana.balBase = G.moves.length;   // these marks belong to THIS board state
+  /* Each balance pick is a ring: index on top, win rate in the upper half and the
+     engine score in the lower half — the same reading order as the web calculator.
+     ★ 2026-11-05（用户）：成对的两个点各自显示**自己那一对**数值（网页版 applyBalance 口径）：
+       偶数点 = 当前走子方视角，奇数点 = 对手视角（胜率 1-wr、分数取反）；
+       分数用引擎原文，杀棋保留 M 格式（+M3 / -M3）。 */
+  var raw = (typeof BAL.lastEvRaw === 'string' && BAL.lastEvRaw) ? BAL.lastEvRaw : '';
+  var baseEv = (typeof BAL.lastEv === 'number') ? BAL.lastEv : null;
+  var baseWr = (typeof BAL.lastWr === 'number') ? BAL.lastWr : null;
+  var line0 = (BAL && BAL.curLine && BAL.curLine.length > 1)
+    ? BAL.curLine.map(function (q) { return [q[0] | 0, q[1] | 0]; }) : null;
+  var vals = arr.map(function (m, i) {
+    var flip = (i % 2 === 1);
+    var evOwn = (typeof m.ev === 'number') ? m.ev : null;
+    var ev = evOwn != null ? (flip ? -evOwn : evOwn) : baseEv;
+    var sc = '';
+    if (typeof m.evRaw === 'string' && m.evRaw) sc = flip ? flipEvalText(m.evRaw) : fmtEval(m.evRaw);
+    else if (raw) sc = flip ? flipEvalText(raw) : fmtEval(raw);
+    else if (ev != null) sc = fmtEval(ev);
+    var wrv = (typeof m.wr === 'number') ? m.wr : baseWr;
+    var wrNum = (wrv != null) ? (flip ? 1 - wrv : wrv)
+                             : (ev == null ? null : 1 / (1 + Math.exp(-ev / 200)));
+    return { sc: sc, wrNum: wrNum };
+  });
   G.ana.marks = arr.map(function (m, i) {
-    // Sequence number only - no eval score on the balance marks
-    return { x: m.x, y: m.y, badge: m.seq, label: '', tier: -1, inline: true,
+    return { x: m.x, y: m.y, badge: m.seq, label: (vals[i].wrNum == null) ? ''
+             : (Math.round(vals[i].wrNum * 100) + '%'), sub: vals[i].sc, tier: -1, inline: true,
              col: m.color === 'b' ? null : WHITE_DISC };
   });
   G.ana.rows = arr.map(function (m, i) {
     return { i: i, badge: m.seq, coord: coordName(m.x, m.y), eval: '', pv: '', tier: -1,
              col: m.color === 'b' ? null : WHITE_DISC };
   });
+  /* ★ 2026-11-05（用户）：平衡点也铺相关路线 —— 与上面的标记一一对应（2 点 → 2 条，1 点 → 1 条）。
+     第 1 个点带成对搜索回吐的整条线（首手 + 对手平衡回应），其余点只有自身坐标；
+     评分 / 胜率与标记同一口径（该行首手一方视角），所以两边数字可以逐点对上。 */
+  var rrows = arr.map(function (m, i) {
+    var line = (i === 0 && line0) ? line0.slice() : [[m.x, m.y]];
+    return {
+      coord: [m.x, m.y], depth: BAL.depth || 0,
+      wr: vals[i].wrNum, ev: vals[i].sc || '–', line: line,
+      side: (m.color === 'b') ? 1 : 2,
+    };
+  });
+  rtSetBal(rrows);
   if (linkSessionOn() && arr.length) {
     var gm2 = null;
     try { var bb = els.board.getBoundingClientRect(); gm2 = { gap: Math.round(bb.width / 14) }; } catch (e) { gm2 = { gap: 40 }; }
     var cellsP = arr.map(function (m) { return m.x + ',' + m.y + ',' + m.seq + ',' + m.color + ',' + (m.ev || ''); });
     tellHost({ type: 'balance', on: true, gap: gm2.gap, cells: cellsP.join(';') });
   }
-}
-
-function balPN() {
-  if (els.btn_an_baln && els.btn_an_baln.value) {
-    var v = parseInt(els.btn_an_baln.value, 10);
-    if (v >= 1 && v <= 6) return v;
-  }
-  var n = 2;
-  try { var sv = parseInt(localStorage.getItem('gb_bal_point_n') || '2', 10); if (sv >= 1 && sv <= 6) n = sv; } catch (e) {}
-  return n;
 }
 
 function wireAnalysis() {
@@ -12277,11 +12876,14 @@ function wireAnalysis() {
     aiStandDown(); anaDefend(true);
   };
   els.btn_an_bal.onclick = function () { balToggle(); };
+
   balUI();
-  if (els.btn_an_baln) els.btn_an_baln.onchange = function () {
-    var n = parseInt(els.btn_an_baln.value, 10);
-    if (isNaN(n) || n < 1 || n > 6) n = 2;
-    try { localStorage.setItem('gb_bal_point_n', String(n)); } catch (e) {}
+  balPNLabel();
+  /* 点数右半：点击循环 1 点 → 2 点 → 1 点（没有独立大按钮）；搜索进行中由 balUI 禁用 */
+  if (els.btn_an_baln) els.btn_an_baln.onclick = function () {
+    if (BAL && BAL.on) return;
+    var n = (BAL_POINT_N === 1) ? 2 : 1;
+    balPNSet(n);
     toast(T('anBalnSet').replace('{n}', String(n)));
   };
   els.num_nbest.onchange = function () {
@@ -12292,6 +12894,7 @@ function wireAnalysis() {
   };
   els.num_nbest.value = String(anaIp());
   renderAna(T('anIdle'), true);
+  rtRender();
 }
 
 function gbOf(mb) { mb = mb | 0; return mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : mb + ' MB'; }
@@ -12407,7 +13010,7 @@ function buildSelects() {
   renderSysInfo();
   var maxT = Math.max(1, host.threadsMax || 1);
   //     t=10 2879K nps / d22  ·  t=12 3567K / d29  ·  t=14~16 4.0M+ / d30
-  
+  //     10s：T4 depth 23 / 0.73M      vs   T14 depth 22 / 2.36M
   var physC = Math.max(0, host.physCores | 0);
   var lowCores = (physC > 1) ? (S.cores < physC) : (S.cores >= 10 && S.cores <= 12);
   if (lowCores && maxT > S.cores && !migFlag('threadsTopo4')) {
@@ -12432,6 +13035,9 @@ function buildSelects() {
     els.coresHint.textContent = T('coresHint')
       .replace('{n}', String(host.cpu || 0)).replace('{m}', String(maxT));
 
+  // ★ 2026-11-05（实测）：8 线程 + mix9svq 下 512 MB 哈希反而最准 —— 同局面同 30s：
+  //   512 MB 完成深度 31（28.1s 收手），1024/1536 MB 只有 24~28 层且节点更多。
+  //   因此默认 512 MB，并把旧版遗留的「自动升到 1024」与更大的值做一次性回迁。
   var memMB = host.memMB | 0;
   var maxH = 4096;
   var hs = [128, 256, 512, 1024, 1536, 2048, 2560, 3072, 3584, 4096];
@@ -12444,17 +13050,16 @@ function buildSelects() {
     var byRes = Math.max(0, memMB - 2048);
     capMB = Math.min(maxH, byPct, byRes);
   }
-  var effH = (S.hashMB && hs.indexOf(S.hashMB) >= 0 && S.hashMB <= capMB)
-    ? S.hashMB
-    : (hs.filter(function (h) { return h <= capMB; }).pop() || 512);
-
-  if (!migFlag('hashDefault1024') && S.hashMB === 512 && capMB >= 1024) {
-    S.hashMB = 1024;
+  // 旧版曾把 1024 强行降到 512、把小于 2048 的强行升到 2048；这里只回滚一次「旧默认」。
+  if (!migFlag('hashTuned512') && S.hashMB > 512 && S.hashMB <= capMB) {
+    S.hashMB = 512;
     enginePrefSet(S.cores, S.hashMB);
     save();
-    effH = 1024;
   }
-  if (!S.hashMB) { S.hashMB = 1024; enginePrefSet(S.cores, S.hashMB); save(); effH = 1024; }
+  var effH = (S.hashMB && hs.indexOf(S.hashMB) >= 0 && S.hashMB <= capMB)
+    ? S.hashMB
+    : (hs.filter(function (h) { return h <= Math.min(capMB, 512); }).pop() || 512);
+  if (!S.hashMB) { S.hashMB = Math.min(512, capMB); enginePrefSet(S.cores, S.hashMB); save(); effH = S.hashMB; }
   els.sel_hash.innerHTML = hs.map(function (h) {
     var off = (h > capMB);
     return '<option value="' + h + '"' + (h === effH ? ' selected' : '') +
@@ -12505,7 +13110,8 @@ function buildSelects() {
     selSyncCustom(els.sel_maxDepth, mdNow, function (x) { return String(x); });
   }
   if (els.inp_maxDepth) els.inp_maxDepth.value = mdNow ? String(mdNow) : '';
-
+  // ★ 2026-10-30（用户定稿）：16 / 64 / 128 / 256 / 512 / 768 / 1024 M，0 = 不限；
+  //   输入框允许 0.1~4096.0 M，默认不限。
   var MN_OPTS = [0, 16000000, 64000000, 128000000, 256000000, 512000000, 768000000, 1024000000];
   var mnNow = S.maxNodes;
   if (!(mnNow === 0 || (mnNow >= 100000 && mnNow <= 4096000000))) mnNow = 0;
@@ -12548,7 +13154,8 @@ function boot() {
 
   // Move numbers are the default now, so switch existing profiles on once.
   if (!migFlag('showNumOn')) { S.showNum = true; try { save(); } catch (eSN) {} }
-
+  // ★ 2026-10-30（用户：「软件首次启动时默认只开启引擎仪表盘的卡片」）
+  //   旧配置曾把 setup / analysis 两张卡强行打开；这里一次性收敛为只显示引擎仪表盘。
   if (!migFlag('cardsEngineOnly')) {
     try {
       var cv0 = cardVis();
@@ -12556,7 +13163,9 @@ function boot() {
       save();
     } catch (eCV) {}
   }
-  S.coach = false;   // coach view retired from the UI: never paint its heat marks again
+  // 2026-11-04（用户）：「指导视图」在 4.51 整项下线（按钮已从卡片移除），S.coach 恒为 false
+  //   —— 即使旧配置里开过，也不会再往棋盘上铺那层方块热力。
+  S.coach = false;
 
   if (!G.board) G.board = newBoard();
   enginePrefEnsure();    // seed the engine key from legacy saves (one-time)
@@ -12580,6 +13189,7 @@ function boot() {
     undoOne();
   });
   bindBoardHover();
+  rtWheelIsolate();
   window.addEventListener('resize', function () {
     fitFont(); syncResponsiveDock(); layoutBoard(); visLayout();
   });
@@ -12657,7 +13267,7 @@ function boot() {
       els.shiftPop.hidden = true;
     }
   });
-  footPopsWatch();   
+  footPopsWatch();   // 弹窗开合 → 行内其它按键隐藏 + 重新排按键行
 
   els.btn_review.onclick = openReviewFromBoard;
 
@@ -12973,8 +13583,10 @@ function boot() {
     else { bgThinkStop(); bgThinkHaltEngine(); }
   };
 
-  
-
+  // ★ 2026-10-31（用户：主窗口「对局设置」里的「动态时间」点不动）：
+  //   设置窗自己 wireSetSetup 里绑了 #btn_dynTime，主窗只绑了 btn_bgThink ——
+  //   同一个开关在主窗是「死」的（点击后 S.dynTime 完全不变）。这里补上主窗绑定，
+  //   save() 会广播 mainSync，设置窗自动跟随。
   if (els.btn_dynTime) els.btn_dynTime.onclick = function () {
     S.dynTime = (S.dynTime === false);
     save();
@@ -12984,7 +13596,6 @@ function boot() {
   els.chk_preview.onchange = function () { S.previewOn = !!els.chk_preview.checked; save(); paint(); };
 
   if (els.btn_live) els.btn_live.onclick = liveAnaToggle;
-  if (els.btn_place_eval) els.btn_place_eval.onclick = placeEvalToggle;
 
   els.btn_save_rv.onclick = savePos;
 
@@ -13008,6 +13619,8 @@ function boot() {
       tellHostDefer = true;
       try { onHostMsg(ev); } finally { tellHostDefer = false; }
     });
+    // ★ 2026-11-06：启动即向宿主读回「原子写入」的微状态；比 localStorage 的更新就应用。
+    try { tellHost({ type: 'stateLoad' }); } catch (eSL) {}
   } else {
     buildSelects();
   }
@@ -13017,7 +13630,13 @@ function boot() {
 
     // the settings window pushed a patch through the host relay
     if (m.type === 'setSync') { try { setPatchApply(m.patch || null); } catch (eSS) {} return; }
-    
+    // ★ 2026-11-06：宿主读回的微状态（原子写入的那一份）。只有比页面现有状态更新才应用，
+    //   否则用户开机后已经落的子会被旧快照覆盖。
+    if (m.type === 'stateLoaded') {
+      try { if (window.__gbApplyState) window.__gbApplyState(m.data); } catch (eSt) {}
+      return;
+    }
+    // 线程测速结果也发给主窗：设置窗中途被关掉时，结果仍会落地并生效
     if (m.type === 'engineOut' || m.type === 'engineAck' || m.type === 'engineAsk') {
       try { LocalAI.relay(m); } catch (e) {}
       return;
@@ -13169,8 +13788,10 @@ function boot() {
     if (spt) setPatchApply(spt, false, true);   // appearance comes from the stored snapshot
   } catch (eSP) {}
 
-  
-
+  // ★ 2026-10-30（用户：启动不要闪多个 logo / 空屏）
+  //   宿主模式：页面在原生 splash 后面加载。boot 一结束就移除 #boot 遮罩，让首帧直接是最终 UI；
+  //   页面首帧真正合成出来后发 painted，宿主收到才开始撤原生覆盖层 ⇒ 屏幕上只有
+  //   「一张品牌 splash → 完整 UI」两态，不会出现第二个 logo 或底色空屏。
   bootDone();
   if (HOST) {
     window.__gbReadySent = true;
@@ -13178,7 +13799,7 @@ function boot() {
     var _gbPainted = function () {
       try { window.chrome.webview.postMessage({ type: 'painted' }); } catch (eP2) {}
     };
-    
+    // 双 rAF：第一次 rAF 前首帧还没提交，第二次 rAF 前首帧已经画完 ⇒ 这时才报 painted。
     if (window.requestAnimationFrame)
       requestAnimationFrame(function () { requestAnimationFrame(function () { setTimeout(_gbPainted, 0); }); });
     else setTimeout(_gbPainted, 120);
@@ -13194,7 +13815,8 @@ function boot() {
 function bootDone() {
   var b = document.getElementById('boot');
   if (!b) return;
-
+  // 宿主模式：页面本来就隐藏在原生 splash 后面，boot 遮罩直接移除（不做 260ms 淡出），
+  // 这样宿主显示 WebView 时绝不会再看到第二个 logo。
   if (HOST) { if (b.parentNode) b.parentNode.removeChild(b); return; }
   b.classList.add('off');
   setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 260);
@@ -13374,28 +13996,33 @@ function scheduleEngineRetry() {
 }
 
 // ---- global font preferences ----------------------------------------------------------------
-
+// ★ 2026-10-30（用户：最大化后字体和板块不要跟着变大；设置里新增「字体」页）
+//   旧版 fitFont() 按窗口宽高算 12~20px，最大化会把整个 UI 放大 1.5 倍。现在根字号固定，
+//   只由「字体大小」三档决定；棋盘仍按可用面积缩放，卡片 / 字体不再随窗口放大。
 var FONT_LEVEL_PX = { small: 12.5, normal: 13.5, large: 14.8 };
 var FONT_NUM_SCALE = { small: 0.38, normal: 0.43, large: 0.50 };
 var FONT_UI_DEFAULT = '"Source Han Sans SC","Source Han Sans CN","Noto Sans SC","思源黑体","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif';
 var FONT_NUM_DEFAULT = '"Source Han Serif SC","Noto Serif SC","Noto Serif CJK SC","思源宋体","SimSun",serif';
-
+// 粗细 / 斜体 / 棋子风格（仿真 = 径向渐变高光，扁平 = 系统原本的纯色棋子）
 var FONT_WEIGHTS = [300, 400, 500, 700, 900];
 var FONT_WEIGHT_DEFAULT = 400;
-var FONT_NUM_WEIGHT_DEFAULT = 700;   
+var FONT_NUM_WEIGHT_DEFAULT = 700;   // 与 5 档滑条一致：旧版 600 归一化到「粗体」700
 var STONE_STYLE_DEFAULT = 'real';
-
+// ★ 2026-11-01（用户：棋子「扁平」选择后不生效）
+//   归一化白名单漏了 'flat'，设置页存下的 flat 被当成非法值回落到 'real'，
+//   于是「扁平」永远画成仿真棋子。三种合法值必须在这一处统一收口。
 function stoneStyleOf(v) {
   return (v === 'flat' || v === 'jade' || v === 'real') ? v : STONE_STYLE_DEFAULT;
 }
 
 function fontWeightNum(v, dflt) {
   var n = Math.round(+v);
-  
+  // 600 是旧版棋子的默认档，滑条只有 5 档（300/400/500/700/900），旧值统一落到 700。
   if (n === 600) return 700;
   return (FONT_WEIGHTS.indexOf(n) >= 0) ? n : dflt;
 }
-
+// 字体名统一去掉包裹引号再存：旧版本把 "Source Han Serif SC"（带引号）直接存进配置，
+// 与新版列表里的裸字体名对不上会出现重复行 / 选中行对不上。
 function cleanFontName(v) {
   return String(v || '').replace(/[\\"']/g, '').trim();
 }
@@ -13430,16 +14057,14 @@ function fontRootPx() {
   var f = fontCfg();
   return FONT_LEVEL_PX[f.size] || FONT_LEVEL_PX.normal;
 }
-// 只改根字号 / CSS 变量 / 棋子绘制参数，不触发棋盘与曲线重绘：各窗口 boot 阶段先调它，
-// 等 DOM 与画布就绪后再由 applyFontPrefs() 做一次完整重绘。
+
 function applyFontVars() {
   var f = fontCfg();
   document.documentElement.style.fontSize = (FONT_LEVEL_PX[f.size] || FONT_LEVEL_PX.normal) + 'px';
   var uiFam = fontFamilyCss(f.ui, FONT_UI_DEFAULT);
-  // ★ 2026-10-30（用户：提示文字没有用上所选字体）
-  //   旧值把 'inherit' 当成字体族拼进列表，得到 "用户字体", inherit —— 这不是合法的
-  //   font-family，整条声明会被浏览器丢弃，于是提示始终停在默认字体。回退必须是一个
-  //   真正的字体列表（用 UI 字体兜底），不能是 CSS 关键字。
+
+  
+  
   var logFam = f.log ? fontFamilyCss(f.log, FONT_UI_DEFAULT) : uiFam;
   var bs = document.body.style;
   bs.setProperty('--font', uiFam);
@@ -13548,12 +14173,7 @@ function save() {
 }
 
 var LINK_CFG_LAST = null;
-// ★ 2026-10-30（用户：「开启连线窗，改为主窗口不再改变」）
-//   旧实现在打开连线窗时会重新读一份存档、强制切到 pve、重设 AI 方、重排卡片并整页重绘，
-//   主窗口的盘面 / 模式 / 卡片位置因此全变。现在只维护 linkOn 状态与标题上的小标记：
-//   · 不 reload S、不切 mode、不重排卡片、不 repaint；
-//   · 主窗口当前局面、分析任务和设置保持原样；
-//   · 只把规则同步给联动窗（联动窗自己的参数从主窗口当前设置起步）。
+
 function setLinkMode(on) {
   if (!!G.linkOn === !!on) return;
 

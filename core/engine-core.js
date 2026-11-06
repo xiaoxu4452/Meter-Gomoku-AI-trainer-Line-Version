@@ -1,9 +1,6 @@
-
 (function (root) {
   'use strict';
   var C = {};
-
-  
 
   C.parseK = function (v) {
     v = String(v).trim();
@@ -34,7 +31,6 @@
     return out;
   };
 
-  
   C.parseLine = function (line, pvs, N) {
     if (!line || !line.trim()) return;
     var i = line.indexOf(' ');
@@ -94,7 +90,7 @@
         return;
       }
       var isPonder = /^\s*\[/.test(tail);
-      if (isPonder) return;
+      if (isPonder) return;                       
       var mpv = tail.match(/^\((\d+)\)\s+([^\s|]+)\s*\|\s*(\d+)(?:-(\d+))?\s*\|\s*(.*)$/);
       if (mpv) {
         var pvi = +mpv[1] - 1;
@@ -153,7 +149,6 @@
     }
   };
 
-  
   C.doneOf = function (raw, pvs, N) {
     var mbest = raw.match(/\bbest\s+(\d+)\s+(\d+)/);
     var chosen = (mbest ? [+mbest[1], N - 1 - (+mbest[2])] : null) || pvs.__final || pvs.__best;
@@ -161,9 +156,6 @@
     return { done: done, best: chosen };
   };
 
-  
-
-  
   C.evalAuth = function (raw) {
     var s = (raw == null) ? '' : String(raw).trim();
     if (!s) return null;
@@ -182,7 +174,6 @@
     return (a.sign < 0 ? '-' : '+') + a.n;
   };
 
-  
   C.evalFor = function (raw, rootSide, viewSide) {
     var a = C.evalAuth(raw);
     if (!a) return '-';
@@ -201,9 +192,6 @@
     return Math.max(-1000, Math.min(1000, v));
   };
 
-  
-
-  
   C.makeEpochGate = function (fallbackMs, parseOne) {
     var age = +fallbackMs || 400;
     var armedAt = 0, held = [], stale = 0, replay = 0;
@@ -217,8 +205,8 @@
     return {
       arm: function () { armedAt = Date.now(); held = []; stale = 0; replay = 0; },
       armed: function () { return !!armedAt; },
-      staleCount: function () { return stale; },
-      replayCount: function () { return replay; },
+      staleCount: function () { return stale; },      
+      replayCount: function () { return replay; },    
       heldCount: function () { return held.length; },
       feed: function (line) {
         if (!armedAt) { C._gateParse(parseOne, line); return; }
@@ -229,9 +217,8 @@
       },
     };
   };
-  C._gateParse = function (fn, line) { if (typeof fn === 'function') fn(line); };
-
   
+  C._gateParse = function (fn, line) { if (typeof fn === 'function') fn(line); };
 
   C.countStones = function (board, N) {
     var n = 0;
@@ -239,7 +226,6 @@
     return n;
   };
 
-  
   C.sideToMove = function (bl, wh) { return (bl.length <= wh.length) ? 1 : 2; };
 
   C.applySideToMove = function (out, side) {
@@ -297,9 +283,6 @@
     return C.applySideToMove(out, side);
   };
 
-  
-
-  
   C.budgetMs = function (userMs, floorMs) {
     var m = +userMs || 0;
     var f = +floorMs || 0;
@@ -307,7 +290,6 @@
     return Math.round(m);
   };
 
-  
   C.makeStopQuiet = function (o) {
     return new Promise(function (resolve) {
       var quietMs = o.quietMs || 110, maxMs = o.maxMs || 450, tickMs = o.tickMs || 35;
@@ -329,7 +311,6 @@
     });
   };
 
-  
   C.collectCandidates = function (pvs, wantTopN) {
     var top = Math.max(1, Math.min(8, wantTopN || 8));
     var out = [], seen = {};

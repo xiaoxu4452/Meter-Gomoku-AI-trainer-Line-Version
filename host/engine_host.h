@@ -123,6 +123,17 @@ struct ParseState {
   int         pvIdx = -1;
   Candidate   cur;
   std::vector<Candidate> cands;   
+
+  
+
+  
+  
+  std::vector<Candidate> pend;    
+
+  
+
+  bool        sortPv = false;
+  int         pendNumPv = 0;
   int         numPv = 0;
   int         maxDepth = 0, selDepth = 0, timeMs = 0;
   long long   totalNodes = 0, speed = 0;
