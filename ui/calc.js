@@ -10191,7 +10191,9 @@ function anaDefend(renew) {
       if (Math.abs(d) > 1e-9) return d;
       return evalNum(b.evalTxt) - evalNum(a.evalTxt);
     });
-    cells = cells.slice(0, SCAN_MAX);
+    /* No UI-side cap: the candidate set is exactly what the engine returned under
+       INFO CAUTION_FACTOR (3 = square3_line4: 7x7 box + 4 cells along each of 8 dirs).
+       Slicing here would silently drop engine candidates and break the YixinBoard range. */
     cells.forEach(function (c, i) { c.rank = i + 1; });
     renderDefendMarks(cells);
 
@@ -10248,7 +10250,6 @@ function renderDefendMarks(cells) {
 }
 
 var SCAN_TILE_SIDE = 0.92 * 0.8;   
-var SCAN_MAX = 48;
 function scanTileP(c) {
   if (c && typeof c.wr === 'number') return Math.max(0, Math.min(1, c.wr));
   if (c && typeof c.pct === 'number') return Math.max(0, Math.min(1, c.pct / 100));
@@ -10582,8 +10583,9 @@ function rtEmptyHtml() {
   return '<div class="rt-empty"><div class="rt-empty-msg">' + escHtml(T('rtEmpty')) +
     '</div><div class="rt-empty-lg">' + escHtml(T('rtLegend')) + '</div></div>';
 }
-/* 扫描路线：条数 = 当前扫描候选数（最多 SCAN_MAX），与棋盘方块一一对应。
-   扫描每帧候选会重排，但 DOM 按坐标复用 + 原地改文字，不整屏重建、不丢滚动位置。 */
+/* Scan route list: one row per engine candidate, no cap (the engine's caution range
+   already bounds the set). Frames reorder candidates, but rows are reused by coordinate
+   and updated in place, so there is no full rebuild and no scroll jump. */
 function rtScanLineKey(r) {
   return r.line.map(function (q) { return q[0] + ',' + q[1]; }).join(' ');
 }
@@ -10636,7 +10638,7 @@ function rtSetScan(cells, side) {
     pinKey = pr.coord[0] + ',' + pr.coord[1];
     pinI = RT_DATA.pin.i || 0;
   }
-  var rows = (cells || []).slice(0, SCAN_MAX).map(function (c) {
+  var rows = (cells || []).map(function (c) {
     var line = (c.line && c.line.length) ? c.line : [[c.x, c.y]];
     return {
       coord: [c.x, c.y], depth: c.depth || 0,
