@@ -8,7 +8,7 @@ A Windows desktop assistant for Gomoku / Renju. It **reads the board you are alr
 
 > 📄 **Printable bilingual manual (PDF):** [docs/Meter-Gomoku-Manual.pdf](docs/Meter-Gomoku-Manual.pdf)
 
-Current version: **4.48** · Engine: **Rapfi 0.44.1** (mix9 NNUE shipped, mix10 in source)
+Engine: **Rapfi 0.44.1** (mix9 NNUE shipped, mix10 in source) · the version number follows the newest release on the Releases page
 
 ---
 
@@ -77,14 +77,14 @@ The quickest way to see whether the engine is actually working — every value u
 <td width="34%" valign="top"><img src="docs/images/analysis.png" width="300" alt="Analysis card"></td>
 <td valign="top">
 <ul>
-<li><b>Compute</b> — one deep search of the current position; the best point is marked on the board. The button toggles to <b>Stop</b>.</li>
-<li><b>Multi-point</b> — returns <i>N</i> candidates (1–8, default 3; the same value as <i>Analysis points</i> in Game setup); each ring carries its rank and score.</li>
-<li><b>Balance picks</b> with <b>Points</b> — the engine's native paired balance search; returns points where neither side has a clear edge (<code>|eval| ≤ 50</code> counts as balanced). <b>Points</b> sets how many to return (1–6); an empty board is fixed at 3.</li>
-<li><b>Defend scan</b> — scores every empty point in a 9×9 neighbourhood as <b>W</b> (moves to win) / <b>L</b> (moves to lose); re-scans after each move.</li>
+<li><b>Analyze</b> — keeps deepening the position on the main lane and lists the engine candidates on the board (best point plus up to 7 more), with the <b>Routes</b> box filling in ranked alongside. Press again to stop.</li>
+<li><b>Scan</b> — engine-native <code>YXSEARCHDEFEND</code>: every point inside the candidate range gets the opponent's win rate if they play there, printed as a percentage inside its ring - higher means defend it. The point set follows the stones (square3_line4 by default) instead of tiling the whole board.</li>
+<li><b>Balance picks</b> with <b>Points</b> — the engine's native paired balance search; the key cycles <b>1 point / 2 points</b> (an empty board is fixed at 3 moves). Thin solid ring with a translucent violet / sky-blue fill: win rate on top, score below, rank badge outside.</li>
+<li><b>Routes</b> — one ranked route per analysis point: a header (rank / score / depth d / win rate) plus a full pill-style code line. Hover to preview, click to pin, double-click to play that move.</li>
 <li><b>Look-ahead · VCF · VCT</b> — forced-line tools. Look-ahead plays the position forward until five in a row actually appears; VCF uses consecutive fours only; VCT adds live threes.</li>
 <li><b>Black / White + Commit</b> — the colour and button used to commit a suggested line.</li>
-<li><b>Coach view</b> — four-colour square hints while it is your turn (best / good / fair / poor); they vanish when you move.</li>
-<li><b>Clear calc</b> — erases this card's marks without touching the position.</li>
+<li><b>Clear</b> — erases this card's marks without touching the position.</li>
+<li><b>One job at a time</b> — Analyze, Scan, Balance and Look-ahead are mutually exclusive; switching stops the old job and wipes its marks.</li>
 </ul>
 </td>
 </tr>
@@ -288,7 +288,7 @@ One click replaces the button area with the six thresholds; the statistics row f
 | **Settings look** | Option labels are sky blue — and switch to black or white automatically when the page colour is close to sky blue, so they never become unreadable. The three window-card switches gained a titled **Window cards** frame. |
 | **Stone row layout** | The Font → stones row uses fixed pixel sizes with the button groups sharing the remaining width, so Medium / Large no longer overflow the window; move-counter sizes were reduced one step. |
 
-### 4.47
+#### 4.47
 
 | Area | Change |
 |---|---|
@@ -297,7 +297,7 @@ One click replaces the button area with the six thresholds; the statistics row f
 | **Link window** | Opening a link session no longer reshapes the main window and no longer keeps its own settings archive; link AI parameters start from the main window. |
 | **Board rendering** | Lines and coordinates are device-pixel aligned, the position-code box moved under the engine log, move numbers are on by default. |
 
-### 4.46
+#### 4.46
 
 | Area | Change |
 |---|---|
