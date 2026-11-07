@@ -12981,6 +12981,14 @@ function buildSelects() {
   if (factoryT < MIN_THREADS) factoryT = Math.min(maxT, MIN_THREADS);
   if (!(S.cores >= MIN_THREADS)) { S.cores = factoryT; enginePrefSet(S.cores, S.hashMB); save(); }
   var effT = Math.max(Math.min(MIN_THREADS, maxT), Math.min(S.cores, maxT));
+  // Same rule as hash: never keep a stored thread count the host will silently clamp
+  // (old profiles could hold 10/12 on an 8-core machine while the picker showed 8).
+  if (S.cores !== effT) {
+    S.cores = effT;
+    try { enginePrefSet(S.cores, S.hashMB); } catch (eT1) {}
+    try { save(); } catch (eT2) {}
+    try { applyEngineConfig(); } catch (eT3) {}
+  }
   var html = '';
   for (var t = Math.min(MIN_THREADS, maxT); t <= maxT; t++) {
     html += '<option value="' + t + '"' + (t === effT ? ' selected' : '') + '>' + t + '</option>';
@@ -13015,6 +13023,15 @@ function buildSelects() {
     ? S.hashMB
     : (hs.filter(function (h) { return h <= Math.min(capMB, 512); }).pop() || 512);
   if (!S.hashMB) { S.hashMB = Math.min(512, capMB); enginePrefSet(S.cores, S.hashMB); save(); effH = S.hashMB; }
+  // Keep the stored value equal to what the dropdown shows and what the host will use:
+  // a stale/unsupported/over-cap value used to stay in S.hashMB while the UI showed the
+  // fallback, so the picker and the engine disagreed. Clamp visibly and re-apply.
+  if (S.hashMB !== effH) {
+    S.hashMB = effH;
+    try { enginePrefSet(S.cores, S.hashMB); } catch (eH1) {}
+    try { save(); } catch (eH2) {}
+    try { applyEngineConfig(); } catch (eH3) {}
+  }
   els.sel_hash.innerHTML = hs.map(function (h) {
     var off = (h > capMB);
     return '<option value="' + h + '"' + (h === effH ? ' selected' : '') +

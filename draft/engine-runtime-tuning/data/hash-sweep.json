@@ -1,0 +1,811 @@
+{
+ "turn": 8000,
+ "reps": 2,
+ "threads": 8,
+ "hashKB": 1572864,
+ "detail": 2,
+ "variants": [
+  {
+   "name": "h64",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "HASHKB": "65536"
+   },
+   "hashkb": 65536,
+   "threads": 0
+  },
+  {
+   "name": "h128",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "HASHKB": "131072"
+   },
+   "hashkb": 131072,
+   "threads": 0
+  },
+  {
+   "name": "h256",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "HASHKB": "262144"
+   },
+   "hashkb": 262144,
+   "threads": 0
+  },
+  {
+   "name": "h384",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "HASHKB": "393216"
+   },
+   "hashkb": 393216,
+   "threads": 0
+  },
+  {
+   "name": "h512",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "HASHKB": "524288"
+   },
+   "hashkb": 524288,
+   "threads": 0
+  },
+  {
+   "name": "h1024",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "HASHKB": "1048576"
+   },
+   "hashkb": 1048576,
+   "threads": 0
+  },
+  {
+   "name": "h2048",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "HASHKB": "2097152"
+   },
+   "hashkb": 2097152,
+   "threads": 0
+  }
+ ],
+ "samples": [
+  {
+   "variant": "h64",
+   "pos": 5,
+   "d": 27,
+   "sd": 54,
+   "nodes": 9901715,
+   "speed": 1830000,
+   "ttime": 7971,
+   "ev": "-228",
+   "best": "7,8",
+   "wall": 8346,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "h128",
+   "pos": 5,
+   "d": 27,
+   "sd": 43,
+   "nodes": 12997684,
+   "speed": 1746000,
+   "ttime": 7442,
+   "ev": "-242",
+   "best": "7,8",
+   "wall": 7837,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "h256",
+   "pos": 5,
+   "d": 25,
+   "sd": 49,
+   "nodes": 7251994,
+   "speed": 1784000,
+   "ttime": 7971,
+   "ev": "-220",
+   "best": "7,8",
+   "wall": 8369,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "h384",
+   "pos": 5,
+   "d": 25,
+   "sd": 49,
+   "nodes": 10635178,
+   "speed": 1776000,
+   "ttime": 7976,
+   "ev": "-248",
+   "best": "7,8",
+   "wall": 8381,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "h512",
+   "pos": 5,
+   "d": 27,
+   "sd": 44,
+   "nodes": 11877391,
+   "speed": 1743000,
+   "ttime": 7971,
+   "ev": "-248",
+   "best": "7,8",
+   "wall": 8369,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "h1024",
+   "pos": 5,
+   "d": 26,
+   "sd": 63,
+   "nodes": 4676348,
+   "speed": 1845000,
+   "ttime": 7973,
+   "ev": "-221",
+   "best": "7,8",
+   "wall": 8440,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "h2048",
+   "pos": 5,
+   "d": 26,
+   "sd": 45,
+   "nodes": 9149462,
+   "speed": 1787000,
+   "ttime": 7976,
+   "ev": "-215",
+   "best": "7,8",
+   "wall": 8558,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "h128",
+   "pos": 5,
+   "d": 26,
+   "sd": 45,
+   "nodes": 10747945,
+   "speed": 1891000,
+   "ttime": 7975,
+   "ev": "-230",
+   "best": "7,8",
+   "wall": 8368,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "h256",
+   "pos": 5,
+   "d": 26,
+   "sd": 46,
+   "nodes": 12124279,
+   "speed": 1878000,
+   "ttime": 7973,
+   "ev": "-245",
+   "best": "7,8",
+   "wall": 8363,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "h384",
+   "pos": 5,
+   "d": 26,
+   "sd": 54,
+   "nodes": 12010084,
+   "speed": 1950000,
+   "ttime": 7974,
+   "ev": "-217",
+   "best": "7,8",
+   "wall": 8361,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "h512",
+   "pos": 5,
+   "d": 26,
+   "sd": 43,
+   "nodes": 11173189,
+   "speed": 1875000,
+   "ttime": 7972,
+   "ev": "-243",
+   "best": "7,8",
+   "wall": 8341,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "h1024",
+   "pos": 5,
+   "d": 26,
+   "sd": 48,
+   "nodes": 14903222,
+   "speed": 2114000,
+   "ttime": 7974,
+   "ev": "-333",
+   "best": "7,8",
+   "wall": 8374,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "h2048",
+   "pos": 5,
+   "d": 26,
+   "sd": 49,
+   "nodes": 13632168,
+   "speed": 1840000,
+   "ttime": 7409,
+   "ev": "-225",
+   "best": "7,8",
+   "wall": 7811,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "h64",
+   "pos": 5,
+   "d": 24,
+   "sd": 47,
+   "nodes": 10966362,
+   "speed": 1585000,
+   "ttime": 7977,
+   "ev": "-235",
+   "best": "7,8",
+   "wall": 8387,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "h64",
+   "pos": 7,
+   "d": 26,
+   "sd": 49,
+   "nodes": 14451805,
+   "speed": 2207000,
+   "ttime": 7974,
+   "ev": "-370",
+   "best": "6,6",
+   "wall": 8369,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "h128",
+   "pos": 7,
+   "d": 23,
+   "sd": 45,
+   "nodes": 14623764,
+   "speed": 2324000,
+   "ttime": 7972,
+   "ev": "-253",
+   "best": "6,6",
+   "wall": 8368,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "h256",
+   "pos": 7,
+   "d": 25,
+   "sd": 52,
+   "nodes": 19412361,
+   "speed": 2435000,
+   "ttime": 7970,
+   "ev": "-393",
+   "best": "6,6",
+   "wall": 8365,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "h384",
+   "pos": 7,
+   "d": 25,
+   "sd": 44,
+   "nodes": 17296066,
+   "speed": 2384000,
+   "ttime": 7255,
+   "ev": "-388",
+   "best": "6,6",
+   "wall": 7642,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "h512",
+   "pos": 7,
+   "d": 24,
+   "sd": 50,
+   "nodes": 16996650,
+   "speed": 2240000,
+   "ttime": 7587,
+   "ev": "-205",
+   "best": "6,6",
+   "wall": 7990,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "h1024",
+   "pos": 7,
+   "d": 25,
+   "sd": 44,
+   "nodes": 18081051,
+   "speed": 2460000,
+   "ttime": 7350,
+   "ev": "-380",
+   "best": "6,6",
+   "wall": 7755,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "h2048",
+   "pos": 7,
+   "d": 25,
+   "sd": 60,
+   "nodes": 6400737,
+   "speed": 1923000,
+   "ttime": 7970,
+   "ev": "-218",
+   "best": "6,6",
+   "wall": 8407,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "h128",
+   "pos": 7,
+   "d": 25,
+   "sd": 50,
+   "nodes": 14341210,
+   "speed": 2109000,
+   "ttime": 7971,
+   "ev": "-380",
+   "best": "6,6",
+   "wall": 8404,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "h256",
+   "pos": 7,
+   "d": 26,
+   "sd": 48,
+   "nodes": 15252464,
+   "speed": 2093000,
+   "ttime": 7287,
+   "ev": "-317",
+   "best": "6,6",
+   "wall": 7662,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "h384",
+   "pos": 7,
+   "d": 26,
+   "sd": 45,
+   "nodes": 10196847,
+   "speed": 2273000,
+   "ttime": 7972,
+   "ev": "-379",
+   "best": "6,6",
+   "wall": 8363,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "h512",
+   "pos": 7,
+   "d": 24,
+   "sd": 45,
+   "nodes": 12935300,
+   "speed": 2024000,
+   "ttime": 7971,
+   "ev": "-210",
+   "best": "6,6",
+   "wall": 8362,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "h1024",
+   "pos": 7,
+   "d": 26,
+   "sd": 58,
+   "nodes": 14670190,
+   "speed": 2174000,
+   "ttime": 7971,
+   "ev": "-213",
+   "best": "6,6",
+   "wall": 8383,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "h2048",
+   "pos": 7,
+   "d": 25,
+   "sd": 52,
+   "nodes": 7291068,
+   "speed": 2242000,
+   "ttime": 7974,
+   "ev": "-332",
+   "best": "6,6",
+   "wall": 8485,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "h64",
+   "pos": 7,
+   "d": 27,
+   "sd": 66,
+   "nodes": 15080677,
+   "speed": 2126000,
+   "ttime": 7973,
+   "ev": "-239",
+   "best": "6,6",
+   "wall": 8366,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "h64",
+   "pos": 9,
+   "d": 29,
+   "sd": 50,
+   "nodes": 11210094,
+   "speed": 1519000,
+   "ttime": 7378,
+   "ev": "-12",
+   "best": "10,8",
+   "wall": 7777,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "h128",
+   "pos": 9,
+   "d": 30,
+   "sd": 44,
+   "nodes": 10412912,
+   "speed": 1548000,
+   "ttime": 7973,
+   "ev": "-9",
+   "best": "10,8",
+   "wall": 8394,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "h256",
+   "pos": 9,
+   "d": 30,
+   "sd": 45,
+   "nodes": 9824434,
+   "speed": 1378000,
+   "ttime": 7976,
+   "ev": "-2",
+   "best": "10,8",
+   "wall": 8364,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "h384",
+   "pos": 9,
+   "d": 28,
+   "sd": 47,
+   "nodes": 8722000,
+   "speed": 1192000,
+   "ttime": 7317,
+   "ev": "-14",
+   "best": "10,8",
+   "wall": 7729,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "h512",
+   "pos": 9,
+   "d": 29,
+   "sd": 47,
+   "nodes": 7824734,
+   "speed": 1338000,
+   "ttime": 7975,
+   "ev": "-17",
+   "best": "10,8",
+   "wall": 8377,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "h1024",
+   "pos": 9,
+   "d": 30,
+   "sd": 44,
+   "nodes": 11449743,
+   "speed": 1846000,
+   "ttime": 7973,
+   "ev": "-6",
+   "best": "10,8",
+   "wall": 8384,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "h2048",
+   "pos": 9,
+   "d": 30,
+   "sd": 55,
+   "nodes": 11295834,
+   "speed": 1860000,
+   "ttime": 7973,
+   "ev": "-4",
+   "best": "10,8",
+   "wall": 8524,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "h128",
+   "pos": 9,
+   "d": 29,
+   "sd": 50,
+   "nodes": 9190244,
+   "speed": 1987000,
+   "ttime": 7972,
+   "ev": "-19",
+   "best": "10,8",
+   "wall": 8370,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "h256",
+   "pos": 9,
+   "d": 33,
+   "sd": 51,
+   "nodes": 16257436,
+   "speed": 2055000,
+   "ttime": 7908,
+   "ev": "-1",
+   "best": "10,8",
+   "wall": 8293,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "h384",
+   "pos": 9,
+   "d": 30,
+   "sd": 43,
+   "nodes": 9349519,
+   "speed": 2003000,
+   "ttime": 7971,
+   "ev": "-5",
+   "best": "10,8",
+   "wall": 8364,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "h512",
+   "pos": 9,
+   "d": 30,
+   "sd": 45,
+   "nodes": 13186450,
+   "speed": 1833000,
+   "ttime": 7973,
+   "ev": "-10",
+   "best": "10,8",
+   "wall": 8366,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "h1024",
+   "pos": 9,
+   "d": 32,
+   "sd": 50,
+   "nodes": 14908965,
+   "speed": 1921000,
+   "ttime": 7761,
+   "ev": "-6",
+   "best": "10,8",
+   "wall": 8175,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "h2048",
+   "pos": 9,
+   "d": 30,
+   "sd": 43,
+   "nodes": 11620273,
+   "speed": 1786000,
+   "ttime": 7972,
+   "ev": "-7",
+   "best": "10,8",
+   "wall": 8464,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "h64",
+   "pos": 9,
+   "d": 31,
+   "sd": 48,
+   "nodes": 14617399,
+   "speed": 1894000,
+   "ttime": 7717,
+   "ev": "-3",
+   "best": "10,8",
+   "wall": 8132,
+   "pi": 2,
+   "rep": 1
+  }
+ ],
+ "summary": {
+  "h64": {
+   "n": 6,
+   "depth": 27,
+   "seldepth": 49.5,
+   "nps": 1862000,
+   "nodes": 12830949.5,
+   "wall": 8356,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-228",
+    "-235",
+    "-370",
+    "-239",
+    "-12",
+    "-3"
+   ]
+  },
+  "h128": {
+   "n": 6,
+   "depth": 26.5,
+   "seldepth": 45,
+   "nps": 1939000,
+   "nodes": 11872814.5,
+   "wall": 8369,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-242",
+    "-230",
+    "-253",
+    "-380",
+    "-9",
+    "-19"
+   ]
+  },
+  "h256": {
+   "n": 6,
+   "depth": 26,
+   "seldepth": 48.5,
+   "nps": 1966500,
+   "nodes": 13688371.5,
+   "wall": 8363.5,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-220",
+    "-245",
+    "-393",
+    "-317",
+    "-2",
+    "-1"
+   ]
+  },
+  "h384": {
+   "n": 6,
+   "depth": 26,
+   "seldepth": 46,
+   "nps": 1976500,
+   "nodes": 10416012.5,
+   "wall": 8362,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-248",
+    "-217",
+    "-388",
+    "-379",
+    "-14",
+    "-5"
+   ]
+  },
+  "h512": {
+   "n": 6,
+   "depth": 26.5,
+   "seldepth": 45,
+   "nps": 1854000,
+   "nodes": 12406345.5,
+   "wall": 8364,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-248",
+    "-243",
+    "-205",
+    "-210",
+    "-17",
+    "-10"
+   ]
+  },
+  "h1024": {
+   "n": 6,
+   "depth": 26,
+   "seldepth": 49,
+   "nps": 2017500,
+   "nodes": 14786706,
+   "wall": 8378.5,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-221",
+    "-333",
+    "-380",
+    "-213",
+    "-6",
+    "-6"
+   ]
+  },
+  "h2048": {
+   "n": 6,
+   "depth": 26,
+   "seldepth": 50.5,
+   "nps": 1850000,
+   "nodes": 10222648,
+   "wall": 8474.5,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-215",
+    "-225",
+    "-218",
+    "-332",
+    "-4",
+    "-7"
+   ]
+  }
+ }
+}

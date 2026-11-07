@@ -1,0 +1,273 @@
+{
+ "turn": 30000,
+ "reps": 2,
+ "threads": 8,
+ "hashKB": 1572864,
+ "detail": 2,
+ "variants": [
+  {
+   "name": "h64",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "HASHKB": "65536"
+   },
+   "hashkb": 65536,
+   "threads": 0
+  },
+  {
+   "name": "h128",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "HASHKB": "131072"
+   },
+   "hashkb": 131072,
+   "threads": 0
+  },
+  {
+   "name": "h256",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "HASHKB": "262144"
+   },
+   "hashkb": 262144,
+   "threads": 0
+  },
+  {
+   "name": "h512",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "HASHKB": "524288"
+   },
+   "hashkb": 524288,
+   "threads": 0
+  },
+  {
+   "name": "h1024",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "HASHKB": "1048576"
+   },
+   "hashkb": 1048576,
+   "threads": 0
+  }
+ ],
+ "samples": [
+  {
+   "variant": "h64",
+   "pos": 9,
+   "d": 34,
+   "sd": 46,
+   "nodes": 55218905,
+   "speed": 2002000,
+   "ttime": 7573,
+   "ev": "-15",
+   "best": "10,8",
+   "wall": 27964,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "h128",
+   "pos": 9,
+   "d": 33,
+   "sd": 43,
+   "nodes": 33328148,
+   "speed": 2033000,
+   "ttime": 6036,
+   "ev": "-3",
+   "best": "10,8",
+   "wall": 30367,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "h256",
+   "pos": 9,
+   "d": 31,
+   "sd": 51,
+   "nodes": 19013698,
+   "speed": 1922000,
+   "ttime": 9654,
+   "ev": "-18",
+   "best": "10,8",
+   "wall": 30382,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "h512",
+   "pos": 9,
+   "d": 32,
+   "sd": 58,
+   "nodes": 38755837,
+   "speed": 1592000,
+   "ttime": 3124,
+   "ev": "-12",
+   "best": "10,8",
+   "wall": 30369,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "h1024",
+   "pos": 9,
+   "d": 34,
+   "sd": 51,
+   "nodes": 37940033,
+   "speed": 1401000,
+   "ttime": 7075,
+   "ev": "-2",
+   "best": "10,8",
+   "wall": 27683,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "h128",
+   "pos": 9,
+   "d": 34,
+   "sd": 53,
+   "nodes": 35585747,
+   "speed": 1576000,
+   "ttime": 2020,
+   "ev": "-3",
+   "best": "10,8",
+   "wall": 30357,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "h256",
+   "pos": 9,
+   "d": 33,
+   "sd": 47,
+   "nodes": 34236360,
+   "speed": 1430000,
+   "ttime": 3565,
+   "ev": "-10",
+   "best": "10,8",
+   "wall": 30518,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "h512",
+   "pos": 9,
+   "d": 35,
+   "sd": 54,
+   "nodes": 42254809,
+   "speed": 1726000,
+   "ttime": 4818,
+   "ev": "-6",
+   "best": "10,8",
+   "wall": 30460,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "h1024",
+   "pos": 9,
+   "d": 35,
+   "sd": 58,
+   "nodes": 46902464,
+   "speed": 1870000,
+   "ttime": 5019,
+   "ev": "-2",
+   "best": "10,8",
+   "wall": 30373,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "h64",
+   "pos": 9,
+   "d": 33,
+   "sd": 58,
+   "nodes": 30027075,
+   "speed": 1319000,
+   "ttime": 2197,
+   "ev": "-13",
+   "best": "10,8",
+   "wall": 30360,
+   "pi": 2,
+   "rep": 1
+  }
+ ],
+ "summary": {
+  "h64": {
+   "n": 2,
+   "depth": 33.5,
+   "seldepth": 52,
+   "nps": 1660500,
+   "nodes": 42622990,
+   "wall": 29162,
+   "best": {
+    "10,8": 2
+   },
+   "evals": [
+    "-15",
+    "-13"
+   ]
+  },
+  "h128": {
+   "n": 2,
+   "depth": 33.5,
+   "seldepth": 48,
+   "nps": 1804500,
+   "nodes": 34456947.5,
+   "wall": 30362,
+   "best": {
+    "10,8": 2
+   },
+   "evals": [
+    "-3",
+    "-3"
+   ]
+  },
+  "h256": {
+   "n": 2,
+   "depth": 32,
+   "seldepth": 49,
+   "nps": 1676000,
+   "nodes": 26625029,
+   "wall": 30450,
+   "best": {
+    "10,8": 2
+   },
+   "evals": [
+    "-18",
+    "-10"
+   ]
+  },
+  "h512": {
+   "n": 2,
+   "depth": 33.5,
+   "seldepth": 56,
+   "nps": 1659000,
+   "nodes": 40505323,
+   "wall": 30414.5,
+   "best": {
+    "10,8": 2
+   },
+   "evals": [
+    "-12",
+    "-6"
+   ]
+  },
+  "h1024": {
+   "n": 2,
+   "depth": 34.5,
+   "seldepth": 54.5,
+   "nps": 1635500,
+   "nodes": 42421248.5,
+   "wall": 29028,
+   "best": {
+    "10,8": 2
+   },
+   "evals": [
+    "-2",
+    "-2"
+   ]
+  }
+ }
+}

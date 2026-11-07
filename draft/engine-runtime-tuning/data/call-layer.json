@@ -1,0 +1,354 @@
+{
+ "threads": 8,
+ "hashKB": 524288,
+ "variants": [
+  {
+   "name": "ours-avx512vnni",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe"
+  },
+  {
+   "name": "ours-avx2",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx2.exe"
+  },
+  {
+   "name": "ref-0.43.01",
+   "exe": "C:\\Users\\harve\\Desktop\\document\\Rapfi-YixinBoard\\engine.exe"
+  }
+ ],
+ "lat": [
+  {
+   "name": "ours-avx512vnni",
+   "firstOut": 68.88480001688004,
+   "firstInfo": 191.29049998521805,
+   "best": 1.129200041294098,
+   "depth": 22,
+   "nodes": 3835000,
+   "speed": 1909000,
+   "etime": 2009,
+   "trial": 0
+  },
+  {
+   "name": "ours-avx512vnni",
+   "firstOut": 66.45219999551773,
+   "firstInfo": 197.6671000123024,
+   "best": 0.6780000329017639,
+   "depth": 22,
+   "nodes": 3808000,
+   "speed": 1888000,
+   "etime": 2017,
+   "trial": 1
+  },
+  {
+   "name": "ours-avx512vnni",
+   "firstOut": 69.40369999408722,
+   "firstInfo": 194.2699999809265,
+   "best": 0.6131000518798828,
+   "depth": 22,
+   "nodes": 3913000,
+   "speed": 1943000,
+   "etime": 2014,
+   "trial": 2
+  },
+  {
+   "name": "ours-avx512vnni",
+   "firstOut": 71.68299996852875,
+   "firstInfo": 225.0527999997139,
+   "best": 0.7207000255584717,
+   "depth": 23,
+   "nodes": 3786000,
+   "speed": 1881000,
+   "etime": 2013,
+   "trial": 3
+  },
+  {
+   "name": "ours-avx512vnni",
+   "firstOut": 65.2542000412941,
+   "firstInfo": 202.93000000715256,
+   "best": 0.8359000086784363,
+   "depth": 22,
+   "nodes": 3925000,
+   "speed": 1950000,
+   "etime": 2013,
+   "trial": 4
+  },
+  {
+   "name": "ours-avx2",
+   "firstOut": 59.456300020217896,
+   "firstInfo": 209.12089997529984,
+   "best": 0.6547999978065491,
+   "depth": 23,
+   "nodes": 3344000,
+   "speed": 1658000,
+   "etime": 2016,
+   "trial": 0
+  },
+  {
+   "name": "ours-avx2",
+   "firstOut": 68.01759999990463,
+   "firstInfo": 192.6647999882698,
+   "best": 0.9307000041007996,
+   "depth": 21,
+   "nodes": 3067000,
+   "speed": 1517000,
+   "etime": 2022,
+   "trial": 1
+  },
+  {
+   "name": "ours-avx2",
+   "firstOut": 65.60449999570847,
+   "firstInfo": 192.56610000133514,
+   "best": 1.009499967098236,
+   "depth": 23,
+   "nodes": 3071000,
+   "speed": 1521000,
+   "etime": 2019,
+   "trial": 2
+  },
+  {
+   "name": "ours-avx2",
+   "firstOut": 71.00929999351501,
+   "firstInfo": 193.62770003080368,
+   "best": 1.155900001525879,
+   "depth": 21,
+   "nodes": 3025000,
+   "speed": 1508000,
+   "etime": 2006,
+   "trial": 3
+  },
+  {
+   "name": "ours-avx2",
+   "firstOut": 62.04339998960495,
+   "firstInfo": 198.8808000087738,
+   "best": 0.6363000273704529,
+   "depth": 22,
+   "nodes": 3223000,
+   "speed": 1599000,
+   "etime": 2015,
+   "trial": 4
+  },
+  {
+   "name": "ref-0.43.01",
+   "firstOut": 1.366699993610382,
+   "firstInfo": 187.6071999669075,
+   "best": 0.8062000274658203,
+   "depth": 24,
+   "nodes": 3865000,
+   "speed": 1911000,
+   "etime": 2022,
+   "trial": 0
+  },
+  {
+   "name": "ref-0.43.01",
+   "firstOut": 13.27240002155304,
+   "firstInfo": 202.64899998903275,
+   "best": 1.525600016117096,
+   "depth": 24,
+   "nodes": 3733000,
+   "speed": 1845000,
+   "etime": 2023,
+   "trial": 1
+  },
+  {
+   "name": "ref-0.43.01",
+   "firstOut": 4.202699959278107,
+   "firstInfo": 191.753300011158,
+   "best": 0.8689000010490417,
+   "depth": 21,
+   "nodes": 3776000,
+   "speed": 1863000,
+   "etime": 2026,
+   "trial": 2
+  },
+  {
+   "name": "ref-0.43.01",
+   "firstOut": 9.694300055503845,
+   "firstInfo": 189.4151000380516,
+   "best": 1.057099997997284,
+   "depth": 23,
+   "nodes": 3650000,
+   "speed": 1807000,
+   "etime": 2020,
+   "trial": 3
+  },
+  {
+   "name": "ref-0.43.01",
+   "firstOut": 3.0102999806404114,
+   "firstInfo": 210.31629997491837,
+   "best": 0.7828999757766724,
+   "depth": 24,
+   "nodes": 3903000,
+   "speed": 1934000,
+   "etime": 2018,
+   "trial": 4
+  }
+ ],
+ "mem": [
+  {
+   "name": "ours-avx512vnni",
+   "samples": [
+    {
+     "at": 1000,
+     "rss": 584597504,
+     "depth": 21,
+     "nodes": 1700214,
+     "speed": 0,
+     "etime": 643
+    },
+    {
+     "at": 5000,
+     "rss": 586465280,
+     "depth": 26,
+     "nodes": 6583707,
+     "speed": 0,
+     "etime": 3504
+    },
+    {
+     "at": 10000,
+     "rss": 586260480,
+     "depth": 28,
+     "nodes": 12287757,
+     "speed": 0,
+     "etime": 6620
+    },
+    {
+     "at": 20000,
+     "rss": 588562432,
+     "depth": 28,
+     "nodes": 12287757,
+     "speed": 0,
+     "etime": 6620
+    },
+    {
+     "at": 30000,
+     "rss": 589742080,
+     "depth": 30,
+     "nodes": 53539974,
+     "speed": 0,
+     "etime": 6620
+    }
+   ],
+   "nodes": 53539974,
+   "speed": 0,
+   "etime": 6620,
+   "wall": 30643.21960002184
+  },
+  {
+   "name": "ours-avx2",
+   "samples": [
+    {
+     "at": 1000,
+     "rss": 584175616,
+     "depth": 19,
+     "nodes": 1053022,
+     "speed": 0,
+     "etime": 622
+    },
+    {
+     "at": 5000,
+     "rss": 585609216,
+     "depth": 26,
+     "nodes": 5534773,
+     "speed": 0,
+     "etime": 4006
+    },
+    {
+     "at": 10000,
+     "rss": 586846208,
+     "depth": 27,
+     "nodes": 7226511,
+     "speed": 0,
+     "etime": 5331
+    },
+    {
+     "at": 20000,
+     "rss": 587943936,
+     "depth": 28,
+     "nodes": 16801390,
+     "speed": 0,
+     "etime": 5331
+    },
+    {
+     "at": 30000,
+     "rss": 588455936,
+     "depth": 31,
+     "nodes": 39502851,
+     "speed": 0,
+     "etime": 5331
+    }
+   ],
+   "nodes": 39502851,
+   "speed": 0,
+   "etime": 5331,
+   "wall": 30584.395200014114
+  },
+  {
+   "name": "ref-0.43.01",
+   "samples": [
+    {
+     "at": 1000,
+     "rss": 590077952,
+     "depth": 17,
+     "nodes": 1376117,
+     "speed": 0,
+     "etime": 804
+    },
+    {
+     "at": 5000,
+     "rss": 591978496,
+     "depth": 24,
+     "nodes": 6893269,
+     "speed": 0,
+     "etime": 4514
+    },
+    {
+     "at": 10000,
+     "rss": 594423808,
+     "depth": 24,
+     "nodes": 6893269,
+     "speed": 0,
+     "etime": 4514
+    },
+    {
+     "at": 20000,
+     "rss": 595374080,
+     "depth": 26,
+     "nodes": 16786713,
+     "speed": 0,
+     "etime": 4514
+    },
+    {
+     "at": 30000,
+     "rss": 596520960,
+     "depth": 26,
+     "nodes": 16786713,
+     "speed": 0,
+     "etime": 4514
+    }
+   ],
+   "nodes": 16786713,
+   "speed": 0,
+   "etime": 4514,
+   "wall": 30863.58670002222
+  }
+ ],
+ "summary": {
+  "ours-avx512vnni": {
+   "initMs": 68.88480001688004,
+   "firstInfoMs": 197.6671000123024,
+   "stopMs": 0.7207000255584717,
+   "depth": 22
+  },
+  "ours-avx2": {
+   "initMs": 65.60449999570847,
+   "firstInfoMs": 193.62770003080368,
+   "stopMs": 0.9307000041007996,
+   "depth": 22
+  },
+  "ref-0.43.01": {
+   "initMs": 4.202699959278107,
+   "firstInfoMs": 191.753300011158,
+   "stopMs": 0.8689000010490417,
+   "depth": 24
+  }
+ }
+}

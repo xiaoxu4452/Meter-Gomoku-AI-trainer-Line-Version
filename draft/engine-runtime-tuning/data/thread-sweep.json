@@ -1,0 +1,811 @@
+{
+ "turn": 8000,
+ "reps": 2,
+ "threads": 8,
+ "hashKB": 524288,
+ "detail": 2,
+ "variants": [
+  {
+   "name": "t1",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "THREADS": "1"
+   },
+   "hashkb": 0,
+   "threads": 1
+  },
+  {
+   "name": "t2",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "THREADS": "2"
+   },
+   "hashkb": 0,
+   "threads": 2
+  },
+  {
+   "name": "t4",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "THREADS": "4"
+   },
+   "hashkb": 0,
+   "threads": 4
+  },
+  {
+   "name": "t6",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "THREADS": "6"
+   },
+   "hashkb": 0,
+   "threads": 6
+  },
+  {
+   "name": "t8",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "THREADS": "8"
+   },
+   "hashkb": 0,
+   "threads": 8
+  },
+  {
+   "name": "t12",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "THREADS": "12"
+   },
+   "hashkb": 0,
+   "threads": 12
+  },
+  {
+   "name": "t16",
+   "exe": "C:\\Users\\harve\\Desktop\\Gobang auto\\Meter Gomoku\\rapfi-native\\RapfiEngine-avx512vnni.exe",
+   "env": {
+    "THREADS": "16"
+   },
+   "hashkb": 0,
+   "threads": 16
+  }
+ ],
+ "samples": [
+  {
+   "variant": "t1",
+   "pos": 5,
+   "d": 24,
+   "sd": 43,
+   "nodes": 2121000,
+   "speed": 266000,
+   "ttime": 7973,
+   "ev": "-237",
+   "best": "7,8",
+   "wall": 8377,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "t2",
+   "pos": 5,
+   "d": 26,
+   "sd": 51,
+   "nodes": 4264000,
+   "speed": 535000,
+   "ttime": 7970,
+   "ev": "-220",
+   "best": "7,8",
+   "wall": 8381,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "t4",
+   "pos": 5,
+   "d": 28,
+   "sd": 43,
+   "nodes": 8992000,
+   "speed": 1140000,
+   "ttime": 7887,
+   "ev": "-216",
+   "best": "7,8",
+   "wall": 8264,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "t6",
+   "pos": 5,
+   "d": 25,
+   "sd": 43,
+   "nodes": 6982919,
+   "speed": 1484000,
+   "ttime": 7972,
+   "ev": "-219",
+   "best": "7,8",
+   "wall": 8364,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "t8",
+   "pos": 5,
+   "d": 24,
+   "sd": 47,
+   "nodes": 9528280,
+   "speed": 1825000,
+   "ttime": 7973,
+   "ev": "-267",
+   "best": "7,8",
+   "wall": 8358,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "t12",
+   "pos": 5,
+   "d": 26,
+   "sd": 56,
+   "nodes": 10947030,
+   "speed": 2361000,
+   "ttime": 7974,
+   "ev": "-214",
+   "best": "7,8",
+   "wall": 8368,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "t16",
+   "pos": 5,
+   "d": 26,
+   "sd": 36,
+   "nodes": 18379885,
+   "speed": 2566000,
+   "ttime": 7991,
+   "ev": "-225",
+   "best": "7,8",
+   "wall": 8385,
+   "pi": 0,
+   "rep": 0
+  },
+  {
+   "variant": "t2",
+   "pos": 5,
+   "d": 26,
+   "sd": 44,
+   "nodes": 4299000,
+   "speed": 539000,
+   "ttime": 7971,
+   "ev": "-211",
+   "best": "7,8",
+   "wall": 8380,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "t4",
+   "pos": 5,
+   "d": 25,
+   "sd": 51,
+   "nodes": 8759000,
+   "speed": 1174000,
+   "ttime": 7455,
+   "ev": "-307",
+   "best": "7,8",
+   "wall": 7838,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "t6",
+   "pos": 5,
+   "d": 29,
+   "sd": 38,
+   "nodes": 9814460,
+   "speed": 1610000,
+   "ttime": 7971,
+   "ev": "-234",
+   "best": "7,8",
+   "wall": 8355,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "t8",
+   "pos": 5,
+   "d": 25,
+   "sd": 58,
+   "nodes": 14410114,
+   "speed": 1872000,
+   "ttime": 7694,
+   "ev": "-222",
+   "best": "7,8",
+   "wall": 8097,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "t12",
+   "pos": 5,
+   "d": 25,
+   "sd": 46,
+   "nodes": 17044972,
+   "speed": 2260000,
+   "ttime": 7539,
+   "ev": "-216",
+   "best": "7,8",
+   "wall": 7936,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "t16",
+   "pos": 5,
+   "d": 25,
+   "sd": 48,
+   "nodes": 22424731,
+   "speed": 2897000,
+   "ttime": 7739,
+   "ev": "-303",
+   "best": "7,8",
+   "wall": 8135,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "t1",
+   "pos": 5,
+   "d": 24,
+   "sd": 43,
+   "nodes": 2158000,
+   "speed": 270000,
+   "ttime": 7971,
+   "ev": "-237",
+   "best": "7,8",
+   "wall": 8398,
+   "pi": 0,
+   "rep": 1
+  },
+  {
+   "variant": "t1",
+   "pos": 7,
+   "d": 24,
+   "sd": 46,
+   "nodes": 2795000,
+   "speed": 350000,
+   "ttime": 7970,
+   "ev": "-240",
+   "best": "6,6",
+   "wall": 8388,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "t2",
+   "pos": 7,
+   "d": 26,
+   "sd": 58,
+   "nodes": 5955000,
+   "speed": 747000,
+   "ttime": 7970,
+   "ev": "-187",
+   "best": "6,6",
+   "wall": 8378,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "t4",
+   "pos": 7,
+   "d": 26,
+   "sd": 46,
+   "nodes": 8891268,
+   "speed": 1264000,
+   "ttime": 7971,
+   "ev": "-196",
+   "best": "6,6",
+   "wall": 8350,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "t6",
+   "pos": 7,
+   "d": 25,
+   "sd": 46,
+   "nodes": 12629193,
+   "speed": 1798000,
+   "ttime": 7972,
+   "ev": "-184",
+   "best": "6,6",
+   "wall": 8373,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "t8",
+   "pos": 7,
+   "d": 23,
+   "sd": 47,
+   "nodes": 5268527,
+   "speed": 2155000,
+   "ttime": 7974,
+   "ev": "-218",
+   "best": "6,6",
+   "wall": 8366,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "t12",
+   "pos": 7,
+   "d": 25,
+   "sd": 47,
+   "nodes": 10537098,
+   "speed": 2666000,
+   "ttime": 7972,
+   "ev": "-178",
+   "best": "6,6",
+   "wall": 8357,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "t16",
+   "pos": 7,
+   "d": 25,
+   "sd": 40,
+   "nodes": 23006383,
+   "speed": 3528000,
+   "ttime": 7978,
+   "ev": "-358",
+   "best": "6,6",
+   "wall": 8371,
+   "pi": 1,
+   "rep": 0
+  },
+  {
+   "variant": "t2",
+   "pos": 7,
+   "d": 24,
+   "sd": 47,
+   "nodes": 5065000,
+   "speed": 678000,
+   "ttime": 7471,
+   "ev": "-166",
+   "best": "6,6",
+   "wall": 7878,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "t4",
+   "pos": 7,
+   "d": 27,
+   "sd": 54,
+   "nodes": 5529610,
+   "speed": 1434000,
+   "ttime": 7974,
+   "ev": "-353",
+   "best": "6,6",
+   "wall": 8360,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "t6",
+   "pos": 7,
+   "d": 27,
+   "sd": 47,
+   "nodes": 10594213,
+   "speed": 1632000,
+   "ttime": 7972,
+   "ev": "-188",
+   "best": "6,6",
+   "wall": 8373,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "t8",
+   "pos": 7,
+   "d": 26,
+   "sd": 50,
+   "nodes": 13730789,
+   "speed": 2003000,
+   "ttime": 7970,
+   "ev": "-193",
+   "best": "6,6",
+   "wall": 8346,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "t12",
+   "pos": 7,
+   "d": 24,
+   "sd": 36,
+   "nodes": 17177372,
+   "speed": 2456000,
+   "ttime": 7973,
+   "ev": "-212",
+   "best": "6,6",
+   "wall": 8355,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "t16",
+   "pos": 7,
+   "d": 26,
+   "sd": 48,
+   "nodes": 16860563,
+   "speed": 2940000,
+   "ttime": 7976,
+   "ev": "-186",
+   "best": "6,6",
+   "wall": 8361,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "t1",
+   "pos": 7,
+   "d": 24,
+   "sd": 46,
+   "nodes": 2767000,
+   "speed": 347000,
+   "ttime": 7970,
+   "ev": "-240",
+   "best": "6,6",
+   "wall": 8383,
+   "pi": 1,
+   "rep": 1
+  },
+  {
+   "variant": "t1",
+   "pos": 9,
+   "d": 27,
+   "sd": 45,
+   "nodes": 2309000,
+   "speed": 293000,
+   "ttime": 7881,
+   "ev": "-16",
+   "best": "10,8",
+   "wall": 8278,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "t2",
+   "pos": 9,
+   "d": 27,
+   "sd": 44,
+   "nodes": 4470000,
+   "speed": 560000,
+   "ttime": 7975,
+   "ev": "-3",
+   "best": "10,8",
+   "wall": 8376,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "t4",
+   "pos": 9,
+   "d": 28,
+   "sd": 45,
+   "nodes": 8511000,
+   "speed": 1067000,
+   "ttime": 7973,
+   "ev": "-21",
+   "best": "10,8",
+   "wall": 8356,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "t6",
+   "pos": 9,
+   "d": 32,
+   "sd": 44,
+   "nodes": 9818945,
+   "speed": 1523000,
+   "ttime": 7971,
+   "ev": "-9",
+   "best": "10,8",
+   "wall": 8367,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "t8",
+   "pos": 9,
+   "d": 29,
+   "sd": 42,
+   "nodes": 13759396,
+   "speed": 1910000,
+   "ttime": 7204,
+   "ev": "-18",
+   "best": "10,8",
+   "wall": 7612,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "t12",
+   "pos": 9,
+   "d": 29,
+   "sd": 37,
+   "nodes": 8421241,
+   "speed": 2011000,
+   "ttime": 7981,
+   "ev": "-4",
+   "best": "10,8",
+   "wall": 8384,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "t16",
+   "pos": 9,
+   "d": 31,
+   "sd": 36,
+   "nodes": 18011915,
+   "speed": 2330000,
+   "ttime": 7731,
+   "ev": "-4",
+   "best": "10,8",
+   "wall": 8131,
+   "pi": 2,
+   "rep": 0
+  },
+  {
+   "variant": "t2",
+   "pos": 9,
+   "d": 27,
+   "sd": 46,
+   "nodes": 3098000,
+   "speed": 404000,
+   "ttime": 7653,
+   "ev": "-5",
+   "best": "10,8",
+   "wall": 8064,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "t4",
+   "pos": 9,
+   "d": 27,
+   "sd": 44,
+   "nodes": 5914000,
+   "speed": 741000,
+   "ttime": 7975,
+   "ev": "-10",
+   "best": "10,8",
+   "wall": 8663,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "t6",
+   "pos": 9,
+   "d": 31,
+   "sd": 53,
+   "nodes": 12817324,
+   "speed": 1724000,
+   "ttime": 7431,
+   "ev": "-11",
+   "best": "10,8",
+   "wall": 7818,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "t8",
+   "pos": 9,
+   "d": 30,
+   "sd": 45,
+   "nodes": 13756654,
+   "speed": 2065000,
+   "ttime": 7971,
+   "ev": "-8",
+   "best": "10,8",
+   "wall": 8354,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "t12",
+   "pos": 9,
+   "d": 30,
+   "sd": 43,
+   "nodes": 17173505,
+   "speed": 2435000,
+   "ttime": 7972,
+   "ev": "-5",
+   "best": "10,8",
+   "wall": 8353,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "t16",
+   "pos": 9,
+   "d": 29,
+   "sd": 42,
+   "nodes": 13670181,
+   "speed": 2735000,
+   "ttime": 7976,
+   "ev": "0",
+   "best": "10,8",
+   "wall": 8376,
+   "pi": 2,
+   "rep": 1
+  },
+  {
+   "variant": "t1",
+   "pos": 9,
+   "d": 26,
+   "sd": 45,
+   "nodes": 2226000,
+   "speed": 279000,
+   "ttime": 7975,
+   "ev": "-16",
+   "best": "10,8",
+   "wall": 8392,
+   "pi": 2,
+   "rep": 1
+  }
+ ],
+ "summary": {
+  "t1": {
+   "n": 6,
+   "depth": 24,
+   "seldepth": 45,
+   "nps": 286000,
+   "nodes": 2267500,
+   "wall": 8385.5,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-237",
+    "-237",
+    "-240",
+    "-240",
+    "-16",
+    "-16"
+   ]
+  },
+  "t2": {
+   "n": 6,
+   "depth": 26,
+   "seldepth": 46.5,
+   "nps": 549500,
+   "nodes": 4384500,
+   "wall": 8377,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-220",
+    "-211",
+    "-187",
+    "-166",
+    "-3",
+    "-5"
+   ]
+  },
+  "t4": {
+   "n": 6,
+   "depth": 27,
+   "seldepth": 45.5,
+   "nps": 1157000,
+   "nodes": 8635000,
+   "wall": 8353,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-216",
+    "-307",
+    "-196",
+    "-353",
+    "-21",
+    "-10"
+   ]
+  },
+  "t6": {
+   "n": 6,
+   "depth": 28,
+   "seldepth": 45,
+   "nps": 1621000,
+   "nodes": 10206579,
+   "wall": 8365.5,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-219",
+    "-234",
+    "-184",
+    "-188",
+    "-9",
+    "-11"
+   ]
+  },
+  "t8": {
+   "n": 6,
+   "depth": 25.5,
+   "seldepth": 47,
+   "nps": 1956500,
+   "nodes": 13743721.5,
+   "wall": 8350,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-267",
+    "-222",
+    "-218",
+    "-193",
+    "-18",
+    "-8"
+   ]
+  },
+  "t12": {
+   "n": 6,
+   "depth": 25.5,
+   "seldepth": 44.5,
+   "nps": 2398000,
+   "nodes": 13996001,
+   "wall": 8356,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-214",
+    "-216",
+    "-178",
+    "-212",
+    "-4",
+    "-5"
+   ]
+  },
+  "t16": {
+   "n": 6,
+   "depth": 26,
+   "seldepth": 41,
+   "nps": 2816000,
+   "nodes": 18195900,
+   "wall": 8366,
+   "best": {
+    "7,8": 2,
+    "6,6": 2,
+    "10,8": 2
+   },
+   "evals": [
+    "-225",
+    "-303",
+    "-358",
+    "-186",
+    "-4",
+    "0"
+   ]
+  }
+ }
+}
