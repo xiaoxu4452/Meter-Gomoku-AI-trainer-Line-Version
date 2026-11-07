@@ -97,6 +97,8 @@ extern HashTable TT;
 /// TT writes are dropped. The root-split prototype uses this to keep the entries
 /// produced by a null-window collaborative subtree out of the table that the main
 /// Lazy SMP iterations rely on. Reads stay enabled.
+#ifdef GB_YBWC_ROOT
 extern thread_local bool ttStoreSuppressed;
+#endif
 
 }  // namespace Search

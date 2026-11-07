@@ -35,7 +35,9 @@ static const char HashDumpMagicString[32] = "RAPFI HASH DUMP VER 001";
 
 namespace Search {
 
+#ifdef GB_YBWC_ROOT
 thread_local bool ttStoreSuppressed = false;
+#endif
 
 static constexpr int CACHE_LINE_SIZE    = 64;
 static constexpr int ENTRIES_PER_BUCKET = 5;
@@ -222,8 +224,10 @@ void HashTable::store(HashKey hashKey,
                       int     depth,
                       int     ply)
 {
+#ifdef GB_YBWC_ROOT
     if (ttStoreSuppressed)
         return;
+#endif
     TTEntry *entry        = firstEntry(hashKey);
     uint32_t newKey32     = uint32_t(hashKey);
     TTEntry *replace      = &entry[0];
