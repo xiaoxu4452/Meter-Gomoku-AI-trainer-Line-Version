@@ -10542,7 +10542,6 @@ function rtWinTxt(r) {
 function escA(s) {
   return escHtml(s == null ? '' : s).replace(/"/g, '&quot;');
 }
-/* 评分统一带符号：正数补 +（扫描分析回吐的裸数字如 573 → +573），杀棋保留 +M53 / -M53 */
 function rtEvTxt(ev) {
   var s = (ev == null) ? '' : String(ev).trim();
   if (!s) return '–';
@@ -10577,8 +10576,6 @@ function rtPatchText() {
     }
   }
 }
-/* 空态：占位提示 + 口径说明（评分/深度/胜率）都居中放在路线框内部；一旦出现任何路线
-   （计算分析 / 扫描 / 平衡点）就整块移除，路线从框顶排列，框外不再留说明文字。 */
 function rtEmptyHtml() {
   return '<div class="rt-empty"><div class="rt-empty-msg">' + escHtml(T('rtEmpty')) +
     '</div><div class="rt-empty-lg">' + escHtml(T('rtLegend')) + '</div></div>';
@@ -10678,7 +10675,7 @@ function rtSetScan(cells, side) {
     var k = r.coord[0] + ',' + r.coord[1];
     var el = existing[k] || rtMakeScanRow(r, ri);
     rtFillScanRow(el, r, ri, !existing[k]);
-    box.appendChild(el);          /* 按引擎名次顺序重排（复用节点） */
+    box.appendChild(el);          
     live[k] = 1;
   });
   [].forEach.call(box.querySelectorAll('.rt-row'), function (el) {
@@ -10690,9 +10687,6 @@ function rtSetScan(cells, side) {
   rtSelPaint();
 }
 
-/* ★ 2026-11-05（用户）：平衡点也铺相关路线 —— 两点平衡 → 2 条，1 点 → 1 条，
-   行格式与其它路线完全一致（#1 评分 d 胜率 坐标链），并与棋盘上的平衡点标记一一对应。
-   停止平衡搜索后保留；切换其它分析 / 落子 / 清除计算时随 rtClear 一起擦掉。 */
 function rtSetBal(rows) {
   rows = rows || [];
   if (!rows.length) { if (RT_DATA.mode === 'bal') rtClear(); return; }
@@ -10714,9 +10708,6 @@ function rtRender() {
   }
   var html = "";
   RT_DATA.rows.forEach(function (r, ri) {
-    /* 每行 = 「题目」（序号 / 评分 / 深度 / 胜率）+ 一条和引擎日志同款的路线代码框。
-       统一格式：#1  +389  d25  胜率 53.9%  H8 I9 G7 …
-       名次始终等于数组下标，旧点退出时整行随 rtKeyOf 变化重建，不会出现重号/空行。 */
     html += '<div class="rt-row" data-r="' + ri + '">' +
       rtHdrHtml(ri, r) +
       '<div class="rt-line pv-box">' + r.line.map(function (q, i) {
@@ -10758,8 +10749,6 @@ function rtApplyPin() {
     side: r.side,
   };
 }
-/* 双击某条路线的某一手 = 把这条线走到那一手（gomocalc 的双击行为）：
-   先停掉正在跑的分析/扫描，再逐手实落到棋盘，复盘 / 分析路线随之刷新。 */
 function rtCommit(ri, i) {
   var r = RT_DATA.rows[ri];
   if (!r || !r.line || i < 0 || i >= r.line.length) return;
@@ -10805,7 +10794,6 @@ function rtBind(box) {
     rtSelPaint();
     paint();
   });
-  /* 双击：把这条路线落到第 i 手（gomocalc 的「双击路线把局面设过去」） */
   box.addEventListener("dblclick", function (e) {
     var t = e.target && e.target.closest ? e.target.closest(".rt-mv") : null;
     if (!t) return;
@@ -10813,16 +10801,11 @@ function rtBind(box) {
     rtCommit(+t.getAttribute("data-r"), +t.getAttribute("data-i"));
   });
 }
-/* ==== 分析路线框的滚动隔离 ====
-   鼠标停在「分析路线」框内时，滚轮只滚框内；即使到上/下边界，外层卡片也不动。
-   只有继续朝同一方向累计满 5 个滚轮档位（触控板按等价滚动量换算）时，才把这一手的
-   滚动交给外层可滚动容器，并清零计数；反向同理。框内内容不足滚动时不拦截外层。
-   手势判定 320ms：惯性滚动（触控板）会连续投递 wheel，交接后继续平滑滚外层。 */
 function rtWheelUnits(e) {
   var dy = e.deltaY || 0;
-  if (e.deltaMode === 1) return dy / 3;      /* 行：一个档位 ≈ 3 行 */
-  if (e.deltaMode === 2) return dy;          /* 页：一页 ≈ 一个档位 */
-  return dy / 100;                           /* Chromium 鼠标一格 = 100px */
+  if (e.deltaMode === 1) return dy / 3;      
+  if (e.deltaMode === 2) return dy;          
+  return dy / 100;                           
 }
 function rtWheelDeltaPx(e, units) {
   if (e.deltaMode === 0) return e.deltaY || 0;
@@ -10850,7 +10833,6 @@ function rtWheelIsolate() {
     if (!units) return;
     var dir = units > 0 ? 1 : -1;
     var maxTop = list.scrollHeight - list.clientHeight;
-    /* 内容不足以滚动：完全不拦截，交给外层（符合「不拦截外层」的口径） */
     if (maxTop <= 1) { ctx.dir = 0; ctx.acc = 0; ctx.hand = false; return; }
     var now = Date.now();
     var atBottom = list.scrollTop >= maxTop - 1;
@@ -10858,13 +10840,11 @@ function rtWheelIsolate() {
     var boundary = (dir > 0 && atBottom) || (dir < 0 && atTop);
     var px = rtWheelDeltaPx(e, units);
     if (!boundary) {
-      /* 框内可滚：拦下原生滚动链，只动框内，避免同一事件把余量传给外层 */
       e.preventDefault();
       list.scrollTop += px;
       ctx.dir = 0; ctx.acc = 0; ctx.hand = false; ctx.t = now;
       return;
     }
-    /* 到边界：方向变了就重来；同一手势内的惯性续滚（<320ms）直接放行 */
     if (dir !== ctx.dir) { ctx.dir = dir; ctx.acc = 0; ctx.hand = false; }
     if (ctx.hand && now - ctx.t < 320) {
       e.preventDefault();
@@ -10877,12 +10857,10 @@ function rtWheelIsolate() {
     ctx.t = now;
     var add = Math.abs(units);
     if (ctx.acc + add < 5) {
-      /* 未满 5 档：只记录，外层绝不动 */
       ctx.acc += add;
       e.preventDefault();
       return;
     }
-    /* 累计满 5 档：交接给外层，计数清零 */
     ctx.acc = 0;
     ctx.hand = true;
     e.preventDefault();
@@ -10892,8 +10870,7 @@ function rtWheelIsolate() {
 }
 function liveAnaStart() {
   if (!LIVE_AN.on) return;
-  // ★ 2026-10-31：AI 思考（G.busy）期间引擎归那一手 ask 独占，分析延后再起；
-  //   否则两边互抢，AI 的搜索会被反复打断，越算越浅。
+
   if (G.busy) { liveAnaScheduleRetry(220); return; }
   if (!liveAnaWanted()) return;
   var gen = ++LIVE_AN.gen;
@@ -10919,9 +10896,8 @@ function liveAnaStart() {
   }, function (res) {
     ended = true;
     if (gen !== LIVE_AN.gen) return;
-    // ★ 2026-10-31（用户：「评估后落子，评估又失败了」）：宿主现在让 live 走无限时间的
-    //   分析模式，正常情况下只在 stop / 落子抢占时结束；但万一引擎仍自己收官
-    //   （旧权重 / 异常回执），把这一帧终局结果也画出来，别让仪表盘一直空白。
+
+    
     try {
       if (res && res.candidates && res.candidates.length &&
           G.moves.length === mvN && LIVE_AN.key === liveAnaKeyNow()) liveAnaApply(res);
@@ -10975,8 +10951,7 @@ function liveAnaTouch(restartMs) {
 }
 
 function liveAnaBoardChanged() {
-  // ★ 2026-10-31：局面变了 = 上一手的实时统计 / 评估分全部作废。旧实现只重启 job、不删 lane，
-  //   新 job 的第一帧 tick 到来之前（深搜某一层可能静默十几秒）界面一直停在上一手的数字。
+
   if (LIVE_AN.on || LIVE_AN.frozen) {
     LIVE_AN.t0 = 0; LIVE_AN.key = '';
     LIVE_AN.cid = liveAnaCidNow();
@@ -11003,10 +10978,9 @@ function bgThinkYield() {
 function bgThinkHintSync() {
   var h = els.t_bgThinkHint;
   if (!h) return;
-  // ★ 2026-10-31（截图：提示变成「有计算在跑，已自动暂停 · 有计算在跑，已自动暂停」）：
-  //   旧逻辑把 DOM 里的当前文本当成 base —— 如果第一次同步时 hint 已经被写成 tag，
-  //   之后 applyLang() 再 removeAttribute('data-base')，下一拍就会把 tag 当 base，
-  //   于是 tag 被拼接两遍。base 只认 i18n 原文，永远不从 DOM 反推。
+
+  
+  
   var base = T('bgThinkHint') || '';
   if (h.getAttribute('data-base') !== base) h.setAttribute('data-base', base);
   var why = bgThinkBusyBy();
@@ -12471,9 +12445,6 @@ var BAL = { on: false, job: null, acc: [], cur: [], need: 2, depth: 0, t0: 0,
             logT: 0, logD: -1, fails: 0, stageT: 0, lastPaint: 0, watch: 0,
             lastEv: null, lastWr: null, lastEvRaw: '', curLine: null };
 
-/* ★ 2026-11-05（用户）：点数不再是独立大按钮/下拉框，而是与「平衡点」同一分段控件的右半：
-   点击循环 1 点 → 2 点 → 1 点，标签显示当前值（1 点 / 2 点），平衡搜索进行中禁用。
-   口径与旧版一致：空盘仍固定 3 手官方平衡开局，与实际点数无关。 */
 var BAL_POINT_N = (function () {
   try { var v = parseInt(localStorage.getItem('gb_bal_point_n') || '2', 10); return (v === 1) ? 1 : 2; }
   catch (e) { return 2; }
@@ -12581,21 +12552,14 @@ function balOnTick(res, gen, bv) {
   if (G.moves.length !== bv) { balLiveStop(); return; }
   var d = (res && res.depth) || 0;
   if (d > BAL.depth) { BAL.depth = d; BAL.stageT = Date.now(); }
-  /* 平衡点的分数就是「走完这一/两步之后的估值」（越接近 0 越平衡，见 gomocalc 的说明），
-     所以整组标记共用同一个实时分数；环里显示它 + 由它换算的胜率。 */
   var c0b = (res && res.candidates && res.candidates[0]) || null;
   if (c0b) {
-    /* ★ 2026-11-05（用户）：mapRes 把 eval 统一成**字符串**（"+18" / "-M3"），
-       旧代码这里只认 typeof === 'number'，于是一辈子不赋值 → 环里只剩一个 50%。
-       现在：数值由 evalNum 解析（和路线/仪表盘同口径），原文留给杀棋 M 格式。 */
     if (typeof c0b.eval === 'string' && c0b.eval) BAL.lastEvRaw = c0b.eval;
     var evn = evalNum(c0b.eval);
     if (!isNaN(evn)) BAL.lastEv = evn;
-    // 只有引擎真的给了 WINRATE 才覆盖；mapRes 的 0.5 兜底不能当真实胜率
+    
     if (c0b.wrKnown && typeof c0b.winrate === 'number') BAL.lastWr = c0b.winrate;
   }
-  /* 路线用引擎回吐的整条 BESTLINE（首手 + 对手平衡回应 + 后续 PV）；
-     平衡点路线与棋盘标记同源，见 balSetMarks → rtSetBal。 */
   if (c0b && c0b.line && c0b.line.length)
     BAL.curLine = c0b.line.map(function (q) { return [q[0] | 0, q[1] | 0]; });
   var pr = balPairOf(res);
@@ -12707,7 +12671,6 @@ function balFinish() {
   balUI();
   if (els.btn_an_baln) els.btn_an_baln.disabled = false;
   balPNLabel();
-  /* 停止后路线保留（用户要求）：只有切换其它分析 / 落子 / 清除计算才走 rtClear。 */
   G.ana.busy = false; G.ana.kind = '';
   anaMark(null);
 }
@@ -12726,7 +12689,7 @@ function balPlayOut(r) {
   }
   G.ana.kind = ''; G.ana.busy = false;
   G.ana.marks = []; G.ana.rows = []; G.ana.balLeft = 0;
-  if (n) rtClear();              /* 落子后平衡点路线随标记一起撤掉，不留旧局面的残影 */
+  if (n) rtClear();              
   anaMark(null);
   paint(); refreshUI();
   return n;
@@ -12765,9 +12728,6 @@ function balToggle() {
       paint();
       return;
     }
-    /* ★ 2026-11-05（用户）：平衡点键 = 纯开关 —— 再点一次只停止计算，
-       标记与相关路线**保留**在棋盘上；切换其它分析 / 落子 / 清除计算时才擦掉。
-       （旧版这里会自动落子，现按新要求取消自动落子。） */
     balSetMarks(picks);
     paint();
     renderAna(balDoneMsg(picks.length, picks.map(function (m) { return coordName(m.x, m.y); }), null) +
@@ -12780,7 +12740,7 @@ function balToggle() {
   BAL.on = true; BAL.acc = []; BAL.cur = []; BAL.depth = 0; BAL.curLine = null;
   BAL.lastEv = null; BAL.lastWr = null; BAL.lastEvRaw = '';
   BAL.t0 = Date.now(); BAL.logT = 0; BAL.logD = -1; BAL.fails = 0; BAL.lastPaint = 0;
-  // 2026-11-04（用户）：平衡点只做 1 点 / 2 点（空盘仍给官方开局的 3 手）
+  
   BAL.need = !G.moves.length ? 3 : Math.max(1, Math.min(2, balPN()));
   var gen = ++G.ana.gen;
   if (els.btn_an_baln) els.btn_an_baln.disabled = true;
@@ -12798,11 +12758,6 @@ function balSetMarks(arr) {
   var WHITE_DISC = 'rgba(70,190,255,.95)';
   G.ana.balLeft = arr.length;
   G.ana.balBase = G.moves.length;   // these marks belong to THIS board state
-  /* Each balance pick is a ring: index on top, win rate in the upper half and the
-     engine score in the lower half — the same reading order as the web calculator.
-     ★ 2026-11-05（用户）：成对的两个点各自显示**自己那一对**数值（网页版 applyBalance 口径）：
-       偶数点 = 当前走子方视角，奇数点 = 对手视角（胜率 1-wr、分数取反）；
-       分数用引擎原文，杀棋保留 M 格式（+M3 / -M3）。 */
   var raw = (typeof BAL.lastEvRaw === 'string' && BAL.lastEvRaw) ? BAL.lastEvRaw : '';
   var baseEv = (typeof BAL.lastEv === 'number') ? BAL.lastEv : null;
   var baseWr = (typeof BAL.lastWr === 'number') ? BAL.lastWr : null;
@@ -12830,9 +12785,6 @@ function balSetMarks(arr) {
     return { i: i, badge: m.seq, coord: coordName(m.x, m.y), eval: '', pv: '', tier: -1,
              col: m.color === 'b' ? null : WHITE_DISC };
   });
-  /* ★ 2026-11-05（用户）：平衡点也铺相关路线 —— 与上面的标记一一对应（2 点 → 2 条，1 点 → 1 条）。
-     第 1 个点带成对搜索回吐的整条线（首手 + 对手平衡回应），其余点只有自身坐标；
-     评分 / 胜率与标记同一口径（该行首手一方视角），所以两边数字可以逐点对上。 */
   var rrows = arr.map(function (m, i) {
     var line = (i === 0 && line0) ? line0.slice() : [[m.x, m.y]];
     return {
@@ -12884,7 +12836,6 @@ function wireAnalysis() {
 
   balUI();
   balPNLabel();
-  /* 点数右半：点击循环 1 点 → 2 点 → 1 点（没有独立大按钮）；搜索进行中由 balUI 禁用 */
   if (els.btn_an_baln) els.btn_an_baln.onclick = function () {
     if (BAL && BAL.on) return;
     var n = (BAL_POINT_N === 1) ? 2 : 1;
@@ -13015,7 +12966,7 @@ function buildSelects() {
   renderSysInfo();
   var maxT = Math.max(1, host.threadsMax || 1);
   //     t=10 2879K nps / d22  ·  t=12 3567K / d29  ·  t=14~16 4.0M+ / d30
-  //     10s：T4 depth 23 / 0.73M      vs   T14 depth 22 / 2.36M
+  
   var physC = Math.max(0, host.physCores | 0);
   var lowCores = (physC > 1) ? (S.cores < physC) : (S.cores >= 10 && S.cores <= 12);
   if (lowCores && maxT > S.cores && !migFlag('threadsTopo4')) {
@@ -13040,9 +12991,8 @@ function buildSelects() {
     els.coresHint.textContent = T('coresHint')
       .replace('{n}', String(host.cpu || 0)).replace('{m}', String(maxT));
 
-  // ★ 2026-11-05（实测）：8 线程 + mix9svq 下 512 MB 哈希反而最准 —— 同局面同 30s：
-  //   512 MB 完成深度 31（28.1s 收手），1024/1536 MB 只有 24~28 层且节点更多。
-  //   因此默认 512 MB，并把旧版遗留的「自动升到 1024」与更大的值做一次性回迁。
+  
+  
   var memMB = host.memMB | 0;
   var maxH = 4096;
   var hs = [128, 256, 512, 1024, 1536, 2048, 2560, 3072, 3584, 4096];
@@ -13055,7 +13005,7 @@ function buildSelects() {
     var byRes = Math.max(0, memMB - 2048);
     capMB = Math.min(maxH, byPct, byRes);
   }
-  // 旧版曾把 1024 强行降到 512、把小于 2048 的强行升到 2048；这里只回滚一次「旧默认」。
+  
   if (!migFlag('hashTuned512') && S.hashMB > 512 && S.hashMB <= capMB) {
     S.hashMB = 512;
     enginePrefSet(S.cores, S.hashMB);
@@ -13115,8 +13065,7 @@ function buildSelects() {
     selSyncCustom(els.sel_maxDepth, mdNow, function (x) { return String(x); });
   }
   if (els.inp_maxDepth) els.inp_maxDepth.value = mdNow ? String(mdNow) : '';
-  // ★ 2026-10-30（用户定稿）：16 / 64 / 128 / 256 / 512 / 768 / 1024 M，0 = 不限；
-  //   输入框允许 0.1~4096.0 M，默认不限。
+
   var MN_OPTS = [0, 16000000, 64000000, 128000000, 256000000, 512000000, 768000000, 1024000000];
   var mnNow = S.maxNodes;
   if (!(mnNow === 0 || (mnNow >= 100000 && mnNow <= 4096000000))) mnNow = 0;
@@ -13159,8 +13108,7 @@ function boot() {
 
   // Move numbers are the default now, so switch existing profiles on once.
   if (!migFlag('showNumOn')) { S.showNum = true; try { save(); } catch (eSN) {} }
-  // ★ 2026-10-30（用户：「软件首次启动时默认只开启引擎仪表盘的卡片」）
-  //   旧配置曾把 setup / analysis 两张卡强行打开；这里一次性收敛为只显示引擎仪表盘。
+
   if (!migFlag('cardsEngineOnly')) {
     try {
       var cv0 = cardVis();
@@ -13168,8 +13116,7 @@ function boot() {
       save();
     } catch (eCV) {}
   }
-  // 2026-11-04（用户）：「指导视图」在 4.51 整项下线（按钮已从卡片移除），S.coach 恒为 false
-  //   —— 即使旧配置里开过，也不会再往棋盘上铺那层方块热力。
+
   S.coach = false;
 
   if (!G.board) G.board = newBoard();
@@ -13272,7 +13219,7 @@ function boot() {
       els.shiftPop.hidden = true;
     }
   });
-  footPopsWatch();   // 弹窗开合 → 行内其它按键隐藏 + 重新排按键行
+  footPopsWatch();   
 
   els.btn_review.onclick = openReviewFromBoard;
 
@@ -13588,10 +13535,8 @@ function boot() {
     else { bgThinkStop(); bgThinkHaltEngine(); }
   };
 
-  // ★ 2026-10-31（用户：主窗口「对局设置」里的「动态时间」点不动）：
-  //   设置窗自己 wireSetSetup 里绑了 #btn_dynTime，主窗只绑了 btn_bgThink ——
-  //   同一个开关在主窗是「死」的（点击后 S.dynTime 完全不变）。这里补上主窗绑定，
-  //   save() 会广播 mainSync，设置窗自动跟随。
+  
+
   if (els.btn_dynTime) els.btn_dynTime.onclick = function () {
     S.dynTime = (S.dynTime === false);
     save();
@@ -13624,7 +13569,7 @@ function boot() {
       tellHostDefer = true;
       try { onHostMsg(ev); } finally { tellHostDefer = false; }
     });
-    // ★ 2026-11-06：启动即向宿主读回「原子写入」的微状态；比 localStorage 的更新就应用。
+    
     try { tellHost({ type: 'stateLoad' }); } catch (eSL) {}
   } else {
     buildSelects();
@@ -13635,13 +13580,12 @@ function boot() {
 
     // the settings window pushed a patch through the host relay
     if (m.type === 'setSync') { try { setPatchApply(m.patch || null); } catch (eSS) {} return; }
-    // ★ 2026-11-06：宿主读回的微状态（原子写入的那一份）。只有比页面现有状态更新才应用，
-    //   否则用户开机后已经落的子会被旧快照覆盖。
+
     if (m.type === 'stateLoaded') {
       try { if (window.__gbApplyState) window.__gbApplyState(m.data); } catch (eSt) {}
       return;
     }
-    // 线程测速结果也发给主窗：设置窗中途被关掉时，结果仍会落地并生效
+    
     if (m.type === 'engineOut' || m.type === 'engineAck' || m.type === 'engineAsk') {
       try { LocalAI.relay(m); } catch (e) {}
       return;
@@ -13793,10 +13737,8 @@ function boot() {
     if (spt) setPatchApply(spt, false, true);   // appearance comes from the stored snapshot
   } catch (eSP) {}
 
-  // ★ 2026-10-30（用户：启动不要闪多个 logo / 空屏）
-  //   宿主模式：页面在原生 splash 后面加载。boot 一结束就移除 #boot 遮罩，让首帧直接是最终 UI；
-  //   页面首帧真正合成出来后发 painted，宿主收到才开始撤原生覆盖层 ⇒ 屏幕上只有
-  //   「一张品牌 splash → 完整 UI」两态，不会出现第二个 logo 或底色空屏。
+  
+
   bootDone();
   if (HOST) {
     window.__gbReadySent = true;
@@ -13804,7 +13746,7 @@ function boot() {
     var _gbPainted = function () {
       try { window.chrome.webview.postMessage({ type: 'painted' }); } catch (eP2) {}
     };
-    // 双 rAF：第一次 rAF 前首帧还没提交，第二次 rAF 前首帧已经画完 ⇒ 这时才报 painted。
+    
     if (window.requestAnimationFrame)
       requestAnimationFrame(function () { requestAnimationFrame(function () { setTimeout(_gbPainted, 0); }); });
     else setTimeout(_gbPainted, 120);
@@ -13820,8 +13762,7 @@ function boot() {
 function bootDone() {
   var b = document.getElementById('boot');
   if (!b) return;
-  // 宿主模式：页面本来就隐藏在原生 splash 后面，boot 遮罩直接移除（不做 260ms 淡出），
-  // 这样宿主显示 WebView 时绝不会再看到第二个 logo。
+
   if (HOST) { if (b.parentNode) b.parentNode.removeChild(b); return; }
   b.classList.add('off');
   setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 260);
@@ -14001,33 +13942,28 @@ function scheduleEngineRetry() {
 }
 
 // ---- global font preferences ----------------------------------------------------------------
-// ★ 2026-10-30（用户：最大化后字体和板块不要跟着变大；设置里新增「字体」页）
-//   旧版 fitFont() 按窗口宽高算 12~20px，最大化会把整个 UI 放大 1.5 倍。现在根字号固定，
-//   只由「字体大小」三档决定；棋盘仍按可用面积缩放，卡片 / 字体不再随窗口放大。
+
 var FONT_LEVEL_PX = { small: 12.5, normal: 13.5, large: 14.8 };
 var FONT_NUM_SCALE = { small: 0.38, normal: 0.43, large: 0.50 };
 var FONT_UI_DEFAULT = '"Source Han Sans SC","Source Han Sans CN","Noto Sans SC","思源黑体","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif';
 var FONT_NUM_DEFAULT = '"Source Han Serif SC","Noto Serif SC","Noto Serif CJK SC","思源宋体","SimSun",serif';
-// 粗细 / 斜体 / 棋子风格（仿真 = 径向渐变高光，扁平 = 系统原本的纯色棋子）
+
 var FONT_WEIGHTS = [300, 400, 500, 700, 900];
 var FONT_WEIGHT_DEFAULT = 400;
-var FONT_NUM_WEIGHT_DEFAULT = 700;   // 与 5 档滑条一致：旧版 600 归一化到「粗体」700
+var FONT_NUM_WEIGHT_DEFAULT = 700;   
 var STONE_STYLE_DEFAULT = 'real';
-// ★ 2026-11-01（用户：棋子「扁平」选择后不生效）
-//   归一化白名单漏了 'flat'，设置页存下的 flat 被当成非法值回落到 'real'，
-//   于是「扁平」永远画成仿真棋子。三种合法值必须在这一处统一收口。
+
 function stoneStyleOf(v) {
   return (v === 'flat' || v === 'jade' || v === 'real') ? v : STONE_STYLE_DEFAULT;
 }
 
 function fontWeightNum(v, dflt) {
   var n = Math.round(+v);
-  // 600 是旧版棋子的默认档，滑条只有 5 档（300/400/500/700/900），旧值统一落到 700。
+  
   if (n === 600) return 700;
   return (FONT_WEIGHTS.indexOf(n) >= 0) ? n : dflt;
 }
-// 字体名统一去掉包裹引号再存：旧版本把 "Source Han Serif SC"（带引号）直接存进配置，
-// 与新版列表里的裸字体名对不上会出现重复行 / 选中行对不上。
+
 function cleanFontName(v) {
   return String(v || '').replace(/[\\"']/g, '').trim();
 }

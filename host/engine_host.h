@@ -135,6 +135,13 @@ struct ParseState {
   bool        sortPv = false;
   int         pendNumPv = 0;
   int         numPv = 0;
+  // Scan mode (YXSEARCHDEFEND) mirrors the Yixin-Board GUI instead of double
+  // buffering: the GUI writes a tag as soon as each `INFO PV DONE` arrives, and
+  // only drops tags older than the completed round (`boarddepth < curdepth`).
+  // That is what makes the scan fill in progressively and refine while it
+  // searches. livePv is set by DoAsk only for mode 3.
+  bool        livePv = false;
+  int         roundNumPv = 0;   // NUMPV of the round currently being published
   int         maxDepth = 0, selDepth = 0, timeMs = 0;
   long long   totalNodes = 0, speed = 0;
   int         lastEvalSide = 0;   

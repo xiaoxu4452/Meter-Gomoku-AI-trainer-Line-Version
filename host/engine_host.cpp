@@ -1138,16 +1138,35 @@ void ParseLine(const std::string& line, ParseState& st) {
     if (tok == "PV") {
       if (val == "DONE") {
         if (st.inPv && st.pvIdx >= 0) {
-          if ((size_t)st.pvIdx >= st.pend.size()) st.pend.resize((size_t)st.pvIdx + 1);
-          st.pend[(size_t)st.pvIdx] = st.cur;
+          if (st.livePv) {
+            // Yixin-Board semantics: publish this slot at once, then drop
+            // entries that the round has not refreshed once the last PV of
+            // the round completes (`boarddepth < curdepth` in main.c).
+            size_t i = (size_t)st.pvIdx;
+            if (st.cands.size() <= i) st.cands.resize(i + 1);
+            st.cands[i] = st.cur;
+            if (st.cur.depth > st.maxDepth) st.maxDepth = st.cur.depth;
+            if (st.roundNumPv > 0 && (int)i + 1 >= st.roundNumPv) {
+              std::vector<Candidate> keep;
+              keep.reserve(st.cands.size());
+              for (const Candidate& cd : st.cands)
+                if (cd.x >= 0 && cd.depth >= st.cur.depth) keep.push_back(cd);
+              st.cands.swap(keep);
+              st.maxDepth = st.cur.depth;
+            }
+          }
+          else {
+            if ((size_t)st.pvIdx >= st.pend.size()) st.pend.resize((size_t)st.pvIdx + 1);
+            st.pend[(size_t)st.pvIdx] = st.cur;
 
-          if (st.sortPv) SortSearchedPrefix(st, st.pvIdx);
+            if (st.sortPv) SortSearchedPrefix(st, st.pvIdx);
+          }
         }
         st.inPv = false;
       } else {
         int idx = atoi(val.c_str());
         
-        if (idx == 0) { CommitRound(st); st.pendNumPv = 0; }
+        if (idx == 0) { if (!st.livePv) CommitRound(st); st.pendNumPv = 0; }
         st.pvIdx = idx;
         st.cur = Candidate();
         st.inPv = true;
@@ -1161,7 +1180,8 @@ void ParseLine(const std::string& line, ParseState& st) {
       
       int n = atoi(val.c_str());
       st.pendNumPv = n;
-      if (n >= 0 && (size_t)n < st.pend.size()) st.pend.resize((size_t)n);
+      if (st.livePv) st.roundNumPv = n;
+      if (!st.livePv && n >= 0 && (size_t)n < st.pend.size()) st.pend.resize((size_t)n);
     }
     else if (tok == "DEPTH")      st.cur.depth = atoi(val.c_str());
     else if (tok == "SELDEPTH")   { st.cur.selDepth = atoi(val.c_str()); if (st.cur.selDepth > st.selDepth) st.selDepth = st.cur.selDepth; }
@@ -1192,8 +1212,12 @@ void ParseLine(const std::string& line, ParseState& st) {
     auto c = ParseCoordList(line);
 
     
+
     
-    if (!c.empty()) { CommitRound(st); st.movePts = c; st.bestX = c[0].first; st.bestY = c[0].second; st.finished = true; }
+    if (!c.empty()) {
+      if (!st.livePv) CommitRound(st);
+      st.movePts = c; st.bestX = c[0].first; st.bestY = c[0].second; st.finished = true;
+    }
   }
 }
 
@@ -1539,6 +1563,7 @@ static bool RestartEngineClean() {
     bool sp = g_cur.ps.sortPv;
     g_cur.ps = ParseState();
     g_cur.ps.sortPv = sp;
+    g_cur.ps.livePv = g_cur.scan;
     g_cur.done = false;
     g_cur.outstanding = 1;
     g_cur.firstInfoMs = 0;
@@ -1567,6 +1592,7 @@ static bool HealSilentAsk(const AskRequest& req, bool hardRestart) {
     bool sp = g_cur.ps.sortPv;
     g_cur.ps = ParseState();
     g_cur.ps.sortPv = sp;
+    g_cur.ps.livePv = g_cur.scan;
     g_cur.done = false;
     g_cur.outstanding = 1;
     g_cur.firstInfoMs = 0;
@@ -1689,6 +1715,16 @@ static void DoAsk(const AskRequest& req, int id, bool fromLink) {
     g_cur.tWriteMs = NowMs();
     g_cur.firstInfoMs = 0;
     g_cur.writes0 = g_writeCalls.load(std::memory_order_relaxed);
+    // Scan (mode 3) publishes PV by PV like the Yixin-Board GUI. Clear the
+    // previous ask's table first, so the panel starts empty and fills in.
+    g_cur.ps.livePv = g_cur.scan;
+    if (g_cur.scan) {
+      g_cur.ps.cands.clear();
+      g_cur.ps.pend.clear();
+      g_cur.ps.maxDepth = 0;
+      g_cur.ps.pendNumPv = 0;
+      g_cur.ps.roundNumPv = 0;
+    }
   }
   WriteRaw(BuildAskCmds(req));
   
