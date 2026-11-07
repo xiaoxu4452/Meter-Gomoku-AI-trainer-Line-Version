@@ -238,6 +238,11 @@ void aspirationSearch(Rule rule, Board &board, SearchStack *ss, Value prevValue,
 bool ybwcRootEnabled();
 int  ybwcSplitDepth();
 int  ybwcHelperLimit();
+/// When false, shared TT writes are dropped inside the collaborative phase.
+bool ybwcTTWritesEnabled();
+/// When true, the root split only runs for fixed-depth searches and never reuses
+/// the aspiration window.
+bool ybwcFixedDepthOnly();
 #endif
 template <NodeType NT = PV>
 Value search(Rule         rule,
@@ -337,7 +342,8 @@ const RootMove *ABSearcher::searchMain(SearchThread &th)
     // everything else keeps the default Lazy SMP path.
     ybwcThisSearch = ybwcRootEnabled() && th.engine.size() > 1 && opts.multiPV == 1
                      && opts.balanceMode == SearchOptions::BALANCE_NONE && !opts.pondering
-                     && !SkillMovePicker(opts.strengthLevel).enabled();
+                     && !SkillMovePicker(opts.strengthLevel).enabled()
+                     && (!ybwcFixedDepthOnly() || opts.maxDepthSet);
     {
         std::lock_guard<std::mutex> lock(ybwcWork.mutex);
         ybwcWork.stop           = false;
@@ -838,6 +844,47 @@ int ybwcHelperLimit()
     return helperLimit;
 }
 
+/// Shared-TT policy for the collaborative phase. RAPFI_YBWC_TT=0 drops every TT
+/// write made while a thread works on a root-split claim (reads stay enabled), so
+/// null-window subtree results cannot rewrite the table used by Lazy SMP.
+/// Unset / any other value keeps the historical behavior.
+bool ybwcTTWritesEnabled()
+{
+    static const bool enabled = []() {
+        const char *v = std::getenv("RAPFI_YBWC_TT");
+        return !(v && v[0] == '0');
+    }();
+    return enabled;
+}
+
+/// RAPFI_YBWC_FIXEDONLY=1 restricts the root split to the fixed-depth domain:
+/// the split only runs when the GUI pinned a depth (INFO MAX_DEPTH), and the
+/// split path uses full windows only (no aspiration reuse from the previous
+/// iteration). Dynamic-time searches then stay on plain Lazy SMP.
+bool ybwcFixedDepthOnly()
+{
+    static const bool enabled = []() {
+        const char *v = std::getenv("RAPFI_YBWC_FIXEDONLY");
+        return v && (v[0] == '1' || v[0] == 'y' || v[0] == 'Y');
+    }();
+    return enabled;
+}
+
+/// RAII guard for Search::ttStoreSuppressed. The flag is thread-local, so a
+/// helper leaving the collaborative phase restores its own normal TT behavior
+/// without affecting the main thread or peer helpers.
+struct TTStoreGuard
+{
+    explicit TTStoreGuard(bool suppress) : saved(ttStoreSuppressed)
+    {
+        if (suppress)
+            ttStoreSuppressed = true;
+    }
+    ~TTStoreGuard() { ttStoreSuppressed = saved; }
+
+    bool saved;
+};
+
 }  // namespace
 
 void ABSearcher::stopRootSplitWorkers()
@@ -857,6 +904,8 @@ void ABSearcher::runRootSplitClaims(SearchThread &th,
                                     int           depth,
                                     uint32_t      moveCount)
 {
+    TTStoreGuard ttGuard(!ybwcTTWritesEnabled());
+
     while (ybwcWork.ticket.load(std::memory_order_acquire) == ticket) {
         uint32_t idx = ybwcWork.nextMove.fetch_add(1, std::memory_order_relaxed);
         if (idx >= moveCount)
@@ -881,7 +930,7 @@ void ABSearcher::runRootSplitClaims(SearchThread &th,
                                          VALUE_INFINITE,
                                          Depth(depth),
                                          ybwcWork.prevValue,
-                                         true,
+                                         !ybwcFixedDepthOnly(),
                                          &pv);
                 alpha = -VALUE_INFINITE;
             }
@@ -988,6 +1037,8 @@ void ABSearcher::cooperativeRootSearch(SearchThread &th, ABSearchData &sd, Depth
     if (moveCount == 0)
         return;
 
+    TTStoreGuard ttGuard(!ybwcTTWritesEnabled());
+
     uint32_t ticket;
     const bool gate = ybwcGateEnabled();
     {
@@ -1021,7 +1072,7 @@ void ABSearcher::cooperativeRootSearch(SearchThread &th, ABSearchData &sd, Depth
                                        VALUE_INFINITE,
                                        depth,
                                        rootMoves[0].previousValue,
-                                       true,
+                                       !ybwcFixedDepthOnly(),
                                        &pv);
         ybwcWork.values[0] = value;
         ybwcWork.pvs[0]    = std::move(pv);

@@ -290,3 +290,58 @@ interleaved in one process so that the CPU state is shared.
   `rapfi/search/ab/search.cpp` and `searcher.h` is unchanged.
 - The experimental `-ybwc` executable is intentionally not distributed; its source is in
   the repository behind `GB_YBWC_ROOT` so anyone can rebuild it under GPL-3.0.
+
+## 12. Follow-up round (2026-11-07): root-split with private TT and fixed-depth-only split
+
+The first round left one hypothesis open: at fixed depth the split changes the evaluation
+because helper threads write null-window results into the shared table and reorder the
+root. Two mechanisms were added to the prototype to attack exactly that:
+
+* `RAPFI_YBWC_TT=0` (mode **A**): while a helper runs a root-split claim, its TT stores are
+  suppressed through a `thread_local ttStoreSuppressed`; reads still work. The split
+  subtree therefore cannot rewrite the shared table.
+* `RAPFI_YBWC_FIXEDONLY=1` (mode **B**): split only when the GUI sent `INFO MAX_DEPTH`, and
+  the split path does not reuse the previous iteration's aspiration window.
+* Controls: `lazy` (stock build) and `hyb` (split with shared TT writes allowed).
+
+Acceptance rule, fixed before looking at the data: median-depth gain must exceed the per-cell
+repeat noise band, must be same-direction in at least 3/4 positions, and fixed-depth 14/16
+best move and eval must stay inside the stock build's own repeat band.
+
+Dynamic search (10 s, 8 threads, 5 reps, 4 positions, `data/dyn-8t-a.json` and
+`data/dyn-8t-b.json`):
+
+* Noise bands: 4 / 1 / 18 / 2 ply. The 18-ply cell is not a usable measurement cell.
+* Median-depth gain vs lazy: `hyb` −1 / +2 / +6 / −1; `A` 0 / +2 / +2 / −1; `B` −1 / 0 /
+  +13 / 0. Only one cell exceeds the band, and never do 3/4 positions move the same way.
+* `A` is somewhat slower than `hyb` (mean depth 30.75 vs 31.5; lazy 30), so suppressing
+  stores costs speed, as expected.
+
+Fixed depth (`data/fix14-tt-suppress.json`, `data/fix16-tt-suppress.json`, 8 threads,
+5 reps, `MAX_DEPTH` 14 and 16, 4 positions):
+
+* The control drifts by itself: lazy at depth 14 spans 38 and 69 eval points on two
+  positions, and at depth 16 its best move alternates between `10,8` and `10,6`. An
+  absolute "no drift" criterion is therefore not satisfiable even for the stock build; the
+  only meaningful band is the stock build's own repeat band.
+* Depth 14: `A` changes the best move on one position and leaves the band on two; `B`
+  changes the best move and turns a `-M14` mate score into `-702` (mate classification
+  lost); `hyb` keeps the moves but leaves the eval band on three positions.
+* Depth 16: `hyb` pins the move to `10,8` but its eval range `-46 … -13` lies outside the
+  lazy range `-33 … 0`; `A` stays inside on that position but leaves the band on the 7-stone
+  position (`-122 … -166` vs `-142 … -172`); `B` runs at ~350 kn/s (≈5× slower) and leaves
+  the band.
+
+**Both new paths are rejected, and `hyb` remains rejected.** Root splitting on top of
+Lazy SMP produces no reproducible depth gain outside the stock noise band and makes
+fixed-depth results less stable than the stock search; the private-TT variant trades speed
+for nothing, and the fixed-depth-only variant loses mate classification. No further
+parameter grid was run: the conclusion is that Rapfi's current architecture has no
+additional parallel-search dessert to mine by splitting root moves.
+
+| file | content |
+| --- | --- |
+| `data/dyn-8t-a.json` | lazy / hyb / A / B, 10 s, 8 threads, 5 reps, batch A |
+| `data/dyn-8t-b.json` | same, batch B |
+| `data/fix14-tt-suppress.json` | fixed depth 14, 8 threads, 5 reps, 4 positions |
+| `data/fix16-tt-suppress.json` | fixed depth 16, same protocol |

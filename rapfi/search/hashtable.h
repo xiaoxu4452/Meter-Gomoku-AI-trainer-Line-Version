@@ -93,4 +93,10 @@ private:
 
 extern HashTable TT;
 
+/// Experimental (GB_YBWC_ROOT only): when set for the calling thread, all shared
+/// TT writes are dropped. The root-split prototype uses this to keep the entries
+/// produced by a null-window collaborative subtree out of the table that the main
+/// Lazy SMP iterations rely on. Reads stay enabled.
+extern thread_local bool ttStoreSuppressed;
+
 }  // namespace Search

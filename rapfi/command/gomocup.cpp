@@ -256,6 +256,7 @@ void getOption()
     /////////////////////////////////////////////////
     else if (token == "MAX_DEPTH") {
         std::cin >> options.maxDepth;
+        options.maxDepthSet = true;
     }
     else if (token == "START_DEPTH") {
         std::cin >> options.startDepth;

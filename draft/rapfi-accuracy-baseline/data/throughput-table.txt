@@ -1,0 +1,40 @@
+﻿== .workbuddy\tmp\engine-sweet\thr-8t.json  turn=10000ms reps=3 threads=8 hash=512MB rule/caution as sent
+  pos  variant     n  depth   seld     nps(k) nodes(M)   wall best
+  0    our         3   25.0   47.0       1970    15.24  10361 7,8:3
+  0    ref         3   25.0   47.0       1521    10.01  10426 7,8:3
+  1    our         3   29.0   10.0       4842     0.45    479 6,6:3
+  1    ref         3   31.0   10.0       4573     0.53    578 6,6:3
+  2    our         3   34.0   34.0       2966    24.14  10360 7,8:3
+  2    ref         2   31.5   34.5       2481    23.76  10024 7,8:2
+  4    our         3   32.0   14.0       3023     5.66   2274 10,7:3
+  4    ref         3   32.0   14.0       2644     8.73   3760 10,7:3
+  -- all positions --
+  our        n=12  depth med 31.0  seld med 24.0  nps med 2992k  nodes med 10.97M  wall med 6253ms
+  ref        n=11  depth med 31.0  seld med 14.0  nps med 2571k  nodes med 8.73M  wall med 4746ms
+  dropped (engine exited before a move): [(9, 'ref', 643)]
+== .workbuddy\tmp\engine-sweet\thr-1t.json  turn=10000ms reps=3 threads=1 hash=512MB rule/caution as sent
+  pos  variant     n  depth   seld     nps(k) nodes(M)   wall best
+  0    our         3   24.0   43.0        259     2.59  10401 7,8:3
+  0    ref         3   21.0   48.0        195     1.95  10466 7,8:3
+  1    our         3   33.0   10.0        560     0.11    650 6,6:3
+  1    ref         3   35.0   10.0        501     0.16    859 6,6:3
+  2    our         3   29.0   35.0        471     4.46   9927 7,8:3
+  2    ref         3   28.0   36.0        421     4.20  10499 7,8:3
+  4    our         3   37.0   14.0        403     3.60   9408 10,7:3
+  4    ref         3   35.0   14.0        371     3.70  10496 10,7:3
+  -- all positions --
+  our        n=12  depth med 31.0  seld med 24.5  nps med 429k  nodes med 3.05M  wall med 9806ms
+  ref        n=12  depth med 31.5  seld med 25.0  nps med 396k  nodes med 2.57M  wall med 10465ms
+== .workbuddy\tmp\engine-sweet\thr-8t-avx2.json  turn=10000ms reps=3 threads=8 hash=512MB rule/caution as sent
+  pos  variant     n  depth   seld     nps(k) nodes(M)   wall best
+  0    our_avx2    3   25.0   40.0       1516    13.06  10419 7,8:3
+  0    ref         3   26.0   49.0       1366    13.10  10239 7,8:3
+  1    our_avx2    3   30.0   10.0       4353     0.51    551 6,6:3
+  1    ref         3   31.0   10.0       4477     0.52    609 6,6:3
+  2    our_avx2    3   34.0   34.0       2897    25.66  10424 7,8:3
+  2    ref         3   33.0   34.0       2651    23.26  10486 7,8:3
+  4    our_avx2    3   34.0   14.0       2928    10.83   4173 10,7:3
+  4    ref         3   34.0   14.0       2439    12.94   4937 10,7:3
+  -- all positions --
+  our_avx2   n=12  depth med 31.5  seld med 15.0  nps med 2912k  nodes med 12.02M  wall med 7485ms
+  ref        n=12  depth med 32.0  seld med 24.0  nps med 2632k  nodes med 13.02M  wall med 9498ms

@@ -1,0 +1,86 @@
+﻿pos       run    depth      n meanPp  maxPp  spear   top1   top3  final(best/wr/eval) mateD
+g0-s10    ref60     25     96   0.00   0.00  1.000      Y   1.00  6,6/100.0/+M35/26 mate@17
+g0-s10    ref15     19     96   0.54  11.41  0.961      Y   0.67  6,6/100.0/+M41/20 mate@17
+g0-s10    ref5      15     96   1.89  42.50  0.879      Y   0.33  6,6/94.7/575/16 mate@None
+g0-s10    our15     21     96   0.31   9.75  0.961      Y   1.00  6,6/100.0/+M39/22 mate@18
+g0-s10    our5      16     96   1.26  39.32  0.879      Y   0.67  6,6/100.0/+M47/17 mate@17
+g0-s14    ref60     16    113   0.00   0.00  1.000      Y   1.00  8,11/99.8/1250/17 mate@None
+g0-s14    ref15     13    113   4.47  20.01  0.877      Y   0.67  8,11/96.4/660/14 mate@None
+g0-s14    ref5      11    113   6.37  29.97  0.856      n   0.67  9,10/86.8/376/12 mate@None
+g0-s14    our15     14    113   3.98  25.57  0.902      Y   0.67  8,11/95.4/354/15 mate@None
+g0-s14    our5      12    113   4.93  28.61  0.906      n   0.33  9,10/92.9/299/13 mate@None
+g0-s6     ref60     24     82   0.00   0.00  1.000      Y   1.00  8,8/100.0/+M35/25 mate@18
+g0-s6     ref15     19     82   0.28  11.21  1.000      n   1.00  8,8/100.0/+M43/20 mate@18
+g0-s6     ref5      16     82   0.67  11.40  0.956      n   1.00  8,8/97.9/773/16 mate@None
+g0-s6     our15     21     82   0.51  24.23  1.000      Y   1.00  8,8/100.0/+M43/22 mate@19
+g0-s6     our5      17     82   1.02  30.61  0.942      n   1.00  8,8/100.0/+M45/18 mate@18
+g1-s10    ref60     25     98   0.00   0.00  1.000      Y   1.00  5,8/100.0/+M21/26 mate@8
+g1-s10    ref15     22     98   0.05   3.87  1.000      Y   1.00  5,8/100.0/+M21/23 mate@10
+g1-s10    ref5      19     98   0.31  15.39  1.000      Y   1.00  5,8/100.0/+M21/20 mate@9
+g1-s10    our15     25     98   0.13   7.44  1.000      Y   1.00  5,8/100.0/+M21/26 mate@10
+g1-s10    our5      21     98   0.10   5.33  1.000      Y   1.00  5,8/100.0/+M21/22 mate@11
+g1-s14    ref60  no full round
+g1-s14    ref15  no full round
+g1-s14    ref5   no full round
+g1-s14    our15  no full round
+g1-s14    our5   no full round
+g1-s6     ref60     22     49   0.00   0.00  1.000      Y   1.00  8,7/100.0/+M31/23 mate@17
+g1-s6     ref15     17     49   1.74  11.40  0.904      Y   1.00  8,7/100.0/+M37/18 mate@16
+g1-s6     ref5      13     49   5.59  36.53  0.765      Y   0.67  8,7/99.1/933/14 mate@None
+g1-s6     our15     19     49   1.21  17.10  0.965      Y   1.00  8,7/100.0/+M33/20 mate@17
+g1-s6     our5      14     49   2.87  21.46  0.775      Y   0.67  8,7/99.4/599/15 mate@None
+q0-s8     ref60     15    153   0.00   0.00  1.000      Y   1.00  5,7/100.0/+M17/16 mate@10
+q0-s8     ref15     12    153   7.65  65.54  0.907      n   0.67  6,7/100.0/+M19/13 mate@10
+q0-s8     ref5      10    153  12.89  51.66  0.880      n   0.33  6,6/100.0/+M23/11 mate@10
+q0-s8     our15     13    153   5.43  42.78  0.924      n   0.67  5,7/100.0/+M17/14 mate@12
+q0-s8     our5      11    153  10.05  76.19  0.906      n   0.00  6,6/100.0/+M25/12 mate@11
+q1-s8     ref60  no full round
+q1-s8     ref15  no full round
+q1-s8     ref5   no full round
+q1-s8     our15  no full round
+q1-s8     our5   no full round
+q2-s10    ref60     20    120   0.00   0.00  1.000      Y   1.00  10,8/100.0/+M19/21 mate@10
+q2-s10    ref15     16    120   2.06  53.49  0.971      n   0.00  10,6/100.0/+M19/17 mate@11
+q2-s10    ref5      11    120   9.14  71.20  0.853      n   0.00  8,7/100.0/+M29/12 mate@11
+q2-s10    our15     16    120   1.68  68.43  0.962      n   0.00  10,8/100.0/+M19/17 mate@12
+q2-s10    our5      13    120   4.52  68.11  0.874      n   0.00  10,8/100.0/+M19/14 mate@12
+q3-s10    ref60     26    150   0.00   0.00  1.000      Y   1.00  9,6/100.0/+M23/26 mate@14
+q3-s10    ref15     20    150   0.05   5.17  1.000      Y   1.00  9,6/100.0/+M25/21 mate@13
+q3-s10    ref5      16    150   0.54  25.26  0.982      n   0.67  9,6/100.0/+M31/17 mate@13
+q3-s10    our15     23    150   0.09   6.88  1.000      Y   1.00  9,6/100.0/+M23/23 mate@14
+q3-s10    our5      18    150   0.36  52.15  0.990      Y   0.67  9,6/100.0/+M25/19 mate@14
+
+oracle final best:
+  g0-s10    6,6 wr=100.0% eval=+M35
+  g0-s14    8,11 wr=99.8% eval=1250
+  g0-s6     8,8 wr=100.0% eval=+M35
+  g1-s10    5,8 wr=100.0% eval=+M21
+  g1-s6     8,7 wr=100.0% eval=+M31
+  q0-s8     5,7 wr=100.0% eval=+M17
+  q2-s10    10,8 wr=100.0% eval=+M19
+  q3-s10    9,6 wr=100.0% eval=+M23
+
+aggregate (mean across positions):
+  ref60  pos=8  meanPp=0.00  maxPp=0.00  spear=1.000  top1=100%  top3=1.00  dec=100%
+  ref15  pos=8  meanPp=2.11  maxPp=65.54  spear=0.952  top1=62%  top3=0.75  dec=100%
+  ref5   pos=8  meanPp=4.67  maxPp=71.20  spear=0.896  top1=38%  top3=0.58  dec=99%
+  our15  pos=8  meanPp=1.67  maxPp=68.43  spear=0.964  top1=75%  top3=0.79  dec=100%
+  our5   pos=8  meanPp=3.14  maxPp=76.19  spear=0.909  top1=50%  top3=0.54  dec=99%
+
+head-to-head at equal budget (negative delta = ours closer to oracle):
+  g0-s10    5s  our=1.26  ref=1.89  delta=-0.63  rank our=0.879 ref=0.879
+  g0-s10    15s  our=0.31  ref=0.54  delta=-0.23  rank our=0.961 ref=0.961
+  g0-s14    5s  our=4.93  ref=6.37  delta=-1.44  rank our=0.906 ref=0.856
+  g0-s14    15s  our=3.98  ref=4.47  delta=-0.50  rank our=0.902 ref=0.877
+  g0-s6     5s  our=1.02  ref=0.67  delta=+0.35  rank our=0.942 ref=0.956
+  g0-s6     15s  our=0.51  ref=0.28  delta=+0.23  rank our=1.000 ref=1.000
+  g1-s10    5s  our=0.10  ref=0.31  delta=-0.21  rank our=1.000 ref=1.000
+  g1-s10    15s  our=0.13  ref=0.05  delta=+0.07  rank our=1.000 ref=1.000
+  g1-s6     5s  our=2.87  ref=5.59  delta=-2.71  rank our=0.775 ref=0.765
+  g1-s6     15s  our=1.21  ref=1.74  delta=-0.53  rank our=0.965 ref=0.904
+  q0-s8     5s  our=10.05  ref=12.89  delta=-2.85  rank our=0.906 ref=0.880
+  q0-s8     15s  our=5.43  ref=7.65  delta=-2.23  rank our=0.924 ref=0.907
+  q2-s10    5s  our=4.52  ref=9.14  delta=-4.61  rank our=0.874 ref=0.853
+  q2-s10    15s  our=1.68  ref=2.06  delta=-0.38  rank our=0.962 ref=0.971
+  q3-s10    5s  our=0.36  ref=0.54  delta=-0.18  rank our=0.990 ref=0.982
+  q3-s10    15s  our=0.09  ref=0.05  delta=+0.04  rank our=1.000 ref=1.000

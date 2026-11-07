@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "generated": "2026-11-06T12:12:54Z",
+  "generated": "2026-11-07T06:10:00Z",
   "variants": {
     "sse": { "source": "built", "file": "RapfiEngine-sse.exe", "sha256": "5154691957d5fd4a26a6739c1255c9385f11316e463b2b5ad774dcccd94a67d4" },
     "avx2": { "source": "built", "file": "RapfiEngine-avx2.exe", "sha256": "21014087c4440af004976bcb6f5709fcb1e301489af12b40885c64475cb8268d" },
     "avxvnni": { "source": "built", "file": "RapfiEngine-avxvnni.exe", "sha256": "4a84c1b9d337d8ed3b535acefe85075c34b4ab89657e14ebcca02bd6d315bdac" },
     "avx512": { "source": "built", "file": "RapfiEngine-avx512.exe", "sha256": "4a300118224632af5fe2e3a513eb35d0bf73c59ecf7909b8768e521ef637145b" },
-    "avx512vnni": { "source": "built", "file": "RapfiEngine-avx512vnni.exe", "sha256": "b324280720a507351cb3752bf244600ee1342a675dc48254c44d3269e84d349d" }
+    "avx512vnni": { "source": "built", "file": "RapfiEngine-avx512vnni.exe", "sha256": "52e332439aa5881c344c1791d167cb58b73f122e778cf963e7e4c3ed358e2db8" }
   }
 }

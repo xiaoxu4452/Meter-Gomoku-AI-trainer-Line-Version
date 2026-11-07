@@ -134,6 +134,9 @@ struct SearchOptions
     Time     timeLeft   = 0;
     uint64_t maxNodes   = 0;  // (0 means no limits)
     int      maxDepth   = 99;
+    /// True when the GUI pinned a depth limit (INFO MAX_DEPTH). The root-split
+    /// prototype uses this to restrict itself to the fixed-depth domain.
+    bool     maxDepthSet = false;
     int      startDepth = 2;
 
     /// MultiPV mode, normally set to 1
