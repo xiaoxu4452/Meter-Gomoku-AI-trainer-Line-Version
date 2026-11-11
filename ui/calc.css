@@ -1246,7 +1246,7 @@ body.link{overflow:hidden}
 #linkPane{
   position:fixed; inset:0; z-index:10;
   display:flex; flex-direction:column;
-  padding:.5rem .75rem .12rem; gap:.28rem;
+  padding:.5rem .75rem .28rem; gap:.28rem;
   background:var(--bg); color:var(--ink); overflow:hidden;
 }
 
@@ -1254,7 +1254,7 @@ body.link{overflow:hidden}
 .lk-brand{
   flex:none; font-size:.86rem; font-style:italic; font-weight:600;
   letter-spacing:.02em; color:var(--boot-fg); user-select:none;
-  text-align:center; opacity:.82; margin-top:.08rem; line-height:1.15;
+  text-align:center; opacity:.82; margin-top:0; line-height:1.15;
 }
 .lk-brand i{font-style:inherit; color:#3d9bd6}
 
@@ -1348,7 +1348,7 @@ body.link{overflow:hidden}
 .lk-boardcol{
   flex:1 1 auto; min-width:0; min-height:0; overflow:hidden;
   display:flex; flex-direction:column; gap:.3rem;
-  align-items:center; justify-content:center;
+  align-items:center; justify-content:flex-end;
 }
 .lk-count{font-size:.78rem; color:var(--sub); font-weight:600; letter-spacing:.04em; flex:none}
 
@@ -1358,27 +1358,26 @@ body.link{overflow:hidden}
   max-width:100%; max-height:100%;
   aspect-ratio:1/1; display:block;
   border:1px solid var(--border); border-radius:4px;
-  box-shadow:0 2px 12px rgba(0,0,0,.10);
 }
 
 @media (max-height: 600px){
-  body.link #linkPane{padding:.38rem .6rem .1rem; gap:.24rem}
+  body.link #linkPane{padding:.38rem .6rem .24rem; gap:.24rem}
   body.link .lk-status{font-size:.84rem; height:5.9em; min-height:5.9em; max-height:5.9em}
   body.link .lk-panel{gap:.3rem}
-  body.link .lk-brand{font-size:.8rem; margin-top:.06rem}
+  body.link .lk-brand{font-size:.8rem; margin-top:0}
 }
 @media (max-height: 520px){
   body.link .lk-status{font-size:.78rem; height:4.4em; min-height:4.4em; max-height:4.4em}
   body.link .lk-stat .k{font-size:.54rem}
   body.link .lk-stat .v{font-size:.74rem}
   body.link .lk-btns .btn{font-size:.72rem}
-  body.link .lk-brand{font-size:.74rem; margin-top:.04rem}
+  body.link .lk-brand{font-size:.74rem; margin-top:0}
 }
 @media (max-height: 440px){
   body.link .lk-status{font-size:.72rem; height:3.7em; min-height:3.7em; max-height:3.7em}
   body.link .lk-stats{gap:.2rem}
   body.link .lk-panel{gap:.24rem}
-  body.link #linkPane{padding:.3rem .5rem .08rem; gap:.2rem}
+  body.link #linkPane{padding:.3rem .5rem .2rem; gap:.2rem}
 }
 
 body.linkOn #hdr .brand::after{
@@ -1397,8 +1396,24 @@ html[lang="en"] body.linkOn #hdr .brand::after{ content:'· Linking'; }
 
 #linkPane #lkSwGrp{flex-wrap:nowrap; gap:.22rem}
 #linkPane #lkSwGrp .btn{flex:1 1 0; min-width:0}
-#linkPane #lk_bal, #linkPane #lk_eval, #linkPane #lk_swxcancel{font-size:.68rem; padding:.22rem .16rem; flex:1 1 0}
-#linkPane #lkSwGrp #lk_baln{flex:0 0 auto; padding-left:.3rem; padding-right:.3rem}
+#linkPane #lk_eval, #linkPane #lk_swxcancel{font-size:.68rem; padding:.22rem .16rem; flex:1 1 0}
+/* Balance | N points capsule, matching the main window's segmented control. */
+#linkPane .lk-balseg{
+  flex:0 0 40%; display:inline-flex; align-items:stretch; min-width:0;
+  border:1px solid var(--border); border-radius:.4rem; overflow:hidden;
+  background:var(--card); align-self:stretch;
+}
+#linkPane .lk-balseg .segbtn{
+  flex:1 1 0; min-width:0; padding:.22rem .34rem; border:0; border-radius:0;
+  background:transparent; color:var(--ink); font:inherit; font-size:.68rem;
+  font-weight:500; line-height:1.2; white-space:nowrap; cursor:pointer;
+}
+#linkPane .lk-balseg .segbtn:hover{background:var(--chip)}
+#linkPane .lk-balseg .seg-n{
+  flex:0 0 2.25rem; padding-left:.1rem; padding-right:.1rem;
+  background:var(--chip); font-weight:700; font-size:.66rem; text-align:center;
+}
+#linkPane .lk-balseg .seg-div{flex:0 0 1px; align-self:stretch; background:var(--border)}
 
 #linkPane .lk-ai-row .tglbtn{padding:.36rem .15rem; gap:.18rem}
 #linkPane .lk-ai-row .tglbtn .tgl-txt{font-size:.66rem}

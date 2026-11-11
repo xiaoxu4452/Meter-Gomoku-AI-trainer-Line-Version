@@ -1335,11 +1335,14 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     for (i = 0; i < balBaseW.length; i++) wbase[balBaseW[i]] = 1;
 
     // Stones played since the marks were made. This is derived (never counted down), so an undo
-    // lowers it again; after three stones the balance window is over and the marks are released.
+    // lowers it again; once the played stones reach the point count chosen in the points button
+    // the balance window is over (same rule as the main window, but keyed off the set count, so
+    // the layer also closes when fewer marks were actually produced than requested).
     var newCnt = 0;
     for (k in bset) if (!bbase[k]) newCnt++;
     for (k in wset) if (!wbase[k]) newCnt++;
-    if (newCnt >= 3) { balOff(); return; }
+    var balNeed = Math.max(1, Math.min(3, balPointN | 0));
+    if (newCnt >= balNeed) { balOff(); return; }
 
     // Colour match per mark: the matching one hides, the other stays. A wrong-colour stone keeps
     // its mark (the overlay is topmost so it can never be misread as a stone by the recognizer).
@@ -2333,10 +2336,10 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     var bp = document.getElementById('__gb_balpoint');
     if (bp && bp.tagName === 'SELECT') bp.value = String(balPointN);
     else if (bp) bp.textContent = '×' + balPointN;
-    // The link pane shows the target as a button: Points (N) / Pts (N).
+    // The link pane shows the target inside the Balance capsule: Balance | N points.
     var lb = document.getElementById('lk_baln');
     if (lb && lb.tagName === 'SELECT') lb.value = String(balPointN);
-    else if (lb) lb.textContent = (S.lang === 'en') ? ('Pts (' + balPointN + ')') : ('点数（' + balPointN + '）');
+    else if (lb) lb.textContent = (S.lang === 'en') ? (balPointN + ' pt') : (balPointN + ' 点');
     var mb = document.getElementById('btn_an_baln');
     if (mb && mb.tagName === 'SELECT') mb.value = String(balPointN);
     else if (mb) mb.textContent = '×' + balPointN;

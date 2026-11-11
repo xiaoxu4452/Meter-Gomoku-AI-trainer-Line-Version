@@ -177,7 +177,7 @@ var I18N = {
         '分工：连线窗负责识别与 AI；主窗大棋盘只同步显示识别到的局面与执子设置，不参与评估、不落子 —— 所以不会出现两侧互相抢着算的情况。',
         'AI 执子与思考时间：连线窗的「AI 执黑」/「AI 执白」二者互斥，选中会无条件同步到主窗「对局设置」里的执子；「思考时间」同样同步（两边一个口径）。',
         '自动落子：打开后识别到对方落子即自动思考，并用三级模拟点击替你落子（先 PostMessage 直达目标窗口，无效升 SendInput，再不行用真实点击兜底），物理鼠标全程不受干扰；一局结束（五子连珠）自动关闭，下一局需重新打开。',
-        '平衡点：点它的同时会自动取消已选的 AI 执黑 / 执白（避免相互干扰）。旁边的「点数（N）」按键在 1~3 之间循环，决定这次要标出几个平衡点。空盘时走**官方定式**：先让引擎按当前规则吐官方开局（禁手用禁手公式、无禁手用无禁手公式，**绝不混用**），引擎不可用时退到本地公式表（无禁手 = 官方 Swap2 三手 9 组，禁手 = RIF 26 组，两张表都经引擎实测只留平衡定式、必胜定式一条都不加）；再不行才在中心区逐手取点。所以开局这三手是「官方平衡开局」，不是对弈引擎算出来的最强手（点数小于 3 时只取前几个点）。棋盘上已有棋子时，走原生 YXBALANCETWO 成对搜索逐个给出：1 点 = 一对只取第 1 手，2 点 = 一对，3 点 = 两对取前三点，并报出评估分（|评估| ≤ 50 才算平）。任何手数都能用，不再限于开局。黑紫白天蓝，可反复点击重新评估。评估完成引擎随即释放；标记只在下对颜色时消失 —— 没落对的标记保留（连线窗里标记始终盖在识别画面最上层，但不会被截图识别）；从生成标记那手起落下第三子时整层标记消失；撤回会自动恢复；也可点「取消」清除标记。',
+        '平衡点：点它的同时会自动取消已选的 AI 执黑 / 执白（避免相互干扰）。旁边的「点数（N）」按键在 1~3 之间循环，决定这次要标出几个平衡点。空盘时走**官方定式**：先让引擎按当前规则吐官方开局（禁手用禁手公式、无禁手用无禁手公式，**绝不混用**），引擎不可用时退到本地公式表（无禁手 = 官方 Swap2 三手 9 组，禁手 = RIF 26 组，两张表都经引擎实测只留平衡定式、必胜定式一条都不加）；再不行才在中心区逐手取点。所以开局这三手是「官方平衡开局」，不是对弈引擎算出来的最强手（点数小于 3 时只取前几个点）。棋盘上已有棋子时，走原生 YXBALANCETWO 成对搜索逐个给出：1 点 = 一对只取第 1 手，2 点 = 一对，3 点 = 两对取前三点，并报出评估分（|评估| ≤ 50 才算平）。任何手数都能用，不再限于开局。黑紫白天蓝，可反复点击重新评估。评估完成引擎随即释放；标记只在下对颜色时消失 —— 没落对的标记保留（连线窗里标记始终盖在识别画面最上层，但不会被截图识别）；从生成标记那手起，落子数达到点数时整层标记消失；撤回会自动恢复，主棋盘上撤到生成标记之前则整层消失；也可点「取消」清除标记。',
         '平衡点 + 自动落子的顺序逻辑：先点平衡点、后打开自动落子 → 计算完成时若自动落子已开，就按顺序自动把这几个平衡点落下（与单机版五子棋助手完全一致）；若是计算完才打开自动落子，则打开的那一刻按序补摆。自动落子在任何手数下都会配合生效。',
         '交换评估：与平衡点相互独立的另一项功能，用于评估当前交换局面的优劣，判断是否值得交换。',
         '盘中标记：推荐落点为天蓝圈；平衡标记为圆形 —— 上半中空显示落子序号、下半半透明填充显示评估分，黑子紫、白子天蓝；全部直接画在识别框内的对应交点，位于截图识别不到的最上层（绝不会被误读成棋子）。',
@@ -536,7 +536,7 @@ tagDefend: '扫描分析', tagCalc: '计算评估', tagNbest: '多点分析',
     balRunTip: '停止平衡搜索（标记保留，按颜色落子后逐个消失）',
     balTip: '持续平衡搜索；再点一次停止（标记保留）',
     balOpenDone: '空盘：官方平衡开局 3 手已就绪 —— 按标记颜色自行落子，对上即消失',
-    balKept: '（已停止：标记保留；下对颜色的那颗立即消失，没落对保留；从生成标记起落下第 3 手后整层消失；撤回会恢复）',
+    balKept: '（已停止：标记保留；下对颜色的那颗立即消失，没落对保留；从生成标记起的落子数达到点数后整层消失；撤回会恢复，撤到生成标记之前则整层消失）',
     balAllDone: '平衡点已全部对上号：标记已清空（撤回可恢复）',
     anBalLabel: '点数',
     anBalColor: '（蓝色 = 白子，紫色 = 黑子）',
@@ -710,7 +710,7 @@ tagDefend: '扫描分析', tagCalc: '计算评估', tagNbest: '多点分析',
         'Who does what: the Link window owns recognition and the AI; the main board only mirrors the recognised position and the AI-side settings - it never evaluates and never drops a stone, so the two windows can never fight over the same search.',
         'AI side and thinking time: "AI plays Black" / "AI plays White" are mutually exclusive, and the choice is mirrored unconditionally into Game Setup in the main window; Thinking time is mirrored the same way.',
         'Auto drop: with it on, the app thinks as soon as the opponent moves and plays for you through a three-stage simulated click (PostMessage straight to the target window, then SendInput, then a real click as the last resort). Your physical mouse is never touched. It switches off when the game ends (five in a row).',
-        'Balance: pressing it automatically cancels any selected AI side first (they would interfere). The "Points (N)" key right next to it cycles 1-3 and sets how many balance points are marked. On an empty board it uses the official opening formula (Renju and freestyle never mix); with stones present it runs the native YXBALANCETWO paired search repeatedly: 1 point = the first move of one pair, 2 points = one pair, 3 points = the first three of two pairs, and reports the evaluation (only |eval| <= 50 counts as balanced). It works at any move number, not just the opening. Markers stay in the recognition frame and the balance engine is released immediately. A marker clears only when a stone of its own colour lands on it; a wrong stone keeps it (in this window the overlay always stays above the recognised board, yet is excluded from screen capture). The third stone played since the picks were made clears the whole layer. Undo restores it.',
+        'Balance: pressing it automatically cancels any selected AI side first (they would interfere). The "Points (N)" key right next to it cycles 1-3 and sets how many balance points are marked. On an empty board it uses the official opening formula (Renju and freestyle never mix); with stones present it runs the native YXBALANCETWO paired search repeatedly: 1 point = the first move of one pair, 2 points = one pair, 3 points = the first three of two pairs, and reports the evaluation (only |eval| <= 50 counts as balanced). It works at any move number, not just the opening. Markers stay in the recognition frame and the balance engine is released immediately. A marker clears only when a stone of its own colour lands on it; a wrong stone keeps it (in this window the overlay always stays above the recognised board, yet is excluded from screen capture). The layer clears once the stones played since the picks were made reach the point count. Undo restores it, and undoing past the picks on the main board clears it for good.',
         'Balance + Auto drop in order: press Balance first and turn Auto drop on; when the calculation finishes the points are played automatically in order (exactly like the standalone assistant). If Auto drop is switched on later, they are played in order the moment it is switched on. Auto drop cooperates at any move number.',
         'Swap evaluation: a separate feature from Balance; it scores the current swap position so you can judge whether to swap.',
         'On-board marks: the suggested move is a sky-blue ring; balance points are purple (Black) / blue (White) rings numbered 1, 2, 3. All of them are drawn inside the recognition frame at the matching intersections and are excluded from screen capture, so they are never misread as stones.',
@@ -1055,7 +1055,7 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     balRunTip: 'Stop the balance search (marks stay; play a stone of the marked colour to clear each)',
     balTip: 'Continuous balance search; press again to stop (marks stay)',
     balOpenDone: 'Empty board: the 3-move official balanced opening is ready - play the marked colours yourself; each mark clears when matched',
-    balKept: ' (stopped: marks kept; a stone of the matching colour clears its own mark, a wrong one keeps it, and the whole layer clears on the third stone played since the picks were made; undo restores it)',
+    balKept: ' (stopped: marks kept; a stone of the matching colour clears its own mark, a wrong one keeps it, and the whole layer clears once the stones played since the picks were made reach the point count; undo restores it, undoing past the picks clears it)',
     balAllDone: 'All balance marks matched: cleared (undo restores them)',
     anBalLabel: 'Points',
     anBalColor: ' (Blue = White, Purple = Black)',
@@ -2022,11 +2022,13 @@ function paint() {
 
   var balHide = false;
   /* 'bal' marks are filtered one by one below: a wrong-colour stone keeps its mark (the stone
-     covers it), and the mark window closes only after the third stone played since the picks
-     were made. Both rules are derived from the move list, so undo brings marks back. */
+     covers it), and the layer closes once the stones played since the picks were made reach the
+     number of balance points. Both rules are derived from the move list, so undo brings marks back
+     (undoing past the position where the picks were generated clears them for good). */
   if (G.ana.kind === 'bal' && G.ana.marks.length) {
-    var balNew = G.moves.length - ((G.ana.balBase != null) ? G.ana.balBase : 0);
-    if (balNew >= 3) balHide = true;
+    var balBase = (G.ana.balBase != null) ? G.ana.balBase : 0;
+    var balNew = G.moves.length - balBase;
+    if (balNew < 0 || balNew >= G.ana.marks.length) balHide = true;
   } else if (G.ana.kind === 'bal1' && G.ana.marks.length) {
     var isStage2 = G.ana.marks.some(function (mk) { return String(mk.badge) === '4'; });
     if (G.moves.length >= (isStage2 ? 5 : 3)) balHide = true;
@@ -7343,14 +7345,16 @@ function savePos() {
 
 // Undo / step-back must not throw away static balance marks: keep their data and let paint()
 // re-derive visibility, so the mark of an undone stone reappears (and the other one is untouched).
+// Undoing PAST the position where the picks were generated drops the whole layer instead.
 function anaResetKeepBal() {
   var keep = (G.ana.kind === 'bal' && G.ana.marks.length)
-    ? { marks: G.ana.marks, rows: G.ana.rows } : null;
+    ? { marks: G.ana.marks, rows: G.ana.rows, base: G.ana.balBase } : null;
   anaReset();
-  if (keep) {
+  if (keep && G.moves.length >= (keep.base != null ? keep.base : 0)) {
     G.ana.kind = 'bal';
     G.ana.marks = keep.marks;
     G.ana.rows = keep.rows;
+    G.ana.balBase = keep.base;
   }
 }
 
@@ -14600,8 +14604,11 @@ function bootLink() {
         '</div>' +
         '<div class="lk-sec lk-fn lk-btns">' +
           '<span class="dashed-group" id="lkSwGrp">' +
-          '<button id="lk_bal" class="btn">' + lkL('平衡点', 'Balance') + '</button>' +
-          '<button id="lk_baln" class="btn">' + lkL('点数（2）', 'Pts (2)') + '</button>' +
+          '<span class="seg balseg lk-balseg" id="lkBalSeg">' +
+          '<button id="lk_bal" class="segbtn" type="button">' + lkL('平衡点', 'Balance') + '</button>' +
+          '<span class="seg-div" aria-hidden="true"></span>' +
+          '<button id="lk_baln" class="segbtn seg-n" type="button">' + lkL('2 点', '2 pt') + '</button>' +
+          '</span>' +
           '<button id="lk_eval" class="btn">' + lkL('交换评估', 'Swap Eval') + '</button>' +
           '<button id="lk_swxcancel" class="btn">' + lkL('取消', 'Cancel') + '</button>' +
           '</span>' +
@@ -15183,7 +15190,7 @@ function bootLink() {
     } else {
       try { localStorage.setItem('gb_bal_point_n', String(n)); } catch (eBn2) {}
     }
-    this.textContent = lkL('点数（' + n + '）', 'Pts (' + n + ')');
+    this.textContent = lkL(n + ' 点', n + ' pt');
     var st = document.getElementById('lkStatus');
     if (st) st.textContent = lkL('平衡点数已设为 ' + n, 'Balance point count set to ' + n);
   };
