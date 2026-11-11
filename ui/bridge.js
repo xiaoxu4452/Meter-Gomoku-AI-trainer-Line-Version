@@ -1344,13 +1344,9 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     var balNeed = Math.max(1, Math.min(3, balPointN | 0));
     if (newCnt >= balNeed) { balOff(); return; }
 
-    // Colour match per mark: the matching one hides, the other stays. A wrong-colour stone keeps
-    // its mark (the overlay is topmost so it can never be misread as a stone by the recognizer).
-    for (i = 0; i < balMarks.length; i++) {
-      var m = balMarks[i], key = m.x + ',' + m.y;
-      var v = bset[key] ? 1 : (wset[key] ? 2 : 0);
-      m.hidden = m.color ? (v === (m.color === 'b' ? 1 : 2)) : (v !== 0);
-    }
+    // Link pane only: the marks are an all-or-nothing layer. They never drop one by one on a
+    // colour match (that is the main board's rule) - they stay put until the set number of new
+    // stones has been played, then the whole layer goes at once.
     balRefresh();
   }
 
