@@ -1292,6 +1292,12 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
   // Visibility is derived from the live board, so removing a stone (undo / re-recognition)
   // brings its mark back instead of losing it forever.
   var balBaseB = [], balBaseW = [];
+  // Recognised stones arrive as {x,y} objects, while engine cells are [x,y] arrays - one key
+  // helper for both, otherwise every stone collapses into "undefined,undefined".
+  function balKey(p) {
+    if (!p) return '';
+    return (p.x != null) ? (p.x + ',' + p.y) : (p[0] + ',' + p[1]);
+  }
   function balSet(cells, sticky, key, colors) {
     balMarks = cells.map(function (c, i) {
       return { x: c[0], y: c[1], seq: i + 1, color: (colors && colors[i]) || '', hidden: false };
@@ -1299,8 +1305,8 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     balSticky = !!sticky;
     balToggleArmed = false;
     balLastKey = key || '';
-    balBaseB = (lastBl || []).map(function (p) { return p[0] + ',' + p[1]; });
-    balBaseW = (lastWh || []).map(function (p) { return p[0] + ',' + p[1]; });
+    balBaseB = (lastBl || []).map(balKey);
+    balBaseW = (lastWh || []).map(balKey);
     balRefresh();
   }
 
@@ -1329,8 +1335,8 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     if (!balMarks.length) return;
     if (!balSticky) { balOff(); return; }
     var bset = {}, wset = {}, bbase = {}, wbase = {}, i, k;
-    for (i = 0; i < (newBl ? newBl.length : 0); i++) bset[newBl[i][0] + ',' + newBl[i][1]] = 1;
-    for (i = 0; i < (newWh ? newWh.length : 0); i++) wset[newWh[i][0] + ',' + newWh[i][1]] = 1;
+    for (i = 0; i < (newBl ? newBl.length : 0); i++) bset[balKey(newBl[i])] = 1;
+    for (i = 0; i < (newWh ? newWh.length : 0); i++) wset[balKey(newWh[i])] = 1;
     for (i = 0; i < balBaseB.length; i++) bbase[balBaseB[i]] = 1;
     for (i = 0; i < balBaseW.length; i++) wbase[balBaseW[i]] = 1;
 
@@ -1375,6 +1381,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
       state: function () {
         return {
           sticky: balSticky,
+          baseB: balBaseB.join(';') + '|' + balBaseW.join(';'),
           marks: balMarks.map(function (m) {
             return { x: m.x, y: m.y, seq: m.seq, c: m.color, hidden: !!m.hidden };
           }),
