@@ -177,9 +177,9 @@ var I18N = {
         '分工：连线窗负责识别与 AI；主窗大棋盘只同步显示识别到的局面与执子设置，不参与评估、不落子 —— 所以不会出现两侧互相抢着算的情况。',
         'AI 执子与思考时间：连线窗的「AI 执黑」/「AI 执白」二者互斥，选中会无条件同步到主窗「对局设置」里的执子；「思考时间」同样同步（两边一个口径）。',
         '自动落子：打开后识别到对方落子即自动思考，并用三级模拟点击替你落子（先 PostMessage 直达目标窗口，无效升 SendInput，再不行用真实点击兜底），物理鼠标全程不受干扰；一局结束（五子连珠）自动关闭，下一局需重新打开。',
-        '交换平衡点：点它的同时会自动取消已选的 AI 执黑 / 执白（避免相互干扰）。空盘时走**官方定式**：先让引擎按当前规则吐官方开局（禁手用禁手公式、无禁手用无禁手公式，**绝不混用**），引擎不可用时退到本地公式表（无禁手 = 官方 Swap2 三手 9 组，禁手 = RIF 26 组，两张表都经引擎实测只留平衡定式、必胜定式一条都不加）；再不行才在中心区逐手取点。所以开局这三手是「官方平衡开局」，不是对弈引擎算出来的最强手。棋盘上已有棋子时（第 2 次交换，一黑一白），走原生 YXBALANCETWO 成对搜索给出这两手并报出评估分（|评估| ≤ 50 才算平）。黑紫白天蓝，可反复点击重新评估。评估完成引擎随即释放；你把相应子数下完（不管下哪），标记自动消失，也可点「清除标记」关闭。',
-        '交换平衡点 + 自动落子的顺序逻辑：先点交换平衡点、后打开自动落子 → 评估完成时若自动落子已开，就按顺序自动把这几个平衡点落下（与单机版五子棋助手完全一致）；若是评估完才打开自动落子，则打开的那一刻按序补摆。',
-        '交换评估：与交换平衡点相互独立的另一项功能，用于评估当前交换局面的优劣，判断是否值得交换。',
+        '平衡点：点它的同时会自动取消已选的 AI 执黑 / 执白（避免相互干扰）。旁边的「点数（N）」按键在 1~3 之间循环，决定这次要标出几个平衡点。空盘时走**官方定式**：先让引擎按当前规则吐官方开局（禁手用禁手公式、无禁手用无禁手公式，**绝不混用**），引擎不可用时退到本地公式表（无禁手 = 官方 Swap2 三手 9 组，禁手 = RIF 26 组，两张表都经引擎实测只留平衡定式、必胜定式一条都不加）；再不行才在中心区逐手取点。所以开局这三手是「官方平衡开局」，不是对弈引擎算出来的最强手（点数小于 3 时只取前几个点）。棋盘上已有棋子时，走原生 YXBALANCETWO 成对搜索逐个给出：1 点 = 一对只取第 1 手，2 点 = 一对，3 点 = 两对取前三点，并报出评估分（|评估| ≤ 50 才算平）。任何手数都能用，不再限于开局。黑紫白天蓝，可反复点击重新评估。评估完成引擎随即释放；标记只在下对颜色时消失 —— 没落对的标记保留（连线窗里标记始终盖在识别画面最上层，但不会被截图识别）；从生成标记那手起落下第三子时整层标记消失；撤回会自动恢复；也可点「取消」清除标记。',
+        '平衡点 + 自动落子的顺序逻辑：先点平衡点、后打开自动落子 → 计算完成时若自动落子已开，就按顺序自动把这几个平衡点落下（与单机版五子棋助手完全一致）；若是计算完才打开自动落子，则打开的那一刻按序补摆。自动落子在任何手数下都会配合生效。',
+        '交换评估：与平衡点相互独立的另一项功能，用于评估当前交换局面的优劣，判断是否值得交换。',
         '盘中标记：推荐落点为天蓝圈；平衡标记为圆形 —— 上半中空显示落子序号、下半半透明填充显示评估分，黑子紫、白子天蓝；全部直接画在识别框内的对应交点，位于截图识别不到的最上层（绝不会被误读成棋子）。',
         '关闭：关掉连线窗后，主窗自动恢复你自己原来的模式与设置，对弈 / 计算等功能照常使用。',
       ]},
@@ -530,15 +530,14 @@ tagDefend: '扫描分析', tagCalc: '计算评估', tagNbest: '多点分析',
     anBalFail: '平衡搜索失败：',
     anBalnSet: '平衡点数已设为 {n}（空盘固定 3）',
     anBalnHint: '平衡点数（1 或 2；空盘固定 3）',
-    balStart: '平衡搜索开始：标记与相关路线随计算微调；再点「平衡点」停止',
+    balStart: '平衡搜索开始：标记与相关路线随计算微调；再点「平衡点」停止（标记保留）',
     balRunStat: '平衡计算中 · 深度 {d} · 已用 {t}s',
     balStopShow: '停止',
-    balRunTip: '停止平衡搜索：标记与相关路线保留在棋盘上',
-    balTip: '持续平衡搜索；再点一次停止（结果保留）',
-    balKept: '（已停止：平衡点标记与相关路线保留；落子 / 切换分析 / 清除计算时清除）',
-    balOpenDone: '空盘：官方平衡开局 3 手已就绪，再点「平衡点」自动落子',
-    balShown: '已自动落子 {n} 手 · 深度 {d}',
-    balNoPlay: '（当前是开局 / 交换流程：标记已保留在棋盘上，未自动落子）',
+    balRunTip: '停止平衡搜索（标记保留，按颜色落子后逐个消失）',
+    balTip: '持续平衡搜索；再点一次停止（标记保留）',
+    balOpenDone: '空盘：官方平衡开局 3 手已就绪 —— 按标记颜色自行落子，对上即消失',
+    balKept: '（已停止：标记保留；下对颜色的那颗立即消失，没落对保留；从生成标记起落下第 3 手后整层消失；撤回会恢复）',
+    balAllDone: '平衡点已全部对上号：标记已清空（撤回可恢复）',
     anBalLabel: '点数',
     anBalColor: '（蓝色 = 白子，紫色 = 黑子）',
 
@@ -711,10 +710,10 @@ tagDefend: '扫描分析', tagCalc: '计算评估', tagNbest: '多点分析',
         'Who does what: the Link window owns recognition and the AI; the main board only mirrors the recognised position and the AI-side settings - it never evaluates and never drops a stone, so the two windows can never fight over the same search.',
         'AI side and thinking time: "AI plays Black" / "AI plays White" are mutually exclusive, and the choice is mirrored unconditionally into Game Setup in the main window; Thinking time is mirrored the same way.',
         'Auto drop: with it on, the app thinks as soon as the opponent moves and plays for you through a three-stage simulated click (PostMessage straight to the target window, then SendInput, then a real click as the last resort). Your physical mouse is never touched. It switches off when the game ends (five in a row).',
-        'Swap balance: pressing it automatically cancels any selected AI side first (they would interfere). On an empty board it gives three points (two Black, one White); with stones present it gives two (one Black, one White). The markers stay in the recognition frame and the balance engine is released immediately afterwards. They disappear once you have played those stones.',
-        'Swap balance + Auto drop in order: if you press Swap balance first and Auto drop is on when the evaluation finishes, the points are played automatically in order (exactly like the standalone assistant). If Auto drop is switched on later, they are played in order the moment it is switched on.',
-        'Swap evaluation: a separate feature from Swap balance; it scores the current swap position so you can judge whether to swap.',
-        'On-board marks: the suggested move is a sky-blue ring; swap balance points are purple (Black) / blue (White) rings numbered 1, 2, 3. All of them are drawn inside the recognition frame at the matching intersections and are excluded from screen capture, so they are never misread as stones.',
+        'Balance: pressing it automatically cancels any selected AI side first (they would interfere). The "Points (N)" key right next to it cycles 1-3 and sets how many balance points are marked. On an empty board it uses the official opening formula (Renju and freestyle never mix); with stones present it runs the native YXBALANCETWO paired search repeatedly: 1 point = the first move of one pair, 2 points = one pair, 3 points = the first three of two pairs, and reports the evaluation (only |eval| <= 50 counts as balanced). It works at any move number, not just the opening. Markers stay in the recognition frame and the balance engine is released immediately. A marker clears only when a stone of its own colour lands on it; a wrong stone keeps it (in this window the overlay always stays above the recognised board, yet is excluded from screen capture). The third stone played since the picks were made clears the whole layer. Undo restores it.',
+        'Balance + Auto drop in order: press Balance first and turn Auto drop on; when the calculation finishes the points are played automatically in order (exactly like the standalone assistant). If Auto drop is switched on later, they are played in order the moment it is switched on. Auto drop cooperates at any move number.',
+        'Swap evaluation: a separate feature from Balance; it scores the current swap position so you can judge whether to swap.',
+        'On-board marks: the suggested move is a sky-blue ring; balance points are purple (Black) / blue (White) rings numbered 1, 2, 3. All of them are drawn inside the recognition frame at the matching intersections and are excluded from screen capture, so they are never misread as stones.',
         'Closing: closing the Link window restores your own mode and settings in the main window; play, computation and everything else keep working as before.',
       ]},
     ],
@@ -1050,15 +1049,14 @@ tagDefend: 'Defence scan', tagCalc: 'Evaluate', tagNbest: 'N-best',
     anBalFail: 'Balance search failed: ',
     anBalnSet: 'Balance point count set to {n} (3 fixed on empty board)',
     anBalnHint: 'Balance point count (1 or 2; 3 fixed on an empty board)',
-    balStart: 'Balance search started: marks and routes refine as it runs; press Balance again to stop',
+    balStart: 'Balance search started: marks and routes refine as it runs; press Balance again to stop (marks stay)',
     balRunStat: 'Balancing · depth {d} · {t}s',
     balStopShow: 'Stop',
-    balRunTip: 'Stop the balance search; marks and routes stay on the board',
-    balTip: 'Continuous balance search; press again to stop (results kept)',
-    balKept: ' (stopped: balance marks and routes kept; cleared by a move, another analysis, or Clear)',
-    balOpenDone: 'Empty board: the official 3-move balanced opening is ready; press Balance again to play it',
-    balShown: 'Played {n} stones · depth {d}',
-    balNoPlay: ' (opening / swap flow active: marks kept on the board, nothing played automatically)',
+    balRunTip: 'Stop the balance search (marks stay; play a stone of the marked colour to clear each)',
+    balTip: 'Continuous balance search; press again to stop (marks stay)',
+    balOpenDone: 'Empty board: the 3-move official balanced opening is ready - play the marked colours yourself; each mark clears when matched',
+    balKept: ' (stopped: marks kept; a stone of the matching colour clears its own mark, a wrong one keeps it, and the whole layer clears on the third stone played since the picks were made; undo restores it)',
+    balAllDone: 'All balance marks matched: cleared (undo restores them)',
     anBalLabel: 'Points',
     anBalColor: ' (Blue = White, Purple = Black)',
 
@@ -2023,13 +2021,12 @@ function paint() {
   if (openActive() && aiDecorOn()) drawOpenGuide(ctx, g, r);
 
   var balHide = false;
+  /* 'bal' marks are filtered one by one below: a wrong-colour stone keeps its mark (the stone
+     covers it), and the mark window closes only after the third stone played since the picks
+     were made. Both rules are derived from the move list, so undo brings marks back. */
   if (G.ana.kind === 'bal' && G.ana.marks.length) {
-    // Hide only after the user has played as many stones as there are marks
-    // SINCE they were computed. The old rule compared the ABSOLUTE move count
-    // against the mark count, so every pick on a board that already had stones
-    // (e.g. 5 stones + 2 picks) was erased the moment it was drawn.
-    var balBaseM = (G.ana.balBase != null) ? G.ana.balBase : 0;
-    if (G.moves.length >= balBaseM + G.ana.marks.length) balHide = true;
+    var balNew = G.moves.length - ((G.ana.balBase != null) ? G.ana.balBase : 0);
+    if (balNew >= 3) balHide = true;
   } else if (G.ana.kind === 'bal1' && G.ana.marks.length) {
     var isStage2 = G.ana.marks.some(function (mk) { return String(mk.badge) === '4'; });
     if (G.moves.length >= (isStage2 ? 5 : 3)) balHide = true;
@@ -2045,11 +2042,11 @@ function paint() {
     var mrBase = Math.max(6, gap * 0.40);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
     var taken = [];
-    // A balance pick that has already been played is covered by its stone, so
-    // drop exactly those marks while the rest keep counting down.
+    // One mark per balance point: drop only the ones whose own colour already sits on them,
+    // the rest stay until their move is played too.
     var balDraw = G.ana.marks.filter(function (m) { return !m.live; });
     if (G.ana.kind === 'bal')
-      balDraw = balDraw.filter(function (m) { return !G.board[m.y][m.x]; });
+      balDraw = balDraw.filter(function (m) { return !balMarkMatched(m); });
     function hits(a, b) {
       return !(a.x2 < b.x1 || b.x2 < a.x1 || a.y2 < b.y1 || b.y2 < a.y1);
     }
@@ -3441,16 +3438,15 @@ function place(x, y, fromRedo, byAI) {
   if (G.ana.defTimer) { clearTimeout(G.ana.defTimer); G.ana.defTimer = null; }
   G.ana.defWinUntil = 0; G.ana.defRefining = false;
   if (G.ana.kind === 'bal' && G.ana.marks.length) {
-    if (!byAI) {
-      G.ana.balLeft = (G.ana.balLeft || G.ana.marks.length) - 1;
-      if (G.ana.balLeft <= 0) {
-        G.ana.gen++; G.ana.busy = false;
-        G.ana.marks = []; G.ana.rows = []; G.ana.defCells = null;
-        G.ana.kind = '';
-        anaMark(null); renderAna(T('anIdle'), true);
-      }
+    /* Static balance marks: no countdown here. paint() hides each mark as soon as a stone of
+       its own colour lands on it, so a wrong-colour move changes nothing and an undo restores it. */
+    var hitBal = false;
+    for (var bi = 0; bi < G.ana.marks.length; bi++) {
+      var bm = G.ana.marks[bi];
+      if (bm.x === x && bm.y === y && balMarkMatched(bm)) { hitBal = true; break; }
     }
     G.ana.busy = false;
+    if (hitBal && !balMarksLeft()) renderAna(T('balAllDone'), true);
   } else {
     G.ana.busy = false; G.ana.kind = '';
     anaReset();
@@ -7345,6 +7341,19 @@ function savePos() {
   }
 }
 
+// Undo / step-back must not throw away static balance marks: keep their data and let paint()
+// re-derive visibility, so the mark of an undone stone reappears (and the other one is untouched).
+function anaResetKeepBal() {
+  var keep = (G.ana.kind === 'bal' && G.ana.marks.length)
+    ? { marks: G.ana.marks, rows: G.ana.rows } : null;
+  anaReset();
+  if (keep) {
+    G.ana.kind = 'bal';
+    G.ana.marks = keep.marks;
+    G.ana.rows = keep.rows;
+  }
+}
+
 function undoOne() {
   if (G.review || openActive() || !G.moves.length) return;
 
@@ -7359,7 +7368,7 @@ function undoOne() {
   G.curve = G.curve.filter(function (p) { return p.i < G.moves.length; });
   G.heat = []; G.nums = [];
   recomputeOver(); persistGame();
-  anaReset();
+  anaResetKeepBal();
   liveAnaBoardChanged();
   paint(); refreshUI();
   refreshCoach();
@@ -7386,7 +7395,7 @@ function stepBack() {
   G.curve = G.curve.filter(function (p) { return p.i < G.moves.length; });
   G.heat = []; G.nums = [];
   recomputeOver(); persistGame();
-  anaReset();
+  anaResetKeepBal();
   liveAnaBoardChanged();
   paint(); refreshUI();
   refreshCoach();
@@ -12440,7 +12449,8 @@ function balOpenHintTxt() {
 // simply keeps deepening and streams INFO PV blocks while it runs. So the page starts ONE search
 // (op=balance with live=1, so the host does not cap the budget) and rebuilds the marks from every
 // tick - the picks drift exactly like the official bundle, and nothing ever restarts. Pressing the
-// key a second time stops the search and plays the last picks as real moves.
+// key a second time stops the search and keeps the last picks as static marks; the user plays them
+// personally, each mark clears when a stone of its own colour lands on it (undo restores it).
 var BAL = { on: false, job: null, acc: [], cur: [], need: 2, depth: 0, t0: 0,
             logT: 0, logD: -1, fails: 0, stageT: 0, lastPaint: 0, watch: 0,
             lastEv: null, lastWr: null, lastEvRaw: '', curLine: null };
@@ -12469,6 +12479,24 @@ function balUI() {
   els.btn_an_bal.title = on ? T('balRunTip') : T('balTip');
   if (els.btn_an_baln) els.btn_an_baln.disabled = on;
   balPNLabel();
+}
+
+// A balance mark disappears only when a stone of the colour printed on it sits on that point.
+// Visibility is re-derived from the board every paint, so undoing that stone brings the mark back;
+// the other mark is untouched, and all of them are gone only once every colour matches.
+function balMarkMatched(m) {
+  if (!m || m.x == null || m.y == null) return true;
+  var row = G.board[m.y];
+  var v = row ? (row[m.x] | 0) : 0;
+  if (!v) return false;
+  var want = (m.color === 'w') ? 2 : (m.color === 'b' ? 1 : 0);
+  return want ? v === want : true;   // legacy mark without colour: any stone counts
+}
+function balMarksLeft() {
+  var n = 0;
+  for (var i = 0; i < G.ana.marks.length; i++)
+    if (!balMarkMatched(G.ana.marks[i])) n++;
+  return n;
 }
 
 function balAbort() {
@@ -12671,32 +12699,13 @@ function balFinish() {
   balUI();
   if (els.btn_an_baln) els.btn_an_baln.disabled = false;
   balPNLabel();
+  /* Marks / routes stay; the stop path re-attaches them as static marks (kind 'bal'). */
   G.ana.busy = false; G.ana.kind = '';
   anaMark(null);
 }
 
-// Play the picks as real moves (same order the marks are numbered). `place()` is the normal move
-// path, so the side to move alternates exactly as it does for a human click.
-function balPlayOut(r) {
-  if (!r || !r.marks || !r.marks.length) return 0;
-  var n = 0;
-  G.ana.kind = 'bal';                    // keeps place() on the balance branch (marks survive)
-  for (var i = 0; i < r.marks.length; i++) {
-    var m = r.marks[i];
-    if (!m || m.x == null || m.y == null || G.over) continue;
-    // afterMove() is what a real click runs: win check, persist, UI refresh, AI kick.
-    if (place(m.x, m.y, false, true)) { n++; afterMove(); }
-  }
-  G.ana.kind = ''; G.ana.busy = false;
-  G.ana.marks = []; G.ana.rows = []; G.ana.balLeft = 0;
-  if (n) rtClear();              
-  anaMark(null);
-  paint(); refreshUI();
-  return n;
-}
-
 // Empty board: the balanced opening comes from the official opening chain, not from a deep search,
-// so it is a single quick pass - the second press still plays it.
+// so it is a single quick pass.
 async function balOpenStart(gen) {
   var marksE = [];
   try { marksE = await openBalChain(engineRule(), Math.max(2000, S.turnMs || 2000), gen); } catch (e) { marksE = []; }
@@ -12719,7 +12728,7 @@ function balToggle() {
     var picks;
     G.ana.gen++;                       // drop whatever tick is in flight
     BAL.on = false;
-    balLiveStop();
+    balLiveStop();                     // STOP to the engine; late INFO blocks are already dead by gen
     balCommitCur();
     picks = BAL.acc.slice(0, BAL.need);
     balFinish();
@@ -12729,6 +12738,7 @@ function balToggle() {
       return;
     }
     balSetMarks(picks);
+    G.ana.kind = 'bal';                // static marks stay alive across ordinary moves
     paint();
     renderAna(balDoneMsg(picks.length, picks.map(function (m) { return coordName(m.x, m.y); }), null) +
       T('anBalColor') + T('balKept'));
@@ -12756,7 +12766,6 @@ function balToggle() {
 
 function balSetMarks(arr) {
   var WHITE_DISC = 'rgba(70,190,255,.95)';
-  G.ana.balLeft = arr.length;
   G.ana.balBase = G.moves.length;   // these marks belong to THIS board state
   var raw = (typeof BAL.lastEvRaw === 'string' && BAL.lastEvRaw) ? BAL.lastEvRaw : '';
   var baseEv = (typeof BAL.lastEv === 'number') ? BAL.lastEv : null;
@@ -12779,6 +12788,7 @@ function balSetMarks(arr) {
   G.ana.marks = arr.map(function (m, i) {
     return { x: m.x, y: m.y, badge: m.seq, label: (vals[i].wrNum == null) ? ''
              : (Math.round(vals[i].wrNum * 100) + '%'), sub: vals[i].sc, tier: -1, inline: true,
+             color: (m.color === 'w') ? 'w' : 'b',
              col: m.color === 'b' ? null : WHITE_DISC };
   });
   G.ana.rows = arr.map(function (m, i) {
@@ -14303,15 +14313,8 @@ function lkRemindFrame() {
 
 function linkBalanceSwap() {
   var st = document.getElementById('lkStatus');
-  var bd = G.board || newBoard();
-  var nn = 0;
-  if (bd) for (var i = 0; i < 15; i++) for (var j = 0; j < 15; j++) if (bd[i][j]) nn++;
-  if (nn > 5) {
-    if (st) st.textContent = lkL('棋子已超过 5 个，不再评估交换平衡点',
-                                 'Over 5 stones - swap-balance disabled');
-    return;
-  }
 
+  // Balance points work at any move number (also with auto-drop), so there is no move-count gate.
   try { if (window.GB_LINK_SWAPBAL) { window.GB_LINK_SWAPBAL(); return; } } catch (e) {}
   if (st) st.textContent = lkL(LK_BAL_TXT.none[0], LK_BAL_TXT.none[1]);
 }
@@ -14597,7 +14600,8 @@ function bootLink() {
         '</div>' +
         '<div class="lk-sec lk-fn lk-btns">' +
           '<span class="dashed-group" id="lkSwGrp">' +
-          '<button id="lk_bal" class="btn">' + lkL('交换平衡点', 'Swap Balance') + '</button>' +
+          '<button id="lk_bal" class="btn">' + lkL('平衡点', 'Balance') + '</button>' +
+          '<button id="lk_baln" class="btn">' + lkL('点数（2）', 'Pts (2)') + '</button>' +
           '<button id="lk_eval" class="btn">' + lkL('交换评估', 'Swap Eval') + '</button>' +
           '<button id="lk_swxcancel" class="btn">' + lkL('取消', 'Cancel') + '</button>' +
           '</span>' +
@@ -15168,6 +15172,22 @@ function bootLink() {
     }
   };
 
+  // Points (N) cycles 1 -> 2 -> 3 -> 1. The value is kept in the bridge so the balance search
+  // and the auto-drop queue always agree on how many points to produce.
+  if (q('lk_baln')) q('lk_baln').onclick = function () {
+    var n = parseInt(localStorage.getItem('gb_bal_point_n') || '2', 10);
+    if (!(n >= 1 && n <= 3)) n = 2;
+    n = n % 3 + 1;
+    if (typeof window.GB_LINK_SETBALN === 'function') {
+      try { n = window.GB_LINK_SETBALN(n); } catch (eBn) {}
+    } else {
+      try { localStorage.setItem('gb_bal_point_n', String(n)); } catch (eBn2) {}
+    }
+    this.textContent = lkL('点数（' + n + '）', 'Pts (' + n + ')');
+    var st = document.getElementById('lkStatus');
+    if (st) st.textContent = lkL('平衡点数已设为 ' + n, 'Balance point count set to ' + n);
+  };
+
   q('lk_eval').onclick = function () {
     if (!lkFramedNow()) { lkRemindFrame(); return; }
     c.aiB = false; c.aiW = false;
@@ -15189,9 +15209,9 @@ function bootLink() {
     var sc = document.getElementById('lkStatus');
     if (sc) {
       sc.textContent = ok
-        ? lkL('已取消交换平衡计算，平衡标记与待落点已清除',
-              'Swap-balance cancelled; marks and pending moves cleared')
-        : lkL('当前没有进行中的交换平衡计算', 'No swap-balance calculation is running');
+        ? lkL('已取消平衡计算，平衡标记与待落点已清除',
+              'Balance cancelled; marks and pending moves cleared')
+        : lkL('当前没有进行中的平衡计算', 'No balance calculation is running');
     }
   };
 
@@ -15223,7 +15243,7 @@ function bootLink() {
       '<button id="__gb_autodrop"></button><button id="__gb_adcount"></button>' +
 
       '<button id="__gb_realclick"></button>' +
-      '<button id="__gb_swbal"></button><select id="__gb_balpoint" class="sel"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select><button id="__gb_sweval"></button>' +
+      '<button id="__gb_swbal"></button><select id="__gb_balpoint" class="sel"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select><button id="__gb_sweval"></button>' +
       '<span id="__gb_st_depth"></span><span id="__gb_st_eval"></span><span id="__gb_st_speed"></span>' +
       '<span id="__gb_st_nodes"></span><span id="__gb_st_line"></span>' +
       '<button data-rule="0"></button><button data-rule="1"></button><button data-rule="2"></button>';

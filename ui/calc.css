@@ -1246,7 +1246,7 @@ body.link{overflow:hidden}
 #linkPane{
   position:fixed; inset:0; z-index:10;
   display:flex; flex-direction:column;
-  padding:.55rem .75rem; gap:.35rem;
+  padding:.5rem .75rem .12rem; gap:.28rem;
   background:var(--bg); color:var(--ink); overflow:hidden;
 }
 
@@ -1254,7 +1254,7 @@ body.link{overflow:hidden}
 .lk-brand{
   flex:none; font-size:.86rem; font-style:italic; font-weight:600;
   letter-spacing:.02em; color:var(--boot-fg); user-select:none;
-  text-align:center; opacity:.82; margin-top:.34rem; line-height:1.15;
+  text-align:center; opacity:.82; margin-top:.08rem; line-height:1.15;
 }
 .lk-brand i{font-style:inherit; color:#3d9bd6}
 
@@ -1328,7 +1328,7 @@ body.link{overflow:hidden}
 
 .lk-status{
   font-size:.9rem; color:var(--sub); line-height:1.55;
-  box-sizing:border-box; height:7em; min-height:7em; max-height:7em;
+  box-sizing:border-box; height:6.2em; min-height:6.2em; max-height:6.2em;
   padding:.3rem .55rem;
   border:2px dashed var(--border); border-radius:6px;
   display:flex; flex-direction:column; align-items:flex-start; gap:.3rem;
@@ -1362,23 +1362,23 @@ body.link{overflow:hidden}
 }
 
 @media (max-height: 600px){
-  body.link #linkPane{padding:.42rem .6rem; gap:.3rem}
-  body.link .lk-status{font-size:.84rem; height:6.7em; min-height:6.7em; max-height:6.7em}
+  body.link #linkPane{padding:.38rem .6rem .1rem; gap:.24rem}
+  body.link .lk-status{font-size:.84rem; height:5.9em; min-height:5.9em; max-height:5.9em}
   body.link .lk-panel{gap:.3rem}
-  body.link .lk-brand{font-size:.8rem; margin-top:.22rem}
+  body.link .lk-brand{font-size:.8rem; margin-top:.06rem}
 }
 @media (max-height: 520px){
-  body.link .lk-status{font-size:.78rem; height:5em; min-height:5em; max-height:5em}
+  body.link .lk-status{font-size:.78rem; height:4.4em; min-height:4.4em; max-height:4.4em}
   body.link .lk-stat .k{font-size:.54rem}
   body.link .lk-stat .v{font-size:.74rem}
   body.link .lk-btns .btn{font-size:.72rem}
-  body.link .lk-brand{font-size:.74rem; margin-top:.16rem}
+  body.link .lk-brand{font-size:.74rem; margin-top:.04rem}
 }
 @media (max-height: 440px){
-  body.link .lk-status{font-size:.72rem; height:4.2em; min-height:4.2em; max-height:4.2em}
+  body.link .lk-status{font-size:.72rem; height:3.7em; min-height:3.7em; max-height:3.7em}
   body.link .lk-stats{gap:.2rem}
   body.link .lk-panel{gap:.24rem}
-  body.link #linkPane{padding:.34rem .5rem; gap:.24rem}
+  body.link #linkPane{padding:.3rem .5rem .08rem; gap:.2rem}
 }
 
 body.linkOn #hdr .brand::after{
@@ -1395,9 +1395,10 @@ html[lang="en"] body.linkOn #hdr .brand::after{ content:'· Linking'; }
 #lkFnBox{display:flex; flex-direction:column; gap:.3rem; min-width:0}
 #lkFnBox[hidden]{display:none !important}
 
-#linkPane #lkSwGrp{flex-wrap:nowrap}
+#linkPane #lkSwGrp{flex-wrap:nowrap; gap:.22rem}
 #linkPane #lkSwGrp .btn{flex:1 1 0; min-width:0}
-#linkPane #lk_bal, #linkPane #lk_eval, #linkPane #lk_swxcancel{font-size:.72rem; padding:.22rem .28rem; flex:1 1 0}
+#linkPane #lk_bal, #linkPane #lk_eval, #linkPane #lk_swxcancel{font-size:.68rem; padding:.22rem .16rem; flex:1 1 0}
+#linkPane #lkSwGrp #lk_baln{flex:0 0 auto; padding-left:.3rem; padding-right:.3rem}
 
 #linkPane .lk-ai-row .tglbtn{padding:.36rem .15rem; gap:.18rem}
 #linkPane .lk-ai-row .tglbtn .tgl-txt{font-size:.66rem}

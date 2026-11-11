@@ -306,8 +306,8 @@ var LBAL = {
 
     balWon: '盘面已有成五点（%1）—— 必胜局面没有平衡可言，以上是引擎直接给出的必胜点',
 
-    adBtn: '自动落子', swBalBtn: '交换平衡点', swEvalBtn: '交换评估',
-    balPointBtn: '点数', balPointSet: '平衡点数已设为 %1（空盘固定 3）',
+    adBtn: '自动落子', swBalBtn: '平衡点', swEvalBtn: '交换评估',
+    balPointBtn: '点数', balPointSet: '平衡点数已设为 %1',
 
     adOn: '自动落子已开启（盯推荐第一点）', adOff: '自动落子已关闭',
 
@@ -328,26 +328,22 @@ var LBAL = {
     adGiveUp: '自动落子连续 3 轮未生效，已暂停（请确认目标窗口在前台；若是自绘/防外挂窗口，先手动点一次再开）',
     adPtUnreachable: '这一手没落上（目标窗口是否在前台？）—— 等棋盘变化自动重试',
 
-    swBalEmpty: '空盘交换平衡计算中（1 白 + 2 黑三点组）…', swBalPair: '交换平衡计算中（1 白 + 1 黑）…',
-    swBalMax: '交换平衡点仅限开局五手（3 手 + 2 手），当前盘面已超出交换阶段',
-    swBalStage: '交换平衡点只在空盘（两黑一白 3 点）或已有 3 子（一黑一白 2 点）时可用；当前手数不在交换窗口',
-    swBalDone: '交换平衡点已标出（浅蓝=白、浅紫=黑）：', swPlacing: '自动摆点：第 %1/%2 个（',
+    swBalEmpty: '空盘平衡计算中…', swBalPair: '平衡计算中（成对搜索）…',
+    swBalDone: '平衡点已标出（浅蓝=白、浅紫=黑）：', swPlacing: '自动摆点：第 %1/%2 个（',
     swBalEval: '（平衡引擎判定：|评估| ≈ %1，≤ 50 才算平）',
     swBalEvalNone: '（平衡引擎未回传评估分）',
     swBalOpenHints: [
-      '官方开局 3 手，评估 3 个点最合理（此处固定 3 个）。',
-      '评估 4 个以上已走出开局，分数不可靠。',
+      '空盘使用官方平衡开局 3 手；「点数」小于 3 时只取前几个点。',
       '禁手 / 无禁手的平衡点不同，结果只对当前规则有效。',
-      '塔拉山口-10 走满 5 手才可评估到 5 个。',
       '天元固定，不用评估。',
     ],
-    swPlaced: '交换平衡摆子完成（%1 个点已自动落完）',
+    swPlaced: '平衡点自动摆子完成（%1 个点已落完）',
     swSwapNow: '引擎判定：此际应当换手（SWAP）——不摆子，直接换',
     swEvaling: '交换评估计算中…', swEvalBlack: '对弈引擎（非平衡口径）：黑优（%1）—— 建议选黑更有优势',
     swEvalWhite: '对弈引擎（非平衡口径）：白优（%1）—— 建议选白更有优势', swEvalEven: '对弈引擎（非平衡口径）：两边接近（%1）—— 选黑选白差别不大',
 
     swAdvB: '黑优', swAdvW: '白优',
-    swEvalEmpty: '棋盘上还没有子 —— 等对手摆完（或先点「交换平衡点」）再评估',
+    swEvalEmpty: '棋盘上还没有子 —— 等对手摆完（或先点「平衡点」）再评估',
     swEvalFail: '交换评估失败：', swEvalDone: '交换评估完成（数来自对弈引擎，不是平衡点评估）：',
     swEvalLate: '已过交换窗口（超过 5 手）—— 交换评估只在开局阶段有意义',
   },
@@ -360,8 +356,8 @@ var LBAL = {
     balPreview: 'no circles in browser preview',
     balWon: 'Board already has a winning five (%1) — no balance exists in a won position; these are the engine\'s direct winning points',
 
-    adBtn: 'Auto drop', swBalBtn: 'Swap balance point', swEvalBtn: 'Swap eval',
-    balPointBtn: 'Points', balPointSet: 'Balance point count set to %1 (3 fixed on empty board)',
+    adBtn: 'Auto drop', swBalBtn: 'Balance', swEvalBtn: 'Swap eval',
+    balPointBtn: 'Points', balPointSet: 'Balance point count set to %1',
 
     adOn: 'Auto-drop ON (watching top recommendation)', adOff: 'Auto-drop OFF',
 
@@ -379,25 +375,21 @@ var LBAL = {
     adGiveUp: 'Auto-drop failed 3 rounds, paused (make sure the target window is in the foreground; for custom-drawn/anti-macro windows, click once by hand first)',
     adPtUnreachable: 'Move did not land (is the target window in front?) — will retry when the board changes',
 
-    swBalEmpty: 'Balancing 3-point swap set (1 white + 2 black)…', swBalPair: 'Balancing swap pair (1 white + 1 black)…',
-    swBalMax: 'Swap balance applies only to the 5-move opening (3 + 2); this position is past the exchange phase',
-    swBalStage: 'Swap balance only works on an empty board (2 black + 1 white, 3 points) or after 3 stones (a black-white pair, 2 points); the current move count is outside the swap window',
-    swBalDone: 'Swap balance points marked (light blue=white, light purple=black): ', swPlacing: 'Auto-placing point %1/%2 (',
+    swBalEmpty: 'Balancing on an empty board…', swBalPair: 'Balancing (paired search)…',
+    swBalDone: 'Balance points marked (light blue=white, light purple=black): ', swPlacing: 'Auto-placing point %1/%2 (',
     swBalEval: ' (balance engine verdict: |eval| ≈ %1; only ≤ 50 counts as balanced)',
     swBalEvalNone: ' (balance engine returned no eval)',
     swBalOpenHints: [
-      'Opening is 3 moves - evaluating 3 points is sensible (3 fixed here).',
-      '4+ points leaves the opening; the eval stops being reliable.',
+      'The empty board uses the official 3-move balanced opening; with a smaller Points value only the first points are kept.',
       'Renju / freestyle balance points differ - result holds only for the current rule.',
-      'Taraguchi-10 (5-move opening) allows up to 5.',
       'Tengen is fixed and needs no evaluation.',
     ],
-    swPlaced: 'Swap placement finished (%1 points dropped)',
+    swPlaced: 'Balance placement finished (%1 points dropped)',
     swSwapNow: 'Engine says: SWAP now — skip placing, take the swap',
     swEvaling: 'Evaluating swap…', swEvalBlack: 'Playing engine (NOT the balance verdict): Black is better (%1) — taking Black is advised',
     swEvalWhite: 'Playing engine (NOT the balance verdict): White is better (%1) — taking White is advised', swEvalEven: 'Playing engine (NOT the balance verdict): nearly even (%1) — either side is fine',
     swAdvB: 'Black is better', swAdvW: 'White is better',
-    swEvalEmpty: 'Board is empty — place stones (or run Swap Balance) first',
+    swEvalEmpty: 'Board is empty — place stones (or run Balance) first',
     swEvalFail: 'Swap evaluation failed: ', swEvalDone: 'Swap evaluation (number comes from the playing engine, not the balance verdict): ',
     swEvalLate: 'Swap window has passed (over 5 moves) — swap evaluation only matters in the opening',
   }
@@ -1296,24 +1288,39 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
   var lastOpen4Toast = 0;
   var balLastKey = '';
 
-  var balBaseB = 0, balBaseW = 0, balNeedB = 0, balNeedW = 0;
+  // Coordinates of the stones that were already on the board when the marks were made.
+  // Visibility is derived from the live board, so removing a stone (undo / re-recognition)
+  // brings its mark back instead of losing it forever.
+  var balBaseB = [], balBaseW = [];
   function balSet(cells, sticky, key, colors) {
-    balMarks = cells.map(function (c) { return { x: c[0], y: c[1] }; });
+    balMarks = cells.map(function (c, i) {
+      return { x: c[0], y: c[1], seq: i + 1, color: (colors && colors[i]) || '', hidden: false };
+    });
     balSticky = !!sticky;
     balToggleArmed = false;
     balLastKey = key || '';
-    balBaseB = (lastBl || []).length;
-    balBaseW = (lastWh || []).length;
-    balNeedB = 0; balNeedW = 0;
-    for (var bi = 0; bi < (colors ? colors.length : 0); bi++) {
-      if (colors[bi] === 'b') balNeedB++;
-      else if (colors[bi] === 'w') balNeedW++;
+    balBaseB = (lastBl || []).map(function (p) { return p[0] + ',' + p[1]; });
+    balBaseW = (lastWh || []).map(function (p) { return p[0] + ',' + p[1]; });
+    balRefresh();
+  }
+
+  // Push the currently visible marks to the immune overlay, so each one disappears on its own.
+  function balRefresh() {
+    if (!balSticky || !balMarks.length) { tellHost({ type: 'balance', on: false }); return; }
+    var parts = [];
+    for (var i = 0; i < balMarks.length; i++) {
+      var m = balMarks[i];
+      if (m.hidden) continue;
+      var p = boardToScreen(m.x, m.y);
+      if (p) parts.push(p.x + ',' + p.y + ',' + m.seq + ',' + (m.color || 'b'));
     }
+    if (!parts.length) { tellHost({ type: 'balance', on: false }); return; }
+    tellHost({ type: 'balance', on: true, gap: Math.round(boardGap()), cells: parts.join(';') });
   }
 
   function balOff() {
     balMarks = []; balSticky = false; balToggleArmed = false; balLastKey = '';
-    balBaseB = balBaseW = balNeedB = balNeedW = 0;
+    balBaseB = []; balBaseW = [];
     tellHost({ type: 'balance', on: false });
     swBtnState();
   }
@@ -1321,22 +1328,61 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
   function balOnBoardChanged(newBl, newWh) {
     if (!balMarks.length) return;
     if (!balSticky) { balOff(); return; }
-    var nbNow = newBl ? newBl.length : 0, nwNow = newWh ? newWh.length : 0;
-    var nM = balMarks.length;
+    var bset = {}, wset = {}, bbase = {}, wbase = {}, i, k;
+    for (i = 0; i < (newBl ? newBl.length : 0); i++) bset[newBl[i][0] + ',' + newBl[i][1]] = 1;
+    for (i = 0; i < (newWh ? newWh.length : 0); i++) wset[newWh[i][0] + ',' + newWh[i][1]] = 1;
+    for (i = 0; i < balBaseB.length; i++) bbase[balBaseB[i]] = 1;
+    for (i = 0; i < balBaseW.length; i++) wbase[balBaseW[i]] = 1;
 
-    if (balNeedB + balNeedW > 0 &&
-        (nbNow - balBaseB) >= balNeedB && (nwNow - balBaseW) >= balNeedW) { balOff(); return; }
-    if (nM >= 3) {
-      var tot = nbNow + nwNow;
-      if (tot >= nM) { balOff(); return; }
+    // Stones played since the marks were made. This is derived (never counted down), so an undo
+    // lowers it again; after three stones the balance window is over and the marks are released.
+    var newCnt = 0;
+    for (k in bset) if (!bbase[k]) newCnt++;
+    for (k in wset) if (!wbase[k]) newCnt++;
+    if (newCnt >= 3) { balOff(); return; }
+
+    // Colour match per mark: the matching one hides, the other stays. A wrong-colour stone keeps
+    // its mark (the overlay is topmost so it can never be misread as a stone by the recognizer).
+    for (i = 0; i < balMarks.length; i++) {
+      var m = balMarks[i], key = m.x + ',' + m.y;
+      var v = bset[key] ? 1 : (wset[key] ? 2 : 0);
+      m.hidden = m.color ? (v === (m.color === 'b' ? 1 : 2)) : (v !== 0);
     }
-    var occ = {};
-    for (var i = 0; i < (newBl ? newBl.length : 0); i++) occ[newBl[i][0] + ',' + newBl[i][1]] = 1;
-    for (var j = 0; j < (newWh ? newWh.length : 0); j++) occ[newWh[j][0] + ',' + newWh[j][1]] = 1;
-    var left = balMarks.filter(function (m) { return !occ[m.x + ',' + m.y]; });
-    if (left.length !== balMarks.length) balMarks = left;
-    if (!balMarks.length) balOff();
+    balRefresh();
   }
+
+  // Regression hook (same idea as __gbTacTest): drive the balance-mark lifecycle without a real
+  // board under the recognizer, so the third-stone expiry and the per-colour match can be checked.
+  try {
+    window.__gbBalTest = {
+      set: function (cells, colors, bl, wh, geo) {
+        if (geo) boardGeo = geo;
+        lastBl = bl || []; lastWh = wh || [];
+        balSet(cells, true, 'test', colors || []);
+        return balMarks.length;
+      },
+      board: function (bl, wh) { balOnBoardChanged(bl || [], wh || []); },
+      pos: function (bl, wh, geo) {
+        if (geo) boardGeo = geo;
+        lastBl = bl || []; lastWh = wh || [];
+        return [lastBl.length, lastWh.length];
+      },
+      setN: function (n) {
+        try { return window.GB_LINK_SETBALN ? window.GB_LINK_SETBALN(n) : balPointN; }
+        catch (e) { return balPointN; }
+      },
+      getN: function () { return balPointN; },
+      run: function () { return runSwapBal(); },
+      state: function () {
+        return {
+          sticky: balSticky,
+          marks: balMarks.map(function (m) {
+            return { x: m.x, y: m.y, seq: m.seq, c: m.color, hidden: !!m.hidden };
+          }),
+        };
+      },
+    };
+  } catch (e) {}
 
   var adOn = false, adCount = 1, adWaiting = false, adFail = 0, adTimer = null;
 
@@ -1486,7 +1532,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
   var swQueue = null, swIdx = 0;
   var pendingBal = null;
   var balPointN = 2;
-  try { var _bpn = parseInt(localStorage.getItem('gb_bal_point_n') || '2', 10); if (_bpn >= 1 && _bpn <= 6) balPointN = _bpn; } catch (e) {}
+  try { var _bpn = parseInt(localStorage.getItem('gb_bal_point_n') || '2', 10); if (_bpn >= 1 && _bpn <= 3) balPointN = _bpn; } catch (e) {}
   var swBusy = false, swEvalBusy = false;
   var swGen = 0;
   function swapCancel() {
@@ -1520,11 +1566,15 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     if (!p) { swQueue = null; return; }
     adWaiting = true;
 
-    adRetryUsed = adRealOnly() || (adStage >= 1);
+    // Stage escalation: 0 = PostMessage, 1 = SendInput, 2 = real mouse click. The previous
+    // implementation assigned adStage from a hoisted (still undefined) variable, which froze
+    // the queue at stage 0; compute the stage first and then store it.
+    var wantStage = (typeof adStage === 'number' && !isNaN(adStage)) ? adStage : 0;
+    adStage = adRealOnly() ? 2 : Math.min(1, wantStage);
+    var stg = adStage;
+    adRetryUsed = adRealOnly() || (stg >= 1);
     adArmTimeout();
 
-    adStage = stg;
-    var stg = adRealOnly() ? 2 : Math.min(1, adStage);
     tellHost({ type: 'autodrop', on: true, x: p.x, y: p.y, count: adCount,
                force: stg >= 1, real: stg >= 2 });
     ui('setStatus', '<span style="color:#0e7490">' +
@@ -1537,11 +1587,6 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
 
     if (!boardGeo) { ui('setStatus', '<span style="color:#e67e22;">' + T('no_board') + '</span>'); return; }
 
-    var swPly = lastBl.length + lastWh.length;
-    if (swPly !== 0 && swPly !== 3) {
-      ui('setStatus', swTipCol(LT('swBalStage'), '#e67e22'));
-      return;
-    }
     swBusy = true;
     var swGen0 = swGen;
     var swDead = function () { return swGen0 !== swGen; };
@@ -1551,6 +1596,9 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     balOff();
     var empty = (lastBl.length + lastWh.length === 0);
     var toBlack = lastBl.length <= lastWh.length;
+    // Target number of balance points (1..3). The search is no longer tied to the swap opening:
+    // it runs on any position, which is also what auto-drop needs.
+    var need = Math.max(1, Math.min(3, balPointN | 0));
 
     var budget = Math.max(1500, Math.min(SWBAL_BUDGET_MS, Math.round((S.turnMs || 5000) * 1.5)));
 
@@ -1713,7 +1761,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
           return best;
         };
         balFromEngine = marks.length;
-        while (marks.length < 3) {
+        while (marks.length < need) {
           var fp = firstFreeInZone(b2, R2, marks);
           if (!fp) break;
           var fc = colors[marks.length - 1];
@@ -1722,36 +1770,65 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         }
         }
       } else {
-
-        var pairMs = Math.max(400, Math.min(turnMs, leftMs() - 300));
-        var pairBody = {
-          board: boardMatrix(lastBl, lastWh), moveList: [], n: 1, mode: 'two', bias: 0,
-          rule: rule, turnMs: pairMs, lane: 'main',
-          cid: 'desktop-swbal2-' + (lastBl.length + lastWh.length),
-          side: toBlack ? 1 : 2,
-        };
-        var j1 = null;
-        try {
-
-          j1 = await onMainLane(function () {
-            return wsCall('balance', pairBody, pairMs + 6000);
-          });
-        } catch (ePair) { j1 = null; }
-        if (swDead()) return;
-        if (!j1 || j1.error) {
-          ui('setStatus', '<span style="color:#c0392b">' + LT('balFail') + ((j1 && j1.error) || 'no response') + '</span>');
+        // Native YXBALANCETWO paired search on the live position. One call yields up to two
+        // consecutive points with alternating colours; repeat on the augmented board until the
+        // requested count (1..3) is reached. This works on any move number, not just the swap opening.
+        var b2 = boardMatrix(lastBl, lastWh);
+        var firstColor = toBlack ? 'b' : 'w';
+        var pairErr = '';
+        var pairRound = 0;
+        while (marks.length < need) {
+          if (leftMs() < 500) break;
+          var colorNow = ((marks.length % 2) === 0)
+            ? firstColor
+            : (firstColor === 'b' ? 'w' : 'b');
+          var ms = Math.max(400, Math.min(turnMs, leftMs() - 400));
+          var pairBody = {
+            board: b2, moveList: [], n: 1, mode: 'two', bias: 0,
+            rule: rule, turnMs: ms, lane: 'main',
+            cid: 'desktop-swbal2-' + (lastBl.length + lastWh.length) + '-' + pairRound,
+            side: (colorNow === 'b') ? 1 : 2,
+          };
+          var jj = null;
+          try {
+            jj = await onMainLane(function () {
+              return wsCall('balance', pairBody, ms + 6000);
+            });
+          } catch (ePair) { jj = null; }
+          if (swDead()) return;
+          if (!jj || jj.error) { pairErr = (jj && jj.error) || 'no response'; break; }
+          if (jj.swap) { ui('setStatus', '<b style="color:#7c3aed">' + LT('swSwapNow') + '</b>'); return; }
+          if (jj.eval != null && balEv == null) balEv = jj.eval;
+          var got = (jj.moves || []).slice(0, 2);
+          if (!got.length) break;
+          for (var gi = 0; gi < got.length && marks.length < need; gi++) {
+            var gpt = got[gi];
+            if (!gpt || gpt[0] < 0 || gpt[0] >= N || gpt[1] < 0 || gpt[1] >= N) continue;
+            if (b2[gpt[1]][gpt[0]] !== 0) continue;
+            var gc = ((marks.length % 2) === 0)
+              ? firstColor
+              : (firstColor === 'b' ? 'w' : 'b');
+            marks.push({ p: [gpt[0], gpt[1]], color: gc });
+            b2[gpt[1]][gpt[0]] = (gc === 'b') ? 1 : 2;
+            balFromEngine = marks.length;
+          }
+          if (got.length < 2) break;
+          pairRound++;
+        }
+        if (!marks.length) {
+          ui('setStatus', '<span style="color:#c0392b">' +
+            (pairErr ? (LT('balFail') + pairErr) : LT('balNone')) + '</span>');
           return;
         }
-        if (j1.swap) { ui('setStatus', '<b style="color:#7c3aed">' + LT('swSwapNow') + '</b>'); return; }
-        if (j1.eval != null) balEv = j1.eval;
-        var pts1 = (j1.moves || []).slice(0, 2);
-        if (pts1.length < 2) { ui('setStatus', '<span style="color:#c0392b">' + LT('balNone') + '</span>'); return; }
-        marks.push({ p: pts1[0], color: toBlack ? 'b' : 'w' });
-        marks.push({ p: pts1[1], color: toBlack ? 'w' : 'b' });
-        balFromEngine = 2;
       }
 
-      if (balEv == null && marks.length === 3 && leftMs() >= 900) {
+      // A fixed three-stone opening is returned by the official tables; honour a smaller request.
+      if (marks.length > need) {
+        marks.length = need;
+        if (balFromEngine > need) balFromEngine = need;
+      }
+
+      if (balEv == null && marks.length >= 1 && leftMs() >= 900) {
         try {
           var b3 = boardMatrix(lastBl, lastWh);
           for (var mi = 0; mi < marks.length; mi++) {
@@ -1784,10 +1861,6 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         balOff();
         return;
       }
-      if (parts.length && HOST) {
-        tellHost({ type: 'balance', on: true, gap: Math.round(boardGap()), cells: parts.join(';') });
-      }
-
       balSet(marks.map(function (m) { return [m.p[0], m.p[1]]; }), true,
              'swap' + (empty ? '-empty' : '-pair'),
              marks.map(function (m) { return m.color; }));
@@ -1940,7 +2013,9 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
         resetForEmpty();
         postGuide(false);
         tellHost({ type: 'heat', on: false });
-        balOff();
+        // Balance marks are NOT dropped on a single failed scan: a shaky frame must not end the
+        // three-stone window earlier than the board itself would. They are re-derived on the next
+        // good board and released by the normal rules (offline() still clears them).
       }
       ui('setStatus', T('no_board'));
       return;
@@ -2258,17 +2333,29 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     var bp = document.getElementById('__gb_balpoint');
     if (bp && bp.tagName === 'SELECT') bp.value = String(balPointN);
     else if (bp) bp.textContent = '×' + balPointN;
+    // The link pane shows the target as a button: Points (N) / Pts (N).
     var lb = document.getElementById('lk_baln');
     if (lb && lb.tagName === 'SELECT') lb.value = String(balPointN);
-    else if (lb) lb.textContent = '×' + balPointN;
+    else if (lb) lb.textContent = (S.lang === 'en') ? ('Pts (' + balPointN + ')') : ('点数（' + balPointN + '）');
     var mb = document.getElementById('btn_an_baln');
     if (mb && mb.tagName === 'SELECT') mb.value = String(balPointN);
     else if (mb) mb.textContent = '×' + balPointN;
   }
+  // Called by the link pane's Points button. Keeping the clamp here means the value can never
+  // drift out of the 1..3 range the balance search supports.
+  window.GB_LINK_SETBALN = function (n) {
+    n = parseInt(n, 10);
+    if (isNaN(n) || n < 1 || n > 3) return balPointN;
+    balPointN = n;
+    try { localStorage.setItem('gb_bal_point_n', String(balPointN)); } catch (e) {}
+    balPointSync();
+    return balPointN;
+  };
+  window.GB_LINK_GETBALN = function () { return balPointN; };
   on('__gb_balpoint', 'change', function () {
     var el = document.getElementById('__gb_balpoint');
     var v = parseInt(el ? el.value : '2', 10);
-    if (!isNaN(v) && v >= 1 && v <= 6) balPointN = v;
+    if (!isNaN(v) && v >= 1 && v <= 3) balPointN = v;
     try { localStorage.setItem('gb_bal_point_n', String(balPointN)); } catch (e) {}
     balPointSync();
     ui('setStatus', '<b style="color:#0e7490">' + LT('balPointSet').replace('%1', balPointN) + '</b>');
@@ -2298,6 +2385,7 @@ function LT(k) { var d = LBAL[S.lang === 'en' ? 'en' : 'zh'] || LBAL.zh; return 
     if (b) b.textContent = LT('adBtn');
     if (s1) s1.textContent = LT('swBalBtn');
     if (s2) s2.textContent = LT('swEvalBtn');
+    balPointSync();
   }
 
   function posBtnOn(on) {
